@@ -13,13 +13,21 @@ import {
   ScrollView,
 } from 'react-native';
 
-import { useFinance, User } from '../../src/core/context/FinanceContext';
-import { Transaction } from '../../src/core/financeEngine';
+import { useFinance } from '../../src/state';
+import { User, Transaction, AuthState } from '../../src/types';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 
 // Import screens
 import { Dashboard } from '../../src/screens/Dashboard';
+// TODO: Import remaining screens from new structure
+// import { Ingresos } from '../../src/screens/Ingresos';
+// import { Gastos } from '../../src/screens/Gastos';
+// import { Categorias } from '../../src/screens/Categorias';
+// import { Estadisticas } from '../../src/screens/Estadisticas';
+// import { BotIA } from '../../src/screens/BotIA';
+// import { Usuario } from '../../src/screens/Usuario';
+// Import legacy screens temporarily
 import { Ingresos } from '../../src/screens/Ingresos';
 import { Gastos } from '../../src/screens/Gastos';
 import { Categorias } from '../../src/screens/Categorias';
@@ -29,8 +37,6 @@ import { Usuario } from '../../src/screens/Usuario';
 import { Navigation, type ScreenName } from '../../src/screens/Navigation';
 import { SelectCategoriesMobile } from '../../src/screens/SelectCategoriesMobile';
 import OnboardingTutorial from '../../src/screens/OnboardingTutorial';
-
-type AuthState = 'login' | 'register' | 'authenticated';
 
 export default function HomeScreen() {
   const { setUser, user, isOnboarded, setIsOnboarded } = useFinance();
@@ -350,7 +356,7 @@ export default function HomeScreen() {
         )}
       </View>
 
-      <ScrollView style={styles.screenContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.screenContent}>
         {currentScreen === 'dashboard' && (
           <Dashboard
             transactions={transactions}
@@ -382,7 +388,7 @@ export default function HomeScreen() {
         {currentScreen === 'perfil' && (
           <Usuario onLogout={handleLogout} />
         )}
-      </ScrollView>
+      </View>
 
       <Navigation
         currentScreen={currentScreen}
@@ -522,6 +528,7 @@ const styles = StyleSheet.create({
   screenContent: {
     flex: 1,
     paddingBottom: 80,
+    overflow: 'hidden',
   },
   dummyBackground: {
     flex: 1,

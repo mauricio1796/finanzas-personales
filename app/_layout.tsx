@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { FinanceProvider } from '@/src/core/context/FinanceContext';
+import { FinanceProvider } from '@/src/state';
 
 export const unstable_settings = {
   anchor: '(tabs)',
