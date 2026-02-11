@@ -4,8 +4,9 @@ export interface Transaction {
   id: string;
   amount: number;
   category: string;
-  date: Date;
+  date: string;
   type: "income" | "expense";
+  description?: string;
 }
 export function calculateTotalIncome(
   transactions: Transaction[]
