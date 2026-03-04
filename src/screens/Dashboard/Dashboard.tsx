@@ -84,7 +84,7 @@ export function Dashboard({ transactions, monthlySalary, onNavigateToSection }: 
   }, [transactions]);
 
   const StatCard = ({ label, value, color, subtext }: { label: string; value: string; color: string; subtext?: string }) => (
-    <ThemedView style={[styles.statCard, { borderLeftColor: color, borderLeftWidth: 4 }]}>
+    <ThemedView style={[styles.statCard, { borderLeftColor: color, borderLeftWidth: 3, backgroundColor: '#23272f' }]}> 
       <ThemedText style={styles.statLabel}>{label}</ThemedText>
       <ThemedText style={[styles.statValue, { color }]}>{value}</ThemedText>
       {subtext && <ThemedText style={styles.statSubtext}>{subtext}</ThemedText>}
@@ -110,10 +110,10 @@ export function Dashboard({ transactions, monthlySalary, onNavigateToSection }: 
       <ThemedView style={[
         styles.budgetCard,
         isOverBudget && styles.budgetCardOverflow,
-        { borderLeftColor: category.color, borderLeftWidth: 4 }
+        { borderLeftColor: '#444', borderLeftWidth: 3, backgroundColor: '#23272f' }
       ]}>
         <View style={styles.budgetHeader}>
-          <ThemedText style={styles.budgetIcon}>{category.icon}</ThemedText>
+          {/* Sin icono, solo nombre y valores */}
           <View style={styles.budgetInfo}>
             <ThemedText style={styles.budgetName}>{category.name}</ThemedText>
             <ThemedText style={styles.budgetAmount}>
@@ -127,14 +127,14 @@ export function Dashboard({ transactions, monthlySalary, onNavigateToSection }: 
               styles.progressFill,
               {
                 width: `${Math.min(percentage, 100)}%`,
-                backgroundColor: isOverBudget ? '#ef4444' : '#22c55e',
+                backgroundColor: isOverBudget ? '#b91c1c' : '#2563eb',
               },
             ]}
           />
         </View>
         {isOverBudget && (
           <ThemedText style={styles.overBudgetText}>
-            ⚠️ Excedido por ${(spent - budget).toFixed(2)}
+            Excedido por ${(spent - budget).toFixed(2)}
           </ThemedText>
         )}
       </ThemedView>
@@ -145,49 +145,49 @@ export function Dashboard({ transactions, monthlySalary, onNavigateToSection }: 
     <FlatList
       data={selectedCategories}
       keyExtractor={item => item.id}
-      contentContainerStyle={[styles.container, { paddingHorizontal: isSmallScreen ? 16 : 24 }]}
+      contentContainerStyle={[styles.container, { paddingHorizontal: isSmallScreen ? 16 : 24, backgroundColor: '#181a20' }]}
       renderItem={({ item }) => {
         const catStats = categoryStats[item.id];
         return <BudgetCard category={item} stats={catStats || { spent: 0, budget: item.budget }} />;
       }}
       ListHeaderComponent={
         <View style={styles.headerSection}>
-          <ThemedText style={styles.title}>Dashboard</ThemedText>
+          <ThemedText style={[styles.title, { color: '#e5e7eb', fontFamily: 'System', fontWeight: '700' }]}>Resumen Financiero</ThemedText>
           <View style={styles.stats}>
             <StatCard
               label="Saldo"
               value={`$${stats.balance.toFixed(2)}`}
-              color={stats.balance >= 0 ? '#22c55e' : '#ef4444'}
+              color={stats.balance >= 0 ? '#2563eb' : '#b91c1c'}
               subtext={`${stats.savingsPercentage.toFixed(1)}% del salario`}
             />
             <StatCard
               label="Ingresos"
               value={`$${stats.income.toFixed(2)}`}
-              color="#3b82f6"
+              color="#2563eb"
             />
             <StatCard
               label="Gastos"
               value={`$${stats.expenses.toFixed(2)}`}
-              color="#f59e0b"
+              color="#b91c1c"
             />
           </View>
           {chartData.length > 0 && (
             <View style={styles.chartSection}>
-              <ThemedText style={styles.chartTitle}>Distribución de Gastos</ThemedText>
+              <ThemedText style={[styles.chartTitle, { color: '#e5e7eb' }]}>Distribución de Gastos</ThemedText>
               <FinanceDonutChart data={chartData} />
             </View>
           )}
           <View style={styles.quickAccessSection}>
             <QuickAccessButton
-              label="+ Ingreso"
+              label="Agregar Ingreso"
               onPress={() => onNavigateToSection('ingresos')}
             />
             <QuickAccessButton
-              label="- Gasto"
+              label="Agregar Gasto"
               onPress={() => onNavigateToSection('gastos')}
             />
           </View>
-          <ThemedText style={styles.budgetsTitle}>Presupuestos por Categoría</ThemedText>
+          <ThemedText style={[styles.budgetsTitle, { color: '#e5e7eb' }]}>Presupuestos por Categoría</ThemedText>
         </View>
       }
     />
@@ -197,14 +197,18 @@ export function Dashboard({ transactions, monthlySalary, onNavigateToSection }: 
 const styles = StyleSheet.create({
   container: {
     paddingVertical: 16,
+    backgroundColor: '#181a20',
   },
   headerSection: {
     marginBottom: 24,
+    backgroundColor: '#181a20',
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 16,
+    color: '#e5e7eb',
+    fontFamily: 'System',
   },
   stats: {
     gap: 12,
@@ -214,59 +218,90 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 8,
+    backgroundColor: '#23272f',
+    borderLeftWidth: 3,
+    borderLeftColor: '#2563eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   statLabel: {
     fontSize: 12,
     opacity: 0.7,
     marginBottom: 4,
+    color: '#a1a1aa',
+    fontFamily: 'System',
   },
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
+    color: '#e5e7eb',
+    fontFamily: 'System',
   },
   statSubtext: {
     fontSize: 12,
     opacity: 0.6,
     marginTop: 4,
+    color: '#a1a1aa',
+    fontFamily: 'System',
   },
   chartSection: {
     alignItems: 'center',
     marginBottom: 24,
+    backgroundColor: '#181a20',
   },
   chartTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 16,
+    color: '#e5e7eb',
+    fontFamily: 'System',
   },
   quickAccessSection: {
     flexDirection: 'row',
     gap: 12,
     marginBottom: 24,
+    backgroundColor: '#181a20',
   },
   quickAccessButton: {
     flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#23272f',
     borderRadius: 8,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#444',
   },
   quickAccessButtonText: {
-    color: '#fff',
+    color: '#e5e7eb',
     fontWeight: '600',
+    fontFamily: 'System',
   },
   budgetsTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
+    color: '#e5e7eb',
+    fontFamily: 'System',
   },
   budgetCard: {
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
+    backgroundColor: '#23272f',
+    borderLeftWidth: 3,
+    borderLeftColor: '#444',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
   },
   budgetCardOverflow: {
     opacity: 0.7,
+    borderColor: '#b91c1c',
+    borderWidth: 1,
   },
   budgetHeader: {
     flexDirection: 'row',
@@ -274,8 +309,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   budgetIcon: {
-    fontSize: 24,
-    marginRight: 12,
+    display: 'none',
   },
   budgetInfo: {
     flex: 1,
@@ -283,15 +317,19 @@ const styles = StyleSheet.create({
   budgetName: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#e5e7eb',
+    fontFamily: 'System',
   },
   budgetAmount: {
     fontSize: 12,
     opacity: 0.6,
+    color: '#a1a1aa',
+    fontFamily: 'System',
   },
   progressBar: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#353945',
     overflow: 'hidden',
   },
   progressFill: {
@@ -300,8 +338,9 @@ const styles = StyleSheet.create({
   },
   overBudgetText: {
     fontSize: 12,
-    color: '#ef4444',
+    color: '#b91c1c',
     marginTop: 6,
     fontWeight: '600',
+    fontFamily: 'System',
   },
 });

@@ -35,11 +35,11 @@ import { Estadisticas } from '../../src/screens/Estadisticas';
 import { BotIA } from '../../src/screens/BotIA';
 import { Usuario } from '../../src/screens/Usuario';
 import { Navigation, type ScreenName } from '../../src/screens/Navigation';
-import { SelectCategoriesMobile } from '../../src/screens/SelectCategoriesMobile';
+import { OnboardingWelcome, OnboardingProfile, OnboardingGoal, OnboardingBudget, OnboardingConfirm, OnboardingDashboardOverlay } from '../../src/screens/Onboarding';
 import OnboardingTutorial from '../../src/screens/OnboardingTutorial';
 
 export default function HomeScreen() {
-  const { setUser, user, isOnboarded, setIsOnboarded } = useFinance();
+  const { setUser, user, isOnboarded, setIsOnboarded, onboardingState } = useFinance();
 
   // ==================== AUTH STATE ====================
   const [authState, setAuthState] = useState<AuthState>('login');
@@ -55,6 +55,22 @@ export default function HomeScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('dashboard');
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showOnboardingOverlay, setShowOnboardingOverlay] = useState(true);
+  // Botón de reset onboarding (solo desarrollo)
+  const handleResetOnboarding = async () => {
+    if (window.confirm && !window.confirm('¿Seguro que quieres reiniciar el onboarding?')) return;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.clear();
+    }
+    if (typeof global !== 'undefined' && global.localStorage) {
+      global.localStorage.clear();
+    }
+    // if (typeof AsyncStorage !== 'undefined') {
+    //   try { await AsyncStorage.clear(); } catch {}
+    // }
+    if (setIsOnboarded) setIsOnboarded(false);
+    window.location.reload();
+  };
 
   // ==================== ANIMATIONS ====================
   const authAnim = useRef(new Animated.Value(0)).current;
@@ -149,10 +165,7 @@ export default function HomeScreen() {
     setCurrentScreen(section as ScreenName);
   };
 
-  const handleCategoriesSelected = async (selectedIds: string[]) => {
-    await setIsOnboarded(true);
-    setCurrentScreen('dashboard');
-  };
+  // handleCategoriesSelected removed (unused)
 
   // ==================== LOGIN SCREEN ====================
   if (!user) {
@@ -330,10 +343,36 @@ export default function HomeScreen() {
     );
   }
 
+  // FLUJO DE ONBOARDING MULTIPANTALLA usando contexto global
+  const onboardingStep = onboardingState?.step ?? 0;
   if (!isOnboarded) {
-    return (
-      <SelectCategoriesMobile onComplete={handleCategoriesSelected} />
-    );
+    switch (onboardingStep) {
+      case 0:
+        return <OnboardingWelcome />;
+      case 1:
+        return <OnboardingProfile />;
+      case 2:
+        return <OnboardingGoal />;
+      case 3:
+        return <OnboardingBudget />;
+      case 4:
+        return <OnboardingConfirm />;
+      case 5:
+        // Dashboard como paso final del onboarding
+        return (
+          <>
+            <View style={styles.dashboardOnboardingContainer}>
+              <Dashboard transactions={transactions} monthlySalary={user?.monthlySalary || 0} onNavigateToSection={() => {}} />
+            </View>
+            <OnboardingDashboardOverlay
+              visible={showOnboardingOverlay}
+              onComplete={() => setShowOnboardingOverlay(false)}
+            />
+          </>
+        );
+      default:
+        return <OnboardingWelcome />;
+    }
   }
 
   // ==================== MOBILE DASHBOARD ====================
@@ -344,18 +383,20 @@ export default function HomeScreen() {
           {currentScreen === 'dashboard' && '📊 Dashboard'}
           {currentScreen === 'ingresos' && '📈 Ingresos'}
           {currentScreen === 'gastos' && '💸 Gastos'}
-          {currentScreen === 'categorias' && '🏷️ Categorías'}
+          {currentScreen === 'categorias' && '🗂️ Categorías'}
           {currentScreen === 'estadisticas' && '📉 Estadísticas'}
           {currentScreen === 'bot' && '🤖 Asistente IA'}
-          {currentScreen === 'perfil' && '👤 Mi Perfil'}
+          {currentScreen === 'perfil' && '👤 Perfil'}
         </ThemedText>
-        {currentScreen !== 'perfil' && (
-          <Pressable onPress={handleLogout} style={styles.logoutBtn}>
-            <ThemedText style={styles.logoutBtnText}>Salir</ThemedText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Pressable style={styles.logoutBtn} onPress={handleLogout}>
+            <ThemedText style={styles.logoutBtnText}>Cerrar sesión</ThemedText>
           </Pressable>
-        )}
+          <Pressable style={[styles.logoutBtn, { backgroundColor: '#e0e7ff' }]} onPress={handleResetOnboarding}>
+            <ThemedText style={[styles.logoutBtnText, { color: '#3730a3' }]}>Reset Onboarding</ThemedText>
+          </Pressable>
+        </View>
       </View>
-
       <View style={styles.screenContent}>
         {currentScreen === 'dashboard' && (
           <Dashboard
@@ -389,7 +430,6 @@ export default function HomeScreen() {
           <Usuario onLogout={handleLogout} />
         )}
       </View>
-
       <Navigation
         currentScreen={currentScreen}
         onScreenChange={setCurrentScreen}
@@ -533,5 +573,8 @@ const styles = StyleSheet.create({
   dummyBackground: {
     flex: 1,
     backgroundColor: '#f9fafb',
+  },
+  dashboardOnboardingContainer: {
+    flex: 1,
   },
 });

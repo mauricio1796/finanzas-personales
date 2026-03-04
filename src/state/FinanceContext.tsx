@@ -62,7 +62,7 @@ interface FinanceContextType {
   refreshData: () => void;
 }
 
-const FinanceContext = createContext<FinanceContextType | null>(null);
+export const FinanceContext = createContext<FinanceContextType | null>(null);
 
 interface FinanceProviderProps {
   children: ReactNode;
@@ -73,29 +73,52 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
   const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isOnboarded, setIsOnboarded] = useState(false);
-  
   // NEW: Financial Profile
   const [profile, setProfile] = useState<FinancialProfile | null>(null);
-  
   // NEW: Financial Goal
   const [goal, setGoal] = useState<FinancialGoal | null>(null);
-  
   // NEW: Budgets
   const [budgets, setBudgets] = useState<Budget[]>([]);
-  
   // NEW: Achievements
   const [achievements, setAchievements] = useState<Achievement[]>([]);
-  
   // NEW: User Level (1-5)
   const [userLevel, setUserLevel] = useState<UserLevel | null>(null);
-  
   // NEW: Onboarding State
   const [onboardingState, setOnboardingState] = useState<OnboardingState>({
+    completed: false,
     step: 0,
     profileCompleted: false,
     goalSelected: false,
     budgetCreated: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   });
+
+  // Sincroniza datos de onboarding con user y categorías cuando cambian profile o budgets
+  useEffect(() => {
+    if (profile && user) {
+      if (profile.monthlySalary && user.monthlySalary !== profile.monthlySalary) {
+        setUser(u => u ? { ...u, monthlySalary: profile.monthlySalary } : u);
+      }
+    }
+  }, [profile, user]);
+
+  useEffect(() => {
+    if (budgets && budgets.length > 0 && categories && categories.length > 0) {
+      let shouldUpdate = false;
+      const updatedCategories = categories.map(cat => {
+        const found = budgets.find(b => b.categoryId === cat.id);
+        if (found && cat.budget !== found.monthlyLimit) {
+          shouldUpdate = true;
+          return { ...cat, budget: found.monthlyLimit };
+        }
+        return cat;
+      });
+      if (shouldUpdate) {
+        setCategories(updatedCategories);
+      }
+    }
+  }, [budgets, categories]);
 
   // Load onboarding state on mount
   useEffect(() => {
