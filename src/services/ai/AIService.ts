@@ -19,46 +19,86 @@ class AIService {
   generateDailyInsight(
     transactions: Transaction[],
     profile: FinancialProfile,
-    monthlyBudget: number
+    monthlyBudget: number,
+    categories?: any[]
   ): AIRecommendation {
-    const today = new Date().toISOString().split('T')[0];
-    const todayTransactions = transactions.filter(t => t.date.startsWith(today) && t.type === 'expense');
-    
-    const todaySpent = todayTransactions.reduce((sum, t) => sum + t.amount, 0);
-    const avgDaily = monthlyBudget / 30;
+    const cats = categories || [];
+    const hoy = new Date().getDate();
+    const fCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
+    const vencidos = cats.filter((c: any) => c.tipo && c.diaPago && c.diaPago < hoy && !c.pagado);
+    const venceHoy = cats.filter((c: any) => c.tipo && c.diaPago === hoy && !c.pagado);
+    const vence3d  = cats.filter((c: any) => c.tipo && !c.pagado && c.diaPago && c.diaPago > hoy && c.diaPago <= hoy + 3);
+    const pagados  = cats.filter((c: any) => c.tipo && c.pagado);
+    const pendienteTotal = cats.filter((c: any) => c.tipo && !c.pagado).reduce((s: number, c: any) => s + (c.presupuesto || 0), 0);
 
-    if (todaySpent > avgDaily * 1.5) {
+    if (vencidos.length > 0) {
       return {
-        id: `insight-${Date.now()}`,
+        id: 'insight-' + Date.now(),
         type: 'warning',
-        title: '⚠️ Gasto alto hoy',
-        message: `Hoy has gastado ${todaySpent.toFixed(0)}. Tu promedio diario es ${avgDaily.toFixed(0)}. Considera reducir gastos.`,
+        title: 'Pagos vencidos',
+        message: 'Tienes ' + vencidos.length + ' pago(s) vencido(s): ' + vencidos.map((c: any) => c.name).join(', ') + '. Registralos cuanto antes.',
         urgency: 'high',
         timestamp: new Date().toISOString(),
       };
     }
-
-    if (todaySpent < avgDaily * 0.5) {
+    if (venceHoy.length > 0) {
+      const nombres = venceHoy.map((c: any) => c.name).join(' y ');
       return {
-        id: `insight-${Date.now()}`,
+        id: 'insight-' + Date.now(),
+        type: 'warning',
+        title: 'Pago hoy',
+        message: 'Hoy vence: ' + nombres + '. No lo dejes para despues.',
+        urgency: 'high',
+        timestamp: new Date().toISOString(),
+      };
+    }
+    if (vence3d.length > 0) {
+      const cat = vence3d[0];
+      return {
+        id: 'insight-' + Date.now(),
+        type: 'insight',
+        title: 'Pago proximo',
+        message: cat.name + ' vence en ' + (cat.diaPago - hoy) + ' dias. Asegurate de tener ' + fCOP(cat.presupuesto || 0) + ' disponibles.',
+        urgency: 'medium',
+        timestamp: new Date().toISOString(),
+      };
+    }
+    if (cats.length > 0 && pagados.length === cats.filter((c: any) => c.tipo).length) {
+      return {
+        id: 'insight-' + Date.now(),
         type: 'celebration',
-        title: '🎉 ¡Muy bien!',
-        message: `Vas por buen camino. Hoy gastaste menos de lo esperado.`,
+        title: 'Mes al dia',
+        message: 'Todos tus compromisos del mes estan pagados. Excelente gestion!',
         urgency: 'low',
         timestamp: new Date().toISOString(),
       };
     }
-
+    if (pendienteTotal > 0) {
+      return {
+        id: 'insight-' + Date.now(),
+        type: 'insight',
+        title: 'Compromisos pendientes',
+        message: 'Te quedan ' + fCOP(pendienteTotal) + ' por pagar este mes en ' + cats.filter((c: any) => c.tipo && !c.pagado).length + ' compromiso(s).',
+        urgency: 'low',
+        timestamp: new Date().toISOString(),
+      };
+    }
+    // Fallback to transaction-based insight
+    const today = new Date().toISOString().split('T')[0];
+    const todayTxs = transactions.filter(t => t.date.startsWith(today) && t.type === 'expense');
+    const todaySpent = todayTxs.reduce((sum, t) => sum + t.amount, 0);
+    const avgDaily = monthlyBudget / 30;
     return {
-      id: `insight-${Date.now()}`,
-      type: 'insight',
-      title: '📊 Seguimiento diario',
-      message: `Llevas ${todaySpent.toFixed(0)} gastados hoy. Vas en línea con tu presupuesto.`,
-      urgency: 'low',
+      id: 'insight-' + Date.now(),
+      type: todaySpent > avgDaily * 1.5 ? 'warning' : 'insight',
+      title: todaySpent > avgDaily * 1.5 ? 'Gasto alto hoy' : 'Seguimiento diario',
+      message: todaySpent > avgDaily * 1.5
+        ? 'Hoy gastaste ' + fCOP(todaySpent) + '. Tu promedio diario es ' + fCOP(avgDaily) + '.'
+        : 'Registra tus compromisos de pago para que Finn te ayude a organizarte.',
+      urgency: todaySpent > avgDaily * 1.5 ? 'high' : 'low',
       timestamp: new Date().toISOString(),
     };
   }
-
   /**
    * Analiza progreso hacia objetivo financiero
    */
@@ -263,6 +303,41 @@ class AIService {
 
     return { level, title, nextLevelProgress };
   }
+  analyzePago(
+    compromiso: any,
+    montoPagado: number,
+    fechaPago: Date,
+    ingresoMensual: number,
+    totalComprometidoMes: number
+  ): string {
+    const diferencia = montoPagado - (compromiso.presupuesto || 0);
+    const diaPago = compromiso.diaPago || 1;
+    const diasRetraso = fechaPago.getDate() - diaPago;
+    const pct = ingresoMensual > 0 ? ((compromiso.presupuesto || 0) / ingresoMensual) * 100 : 0;
+    const fCOP = (n: number) => '$' + Math.round(Math.abs(n)).toLocaleString('es-CO').replace(/,/g, '.');
+    const pendiente = totalComprometidoMes - (compromiso.presupuesto || 0);
+    let msg = '';
+    if (diasRetraso > 3) {
+      msg += 'Registrado con ' + diasRetraso + ' dias de retraso. ';
+      if (diasRetraso > 7) msg += 'Los pagos tardios pueden generar recargos. ';
+    } else {
+      msg += 'Pagado a tiempo. ';
+    }
+    if (diferencia > 0) {
+      msg += 'Pagaste ' + fCOP(diferencia) + ' mas de lo presupuestado. Considera actualizar el monto. ';
+    } else if (diferencia < 0) {
+      msg += 'Pagaste ' + fCOP(diferencia) + ' menos del presupuesto. ';
+    }
+    if (pct > 35) {
+      msg += compromiso.name + ' representa el ' + pct.toFixed(0) + '% de tu ingreso. ';
+    }
+    if (pendiente > 0) {
+      msg += 'Aun tienes ' + fCOP(pendiente) + ' en otros compromisos este mes.';
+    } else {
+      msg += 'Todos tus compromisos del mes estan al dia!';
+    }
+    return msg.trim();
+  }
 }
 
-export const aiService = new AIService();
+export const aiService = new AIService();

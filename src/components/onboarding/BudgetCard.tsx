@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SPACING } from '../../constants';
+import { useTheme } from '../../state/ThemeContext';
+import { SPACING } from '../../constants';
 
 interface BudgetItem {
   category: string;
@@ -20,36 +21,29 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({
   totalBudget,
   title = 'Distribución Presupuestaria',
 }) => {
+  const { colors } = useTheme();
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.glass_bg, borderColor: colors.glass_border }]}>
       <Text style={styles.title}>{title}</Text>
 
-      {/* Visual Distribution */}
       <View style={styles.distributionRow}>
         {items.map((item, index) => (
           <View
             key={index}
             style={[
               styles.distributionBar,
-              {
-                flex: item.percentage,
-                backgroundColor: item.color,
-              },
+              { flex: item.percentage, backgroundColor: item.color },
+              index === 0 && styles.barFirst,
+              index === items.length - 1 && styles.barLast,
             ]}
           />
         ))}
       </View>
 
-      {/* Legend */}
       <View style={styles.legend}>
         {items.map((item, index) => (
           <View key={index} style={styles.legendItem}>
-            <View
-              style={[
-                styles.legendColor,
-                { backgroundColor: item.color },
-              ]}
-            />
+            <View style={[styles.legendColor, { backgroundColor: item.color }]} />
             <View style={styles.legendContent}>
               <Text style={styles.categoryName}>{item.category}</Text>
               <Text style={styles.categoryAmount}>
@@ -60,12 +54,9 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({
         ))}
       </View>
 
-      {/* Total */}
       <View style={styles.totalContainer}>
         <Text style={styles.totalLabel}>Presupuesto Total</Text>
-        <Text style={styles.totalAmount}>
-          ${totalBudget.toFixed(2)}
-        </Text>
+        <Text style={styles.totalAmount}>${totalBudget.toFixed(2)}</Text>
       </View>
     </View>
   );
@@ -73,29 +64,42 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.background_secondary,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: SPACING.lg,
     gap: SPACING.md,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   title: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: COLORS.text_primary,
+    color: '#1A2E1F',
+    letterSpacing: 0.3,
   },
   distributionRow: {
     flexDirection: 'row',
-    height: 40,
-    borderRadius: 8,
+    height: 10,
+    borderRadius: 5,
     overflow: 'hidden',
-    gap: 1,
-    backgroundColor: COLORS.gray,
+    gap: 2,
   },
   distributionBar: {
     height: '100%',
   },
+  barFirst: {
+    borderTopLeftRadius: 5,
+    borderBottomLeftRadius: 5,
+  },
+  barLast: {
+    borderTopRightRadius: 5,
+    borderBottomRightRadius: 5,
+  },
   legend: {
     gap: SPACING.sm,
+    marginTop: SPACING.xs,
   },
   legendItem: {
     flexDirection: 'row',
@@ -103,40 +107,43 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   legendColor: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   legendContent: {
     flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   categoryName: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.text_primary,
+    color: '#1A2E1F',
   },
   categoryAmount: {
     fontSize: 12,
-    color: COLORS.text_secondary,
-    marginTop: 2,
+    color: '#4A6B52',
+    fontWeight: '600',
   },
   totalContainer: {
-    marginTop: SPACING.md,
+    marginTop: SPACING.sm,
     paddingTop: SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: COLORS.gray,
-    justifyContent: 'center',
+    borderTopColor: 'rgba(26,46,31,0.12)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: SPACING.xs,
   },
   totalLabel: {
-    fontSize: 12,
-    color: COLORS.text_secondary,
-    fontWeight: '500',
+    fontSize: 13,
+    color: '#4A6B52',
+    fontWeight: '600',
   },
   totalAmount: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.primary,
+    color: '#F5A623',
   },
 });

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Modal,
-  Animated,
   useWindowDimensions,
 } from 'react-native';
 import { useFinance } from '../../state';
@@ -72,7 +71,7 @@ export const OnboardingDashboardOverlay: React.FC<OnboardingDashboardOverlayProp
             </View>
 
             <ChatBubble
-              message="¿Estás listo para comenzar a gestionar tus finanzas?"
+              message="¡Tu perfil financiero está listo! Ahora crea tu cuenta para guardar todos tus datos y acceder a la app."
               isUser={false}
             />
 
@@ -82,12 +81,12 @@ export const OnboardingDashboardOverlay: React.FC<OnboardingDashboardOverlayProp
                 style={styles.completeButton}
                 activeOpacity={0.7}
               >
-                <Text style={styles.completeButtonText}>¡Comenzar Ahora! 🚀</Text>
+                <Text style={styles.completeButtonText}>Crear Cuenta y Empezar →</Text>
               </TouchableOpacity>
             </View>
 
             <Text style={styles.tipsText}>
-              💡 Tip: Puedes acceder a tu perfil y configuración en cualquier momento desde el menú.
+              🔒 Tu información financiera se guarda de forma segura en tu cuenta.
             </Text>
           </View>
         </View>
@@ -185,7 +184,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   completeButtonText: {
-    color: COLORS.background,
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },

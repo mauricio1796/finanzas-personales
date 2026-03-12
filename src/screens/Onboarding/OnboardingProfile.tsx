@@ -1,253 +1,101 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  Animated,
-  SafeAreaView,
-  TouchableOpacity,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
+  View, Text, StyleSheet, Animated, SafeAreaView,
+  TouchableOpacity, TextInput, KeyboardAvoidingView,
+  Platform, Keyboard,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { useFinance } from '../../state';
-import { COLORS, SPACING } from '../../constants';
-import { ChatBubble, OptionButton, ProgressIndicator } from '../../components/onboarding';
+import { useTheme } from '../../state/ThemeContext';
+import { ChatBubble, ProgressIndicator } from '../../components/onboarding';
+
+const fmtCOP = (raw: string) => {
+  const num = parseInt(raw.replace(/\./g, ''), 10);
+  if (isNaN(num)) return '';
+  return num.toLocaleString('es-CO').replace(/,/g, '.');
+};
 
 export const OnboardingProfile: React.FC = () => {
-  const navigation = useNavigation();
-  const { updateOnboardingStep, setProfile } = useFinance();
-
-  // Estados para cada respuesta
-  const [answers, setAnswers] = useState({
-    employmentType: null as 'employed' | 'student' | 'freelance' | 'business' | 'other' | null,
-    incomeType: null as 'fixed' | 'variable' | 'mixed' | null,
-    monthlySalary: '',
-    mainFinancialConcern: '',
-    currencyPreference: 'MXN',
-  });
-  const [step, setStep] = useState(0);
+  const { updateOnboardingStep, setProfile, profile } = useFinance();
+  const { colors } = useTheme();
+  const [income, setIncome] = useState('');
+  const [focused, setFocused] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
-  const [isFocused, setIsFocused] = useState(false);
 
-  React.useEffect(() => {
+  const nombre = profile?.mainFinancialConcern ?? 'amigo';
+
+  useEffect(() => {
+    Keyboard.dismiss();
     Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
     ]).start();
-  }, [step]);
+  }, []);
 
-  const nextStep = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: -30,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setStep(s => s + 1);
-      fadeAnim.setValue(0);
-      slideAnim.setValue(30);
-    });
-  };
-
-  // Guardar y avanzar al final
-  const handleFinish = () => {
+  const handleContinue = () => {
+    Keyboard.dismiss();
+    const salario = parseInt(income.replace(/\./g, ''), 10) || 0;
     setProfile({
-      id: Date.now().toString(),
+      ...(profile as any),
+      id: profile?.id ?? Date.now().toString(),
       userId: '1',
-      employmentType: answers.employmentType!,
-      incomeType: answers.incomeType!,
-      monthlySalary: Number(answers.monthlySalary),
+      employmentType: profile?.employmentType ?? 'employed',
+      incomeType: 'fixed',
+      monthlySalary: salario,
       hasDebts: false,
-      mainFinancialConcern: answers.mainFinancialConcern,
-      currencyPreference: answers.currencyPreference,
-      createdAt: new Date().toISOString(),
+      mainFinancialConcern: profile?.mainFinancialConcern ?? '',
+      currencyPreference: 'COP',
+      createdAt: profile?.createdAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
     updateOnboardingStep(2);
-    navigation.navigate('OnboardingGoal' as never);
   };
 
-  // Preguntas secuenciales
-  const questions = [
-    {
-      key: 'employmentType',
-      render: () => (
-        <ChatBubble
-          message="¿Cuál es tu situación laboral?"
-          isUser={false}
-        />
-      ),
-      options: [
-        { label: 'Empleado', value: 'employed' },
-        { label: 'Estudiante', value: 'student' },
-        { label: 'Freelancer', value: 'freelance' },
-        { label: 'Empresario', value: 'business' },
-        { label: 'Otro', value: 'other' },
-      ],
-      onSelect: (val: any) => setAnswers(a => ({ ...a, employmentType: val })),
-      selected: answers.employmentType,
-    },
-    {
-      key: 'incomeType',
-      render: () => (
-        <ChatBubble
-          message="¿Tus ingresos son fijos, variables o mixtos?"
-          isUser={false}
-        />
-      ),
-      options: [
-        { label: 'Fijo', value: 'fixed' },
-        { label: 'Variable', value: 'variable' },
-        { label: 'Mixto', value: 'mixed' },
-      ],
-      onSelect: (val: any) => setAnswers(a => ({ ...a, incomeType: val })),
-      selected: answers.incomeType,
-    },
-    {
-      key: 'monthlySalary',
-      render: () => (
-        <ChatBubble
-          message="¿Cuánto ganas al mes aproximadamente?"
-          isUser={false}
-        />
-      ),
-      input: true,
-      value: answers.monthlySalary,
-      onChange: (val: string) => setAnswers(a => ({ ...a, monthlySalary: val })),
-      placeholder: 'Ej: 2500',
-      keyboardType: 'numeric',
-    },
-    {
-      key: 'mainFinancialConcern',
-      render: () => (
-        <ChatBubble
-          message="¿Cuál es tu mayor preocupación financiera?"
-          isUser={false}
-        />
-      ),
-      input: true,
-      value: answers.mainFinancialConcern,
-      onChange: (val: string) => setAnswers(a => ({ ...a, mainFinancialConcern: val })),
-      placeholder: 'Ej: Ahorrar para emergencias',
-    },
-    {
-      key: 'currencyPreference',
-      render: () => (
-        <ChatBubble
-          message="¿Con qué moneda prefieres trabajar? (Ej: MXN, USD, EUR)"
-          isUser={false}
-        />
-      ),
-      input: true,
-      value: answers.currencyPreference,
-      onChange: (val: string) => setAnswers(a => ({ ...a, currencyPreference: val })),
-      placeholder: 'Ej: MXN',
-    },
-  ];
-
-  const current = questions[step];
-  const canContinue =
-    (current?.input && current.value && current.value.length > 0) ||
-    (current?.options && current.selected);
+  const canContinue = income.replace(/\./g, '').length > 0 && parseInt(income.replace(/\./g, ''), 10) > 0;
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.progressContainer}>
-        <ProgressIndicator
-          currentStep={1}
-          totalSteps={6}
-          stepLabels={[
-            'Bienvenida',
-            'Perfil',
-            'Objetivo',
-            'Presupuesto',
-            'Confirmación',
-            'Dashboard',
-          ]}
-        />
+      <View style={styles.progress}>
+        <ProgressIndicator currentStep={1} totalSteps={5} />
       </View>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardAvoid}
-      >
-        <Animated.View
-          style={{
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-            marginTop: 40,
-          }}
-        >
-          {current.render()}
-          {current.options && (
-            <View style={styles.optionsContainer}>
-              {current.options.map(opt => (
-                <OptionButton
-                  key={opt.value}
-                  label={opt.label}
-                  isSelected={current.selected === opt.value}
-                  onPress={() => {
-                    current.onSelect(opt.value);
-                    setTimeout(nextStep, 350);
-                  }}
-                />
-              ))}
-            </View>
-          )}
-          {current.input && (
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={[
-                  styles.input,
-                  isFocused && styles.inputFocused,
-                ]}
-                placeholder={current.placeholder}
-                placeholderTextColor={COLORS.text_secondary}
-                value={current.value}
-                onChangeText={current.onChange}
-                keyboardType={current.keyboardType as any || 'default'}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                autoFocus
-              />
-              <TouchableOpacity
-                onPress={nextStep}
-                disabled={!canContinue}
-                style={[styles.continueButton, !canContinue && styles.continueButtonDisabled]}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.continueButtonText}>Siguiente</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          {/* Último paso: botón finalizar */}
-          {step === questions.length - 1 && !current.options && !current.input && (
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                onPress={handleFinish}
-                style={styles.continueButton}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.continueButtonText}>Finalizar</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.kav}>
+        <Animated.View style={[styles.inner, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          <ChatBubble
+            message={"Mucho gusto, " + nombre + "! Para ayudarte bien necesito saber con cuanto dinero cuentas cada mes. Cual es tu ingreso mensual aproximado?"}
+            isUser={false}
+          />
+          <View style={styles.inputBlock}>
+            <TextInput
+              style={[styles.input, { color: colors.text_primary, borderColor: focused ? colors.primary : '#E5E7EB', backgroundColor: '#FFFFFF', borderWidth: focused ? 2 : 1 }]}
+              placeholder='Ej: 2.500.000'
+              placeholderTextColor='#9CA3AF'
+              value={income}
+              onChangeText={(txt) => {
+                const digits = txt.replace(/\./g, '').replace(/[^0-9]/g, '');
+                const num = parseInt(digits, 10);
+                setIncome(isNaN(num) ? '' : num.toLocaleString('es-CO').replace(/,/g, '.'));
+              }}
+              keyboardType='numeric'
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              returnKeyType='done'
+              onSubmitEditing={canContinue ? handleContinue : undefined}
+              autoFocus
+            />
+            {income.length > 0 && (
+              <Text style={[styles.preview, { color: colors.primary }]}>
+                {}
+              </Text>
+            )}
+          </View>
+          <TouchableOpacity
+            style={[styles.btn, { backgroundColor: colors.primary }, !canContinue && styles.btnDisabled]}
+            onPress={handleContinue}
+            disabled={!canContinue}
+            activeOpacity={0.82}
+          >
+            <Text style={styles.btnText}>Continuar</Text>
+          </TouchableOpacity>
         </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -255,63 +103,14 @@ export const OnboardingProfile: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  keyboardAvoid: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    padding: SPACING.lg,
-  },
-  progressContainer: {
-    marginBottom: SPACING.lg,
-  },
-  inputContainer: {
-    marginVertical: SPACING.md,
-    gap: SPACING.sm,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.text_primary,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: COLORS.gray,
-    borderRadius: 8,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-    color: COLORS.text_primary,
-    fontSize: 14,
-  },
-  inputFocused: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.background,
-  },
-  optionsContainer: {
-    marginVertical: SPACING.md,
-    gap: SPACING.sm,
-  },
-  buttonContainer: {
-    marginTop: SPACING.xl,
-  },
-  continueButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.md,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  continueButtonDisabled: {
-    backgroundColor: COLORS.primary,
-    opacity: 0.5,
-  },
-  continueButtonText: {
-    color: COLORS.background,
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  container: { flex: 1, backgroundColor: 'transparent' },
+  kav: { flex: 1 },
+  progress: { marginBottom: 4 },
+  inner: { flex: 1, paddingHorizontal: 24, paddingTop: 32, gap: 20 },
+  inputBlock: { gap: 8 },
+  input: { borderRadius: 12, paddingHorizontal: 16, paddingVertical: 16, fontSize: 22, fontWeight: '700' },
+  preview: { fontSize: 13, fontWeight: '600', textAlign: 'right' },
+  btn: { paddingVertical: 17, borderRadius: 14, alignItems: 'center', marginTop: 8 },
+  btnDisabled: { opacity: 0.4 },
+  btnText: { fontSize: 17, fontWeight: '700', color: '#FFFFFF' },
 });

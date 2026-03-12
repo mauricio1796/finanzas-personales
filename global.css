@@ -1,0 +1,275 @@
+/* ─────────────────────────────────────────────────────────
+   FinancyAI — Monefy Green Design System
+   CSS Variables & Web-specific utilities
+───────────────────────────────────────────────────────── */
+
+/* ── Nunito Font ──────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
+:root {
+  /* ── Monefy Green Palette ────────────────────────────── */
+  --bg-primary:     #4A7C59;
+  --bg-secondary:   #3D6B4A;
+  --bg-dark:        #2E5438;
+  --bg-header:      #3A6B48;
+
+  /* Surface — cream cards */
+  --surface:        #F5F0E8;
+  --surface-alt:    #EDE8DF;
+  --surface-input:  #FFFFFF;
+
+  /* Text */
+  --text-on-green:  #FFFFFF;
+  --text-muted:     rgba(255,255,255,0.6);
+  --text-on-cream:  #1A2E1F;
+  --text-secondary: #4A6B52;
+
+  /* Monefy signature */
+  --expense:  #E8453C;
+  --income:   #F5A623;
+  --balance:  #FFFFFF;
+
+  /* Category colors */
+  --cat-1: #E8453C;
+  --cat-2: #F5A623;
+  --cat-3: #4A90D9;
+  --cat-4: #7ED321;
+  --cat-5: #9B59B6;
+  --cat-6: #E67E22;
+  --cat-7: #1ABC9C;
+  --cat-8: #E91E8C;
+
+  /* Radii */
+  --r-sm:     8px;
+  --r-md:     16px;
+  --r-lg:     24px;
+  --r-pill:   999px;
+  --r-circle: 50%;
+
+  /* Shadows */
+  --shadow-card: 0 4px 20px rgba(0,0,0,0.18);
+  --shadow-btn:  0 4px 12px rgba(0,0,0,0.25);
+}
+
+/* ── Reset & Base ─────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-dark);
+  min-height: 100dvh;
+  font-family: 'Nunito', -apple-system, system-ui, sans-serif;
+}
+
+* {
+  font-family: 'Nunito', -apple-system, system-ui, sans-serif;
+}
+
+/* ── Mobile Shell ─────────────────────────────────────── */
+.mobile-shell {
+  position: relative;
+  width: 100%;
+  max-width: 390px;
+  min-height: 844px;
+  height: 100dvh;
+  margin: 0 auto;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+@media (min-width: 600px) {
+  body {
+    background: #1a2e1f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .mobile-shell {
+    height: 844px;
+    border-radius: 44px;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.12),
+      0 40px 120px rgba(0,0,0,0.6),
+      inset 0 1px 0 rgba(255,255,255,0.15);
+    overflow: hidden;
+  }
+}
+
+/* ── Monefy Card Surface ──────────────────────────────── */
+.monefy-card {
+  background: var(--surface);
+  border-radius: var(--r-md);
+  padding: 16px;
+  box-shadow: var(--shadow-card);
+}
+
+/* ── Transaction Item ─────────────────────────────────── */
+.transaction-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--surface-alt);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.transaction-item:active { background: var(--surface-alt); }
+
+.transaction-icon {
+  width: 40px; height: 40px;
+  border-radius: var(--r-circle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.transaction-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-on-cream);
+}
+.transaction-amount {
+  font-size: 16px;
+  font-weight: 800;
+}
+.transaction-amount.expense { color: var(--expense); }
+.transaction-amount.income  { color: var(--income); }
+
+/* ── Date separator ───────────────────────────────────── */
+.date-separator {
+  background: var(--bg-secondary);
+  color: rgba(255,255,255,0.7);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── Bottom navigation ────────────────────────────────── */
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 390px;
+  background: var(--bg-dark);
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 0 24px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: rgba(255,255,255,0.45);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 16px;
+  border-radius: var(--r-md);
+  transition: color 0.2s;
+}
+.nav-item.active { color: white; }
+.nav-icon { font-size: 22px; }
+
+@media (max-width: 430px) {
+  .bottom-nav { width: 100%; }
+}
+
+/* ── Action buttons (Monefy style) ───────────────────────*/
+.btn-expense {
+  background: var(--expense);
+  color: white;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 12px 20px;
+  border-radius: var(--r-pill);
+  border: none;
+  cursor: pointer;
+  min-width: 110px;
+}
+.btn-income {
+  background: var(--income);
+  color: white;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 12px 20px;
+  border-radius: var(--r-pill);
+  border: none;
+  cursor: pointer;
+  min-width: 110px;
+}
+
+/* ── Category icon circles ────────────────────────────── */
+.category-icon {
+  width: 44px; height: 44px;
+  border-radius: var(--r-circle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: rgba(255,255,255,0.15);
+  border: 2px solid rgba(255,255,255,0.25);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.category-icon:active { transform: scale(0.92); }
+.category-icon.active { background: rgba(255,255,255,0.35); }
+
+/* ── Balance display ──────────────────────────────────── */
+.hero-balance {
+  font-size: 48px;
+  font-weight: 900;
+  color: #FFFFFF;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1px;
+}
+
+/* ── Scroll ───────────────────────────────────────────── */
+.native-scroll {
+  overflow-y: scroll;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.native-scroll::-webkit-scrollbar { display: none; }
+
+/* ── Shimmer skeleton ─────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0;  }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.05) 25%,
+    rgba(255,255,255,0.15) 50%,
+    rgba(255,255,255,0.05) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.6s infinite;
+  border-radius: 8px;
+}
+
+/* ── Fade-in animation ────────────────────────────────── */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-slide-up {
+  animation: fadeSlideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ── Stagger ──────────────────────────────────────────── */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.20s; }
+.stagger-5 { animation-delay: 0.25s; }

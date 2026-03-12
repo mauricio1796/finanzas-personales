@@ -4,392 +4,418 @@ import {
   TextInput,
   Pressable,
   View,
+  Text,
   ScrollView,
   FlatList,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { useFinance, Transaction } from '@/src/core/context/FinanceContext';
+import { SwipeableRow } from '@/src/components/ui/SwipeableRow';
+import { Icon, getCategoryIcon } from '@/src/components/ui/Icon';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const formatCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
 
 interface IngresosProps {
   transactions: Transaction[];
-  onAddIncome: (amount: number, category: string, date: Date) => void;
+  onAddIncome: (amount: number, category: string, date: Date, description?: string) => void;
   onDeleteTransaction: (id: string) => void;
 }
 
 export function Ingresos({ transactions, onAddIncome, onDeleteTransaction }: IngresosProps) {
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { user, updateUserSalary } = useFinance();
-  const [monthlySalary, setMonthlySalary] = useState(user?.monthlySalary?.toString() || '');
+  const [monthlySalary, setMonthlySalary] = useState(user?.monthlySalary ? Math.round(user.monthlySalary).toLocaleString('es-CO').replace(/,/g, '.') : '');
   const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Salario');
   const [error, setError] = useState('');
+  const [amountFocused, setAmountFocused] = useState(false);
+  const [descFocused, setDescFocused] = useState(false);
+  const [salaryFocused, setSalaryFocused] = useState(false);
 
-  const isSmallScreen = width < 768;
-
+  const isSmall = width < 768;
   const incomeCategories = ['Salario', 'Freelance', 'Inversiones', 'Bonus', 'Otros'];
-  const incomeTransactions = transactions.filter(t => t.type === 'income');
+  const incomeTransactions = transactions
+    .filter(t => t.type === 'income')
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const validateAmount = (value: string): boolean => {
-    const num = parseFloat(value);
-    return !isNaN(num) && num > 0;
-  };
+  const validate = (v: string) => parseInt(v.replace(/\./g, ''), 10) > 0;
 
   const handleSaveSalary = () => {
     setError('');
-    if (!monthlySalary.trim()) {
-      setError('Ingresa tu salario mensual');
+    if (!monthlySalary.trim() || !validate(monthlySalary)) {
+      setError('Ingresa un salario mensual válido');
       return;
     }
-    if (!validateAmount(monthlySalary)) {
-      setError('El salario debe ser un número positivo');
-      return;
-    }
-    updateUserSalary(parseFloat(monthlySalary));
-    setError('');
+    updateUserSalary(parseInt(monthlySalary.replace(/\./g, ''), 10));
   };
 
   const handleAddIncome = () => {
     setError('');
-
-    if (!amount.trim()) {
-      setError('Ingresa un monto');
+    if (!amount.trim() || !validate(amount)) {
+      setError('Ingresa un monto válido');
       return;
     }
-
-    if (!validateAmount(amount)) {
-      setError('El monto debe ser un número positivo');
-      return;
-    }
-
-    onAddIncome(parseFloat(amount), category, new Date());
+    onAddIncome(parseInt(amount.replace(/\./g, ''), 10), category, new Date(), description);
     setAmount('');
+    setDescription('');
     setCategory('Salario');
   };
 
-  const renderIncomeItem = ({ item }: { item: Transaction }) => (
-    <ThemedView style={styles.transactionItem}>
-      <View style={styles.transactionInfo}>
-        <ThemedText style={styles.transactionCategory}>{item.category}</ThemedText>
-        <ThemedText style={styles.transactionDate}>
-          {new Date(item.date).toLocaleDateString('es-ES')}
-        </ThemedText>
+  const renderItem = ({ item, index }: { item: Transaction; index: number }) => (
+    <SwipeableRow onDelete={() => onDeleteTransaction(item.id)}>
+      <View style={[styles.txItem, index < incomeTransactions.length - 1 && styles.txItemBorder]}>
+        <View style={styles.txLeft}>
+          <View style={styles.txIconCircle}>
+              <Icon name={getCategoryIcon(item.category)} size={16} color="#10B981" />
+          </View>
+          <View>
+            <Text style={styles.txCategory}>{item.category}</Text>
+            {item.description ? (
+              <Text style={styles.txDesc} numberOfLines={1}>{item.description}</Text>
+            ) : null}
+            <Text style={styles.txDate}>
+              {new Date(item.date).toLocaleDateString('es-CO')}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.txRight}>
+          <Text style={styles.incomeAmount}>+{formatCOP(item.amount)}</Text>
+        </View>
       </View>
-      <View style={styles.transactionAmount}>
-        <ThemedText style={styles.incomeAmount}>+${item.amount.toFixed(2)}</ThemedText>
-        <Pressable onPress={() => onDeleteTransaction(item.id)}>
-          <ThemedText style={styles.deleteButton}>Eliminar</ThemedText>
-        </Pressable>
-      </View>
-    </ThemedView>
+    </SwipeableRow>
   );
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: isSmallScreen ? 16 : 24 }]}>
-      <ThemedText type="title" style={styles.title}>
-        Registrar Ingresos
-      </ThemedText>
+    <ScrollView
+      style={[styles.scroll, { paddingTop: insets.top }]}
+      contentContainerStyle={[styles.content, { paddingHorizontal: isSmall ? 20 : 28 }]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerLabel}>FINANZAS</Text>
+        <Text style={styles.headerTitle}>Registrar Ingresos</Text>
+      </View>
 
-      {/* Salario Mensual */}
-      <ThemedView style={styles.salarySection}>
-        <ThemedText style={styles.salaryTitle}>📊 Salario Mensual</ThemedText>
-        <View style={styles.salaryInputContainer}>
+      {/* Salary card */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Salario Mensual</Text>
+        <View style={styles.salaryRow}>
           <TextInput
-            style={styles.salaryInput}
-            placeholder="Ingresa tu salario mensual"
-            placeholderTextColor="#999"
-            keyboardType="decimal-pad"
+            style={[styles.input, salaryFocused && styles.inputFocused, { flex: 1 }]}
+            placeholder="Ej: 3.000.000"
+            placeholderTextColor="#9CA3AF"
+            keyboardType="numeric"
             value={monthlySalary}
-            onChangeText={setMonthlySalary}
+            onChangeText={(txt) => { const d = txt.replace(/\./g, '').replace(/[^0-9]/g, ''); const n = parseInt(d, 10); setMonthlySalary(isNaN(n) ? '' : n.toLocaleString('es-CO').replace(/,/g, '.')); }}
+            onFocus={() => setSalaryFocused(true)}
+            onBlur={() => setSalaryFocused(false)}
           />
-          <Pressable style={styles.saveSalaryButton} onPress={handleSaveSalary}>
-            <ThemedText style={styles.saveSalaryButtonText}>Guardar</ThemedText>
+          <Pressable style={styles.saveBtn} onPress={handleSaveSalary}>
+            <Text style={styles.saveBtnText}>Guardar</Text>
           </Pressable>
         </View>
-        {user?.monthlySalary && (
-          <ThemedText style={styles.salaryDisplay}>
-            Salario actual: ${user.monthlySalary.toFixed(2)}
-          </ThemedText>
-        )}
-      </ThemedView>
+        {user?.monthlySalary ? (
+          <Text style={styles.currentSalary}>
+            Salario actual: {formatCOP(user.monthlySalary)}
+          </Text>
+        ) : null}
+      </View>
 
-      {/* Registrar Ingreso */}
-      <ThemedView style={styles.form}>
+      {/* Add income form */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Nuevo Ingreso</Text>
+
         {error ? (
-          <ThemedView style={styles.errorContainer}>
-            <ThemedText style={styles.errorText}>{error}</ThemedText>
-          </ThemedView>
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
         ) : null}
 
-        <View>
-          <ThemedText style={styles.label}>Monto</ThemedText>
-          <TextInput
-            style={styles.input}
-            placeholder="0.00"
-            placeholderTextColor="#999"
-            keyboardType="decimal-pad"
-            value={amount}
-            onChangeText={setAmount}
-          />
-        </View>
+        <Text style={styles.fieldLabel}>MONTO</Text>
+        <TextInput
+          style={[styles.input, amountFocused && styles.inputFocused]}
+          placeholder="Ej: 500.000"
+          placeholderTextColor="#9CA3AF"
+          keyboardType="numeric"
+          value={amount}
+          onChangeText={(txt) => { const d = txt.replace(/\./g, '').replace(/[^0-9]/g, ''); const n = parseInt(d, 10); setAmount(isNaN(n) ? '' : n.toLocaleString('es-CO').replace(/,/g, '.')); }}
+          onFocus={() => setAmountFocused(true)}
+          onBlur={() => setAmountFocused(false)}
+        />
 
-        <View>
-          <ThemedText style={styles.label}>Categoría</ThemedText>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-            {incomeCategories.map(cat => (
-              <Pressable
-                key={cat}
-                style={[
-                  styles.categoryButton,
-                  category === cat && styles.categoryButtonActive,
-                ]}
-                onPress={() => setCategory(cat)}
-              >
-                <ThemedText
-                  style={[
-                    styles.categoryButtonText,
-                    category === cat && styles.categoryButtonTextActive,
-                  ]}
-                >
-                  {cat}
-                </ThemedText>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
+        <Text style={[styles.fieldLabel, { marginTop: 16 }]}>DESCRIPCIÓN (opcional)</Text>
+        <TextInput
+          style={[styles.input, descFocused && styles.inputFocused]}
+          placeholder="Ej: Pago quincena, Proyecto cliente..."
+          placeholderTextColor="#9CA3AF"
+          value={description}
+          onChangeText={setDescription}
+          onFocus={() => setDescFocused(true)}
+          onBlur={() => setDescFocused(false)}
+          maxLength={80}
+        />
 
-        <Pressable style={styles.button} onPress={handleAddIncome}>
-          <ThemedText style={styles.buttonText}>Agregar Ingreso</ThemedText>
+        <Text style={[styles.fieldLabel, { marginTop: 16 }]}>CATEGORÍA</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
+          {incomeCategories.map(cat => (
+            <Pressable
+              key={cat}
+              style={[styles.catPill, category === cat && styles.catPillActive]}
+              onPress={() => setCategory(cat)}
+            >
+              <Text style={[styles.catPillText, category === cat && styles.catPillTextActive]}>
+                {cat}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        <Pressable style={styles.addBtn} onPress={handleAddIncome}>
+          <Text style={styles.addBtnText}>+ Agregar Ingreso</Text>
         </Pressable>
-      </ThemedView>
+      </View>
 
-      <ThemedView style={styles.listContainer}>
-        <ThemedText style={styles.listTitle}>Últimos Ingresos</ThemedText>
+      {/* List */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Últimos Ingresos</Text>
         {incomeTransactions.length > 0 ? (
           <FlatList
-            data={incomeTransactions.sort((a, b) => 
-              new Date(b.date).getTime() - new Date(a.date).getTime()
-            )}
-            renderItem={renderIncomeItem}
+            data={incomeTransactions}
+            renderItem={renderItem}
             keyExtractor={item => item.id}
             scrollEnabled={false}
           />
         ) : (
-          <ThemedText style={styles.emptyText}>No hay ingresos registrados</ThemedText>
+          <Text style={styles.emptyText}>No hay ingresos registrados</Text>
         )}
-      </ThemedView>
+      </View>
+
+      <View style={{ height: 16 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    paddingVertical: 28,
-    gap: 28,
+  scroll: {
+    flex: 1,
+    backgroundColor: '#FAFAFA',
   },
-  title: {
-    fontSize: 32,
-    fontWeight: '800',
-    marginBottom: 24,
-    color: '#1f2937',
-    letterSpacing: 0.3,
+  content: {
+    paddingTop: 20,
+    gap: 16,
   },
-  salarySection: {
-    padding: 20,
-    borderRadius: 12,
-    gap: 12,
-    backgroundColor: '#f0fdf4',
-    borderWidth: 2,
-    borderColor: '#22c55e',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+
+  // Header
+  header: {
+    marginBottom: 4,
   },
-  salaryTitle: {
-    fontSize: 16,
+  headerLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
     fontWeight: '700',
-    color: '#15803d',
+    letterSpacing: 1.2,
   },
-  salaryInputContainer: {
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
+  },
+
+  // Card
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 20,
+    ...(Platform.OS !== 'web' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
+    } : {}),
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 16,
+  },
+
+  // Salary row
+  salaryRow: {
     flexDirection: 'row',
     gap: 10,
   },
-  salaryInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#22c55e',
-    padding: 12,
+  saveBtn: {
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 18,
     borderRadius: 10,
-    fontSize: 16,
-    color: '#1f2937',
-    backgroundColor: '#ffffff',
-    fontWeight: '500',
-  },
-  saveSalaryButton: {
-    backgroundColor: '#22c55e',
-    paddingHorizontal: 20,
     justifyContent: 'center',
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  saveSalaryButtonText: {
-    color: 'white',
+  saveBtnText: {
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },
-  salaryDisplay: {
-    fontSize: 14,
+  currentSalary: {
+    fontSize: 13,
+    color: '#10B981',
     fontWeight: '600',
-    color: '#15803d',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#86efac',
+    marginTop: 10,
   },
-  form: {
-    padding: 20,
-    borderRadius: 12,
-    gap: 20,
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  label: {
-    fontSize: 14,
+
+  // Fields
+  fieldLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
     fontWeight: '700',
-    marginBottom: 10,
-    color: '#1f2937',
+    letterSpacing: 0.8,
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
     padding: 14,
     borderRadius: 10,
     fontSize: 16,
-    color: '#1f2937',
-    backgroundColor: '#ffffff',
-    fontWeight: '500',
+    color: '#111827',
+    fontWeight: '600',
   },
-  categoryScroll: {
+  inputFocused: {
+    borderColor: '#6366F1',
+    borderWidth: 2,
+  },
+
+  // Category pills
+  catScroll: {
     marginBottom: 4,
   },
-  categoryButton: {
+  catPill: {
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 8,
+    borderRadius: 100,
+    marginRight: 8,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    marginRight: 10,
-    marginBottom: 10,
-    backgroundColor: '#ffffff',
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
   },
-  categoryButtonActive: {
-    backgroundColor: '#22c55e',
-    borderColor: '#22c55e',
+  catPillActive: {
+    backgroundColor: '#10B981',
+    borderColor: '#10B981',
   },
-  categoryButtonText: {
-    fontSize: 14,
+  catPillText: {
+    fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
+    color: '#6B7280',
   },
-  categoryButtonTextActive: {
-    color: 'white',
+  catPillTextActive: {
+    color: '#FFFFFF',
     fontWeight: '700',
   },
-  button: {
-    backgroundColor: '#22c55e',
-    padding: 16,
-    borderRadius: 10,
+
+  // Add button
+  addBtn: {
+    backgroundColor: '#10B981',
+    padding: 15,
+    borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginTop: 16,
+    ...(Platform.OS !== 'web' ? {
+      shadowColor: '#10B981',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 4,
+    } : {}),
   },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
+  addBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
   },
-  errorContainer: {
-    backgroundColor: '#fee2e2',
-    padding: 14,
-    borderRadius: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#dc2626',
+
+  // Error
+  errorBox: {
+    backgroundColor: '#FEF2F2',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#EF4444',
+    marginBottom: 12,
   },
   errorText: {
-    color: '#991b1b',
-    fontSize: 14,
+    color: '#EF4444',
+    fontSize: 13,
     fontWeight: '600',
   },
-  listContainer: {
-    padding: 20,
-    borderRadius: 12,
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  listTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 16,
-    color: '#1f2937',
-  },
-  transactionItem: {
+
+  // Transaction list
+  txItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    marginBottom: 8,
+    paddingVertical: 12,
   },
-  transactionInfo: {
+  txItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  txLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     flex: 1,
   },
-  transactionCategory: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 4,
-    color: '#1f2937',
+  txIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  transactionDate: {
-    fontSize: 13,
-    color: '#6b7280',
+  txCategory: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  txDesc: {
+    fontSize: 12,
+    color: '#6B7280',
     fontWeight: '500',
+    marginTop: 1,
   },
-  transactionAmount: {
+  txDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  txRight: {
     alignItems: 'flex-end',
+    gap: 4,
   },
   incomeAmount: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#22c55e',
-    marginBottom: 6,
+    color: '#10B981',
   },
-  deleteButton: {
+  deleteBtn: {
     fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '700',
+    color: '#EF4444',
+    fontWeight: '600',
   },
   emptyText: {
     textAlign: 'center',
-    color: '#6b7280',
+    color: '#9CA3AF',
     fontSize: 14,
-    paddingVertical: 24,
-    fontWeight: '500',
+    paddingVertical: 20,
   },
 });

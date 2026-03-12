@@ -1,17 +1,17 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View,
-  StyleSheet,
-  SafeAreaView,
   Animated,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
+  StyleSheet,
   Text,
+  View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { useFinance } from '../../state';
+import { BudgetCard, ChatBubble, OptionButton, ProgressIndicator } from '../../components/onboarding';
 import { COLORS, SPACING } from '../../constants';
-import { BudgetCard, ChatBubble, ProgressIndicator, OptionButton } from '../../components/onboarding';
+import { useTheme } from '../../state/ThemeContext';
+import { useFinance } from '../../state';
 
 interface BudgetItem {
   category: string;
@@ -22,8 +22,8 @@ interface BudgetItem {
 
 
 export const OnboardingBudget: React.FC = () => {
-  const navigation = useNavigation();
-  const { updateOnboardingStep, setBudgets } = useFinance();
+  const { updateOnboardingStep } = useFinance();
+  const { colors } = useTheme();
 
   const [budgetItems, setBudgetItems] = useState<BudgetItem[]>([]);
   const [monthlyIncome] = useState(2500); // TODO: obtener del perfil si está disponible
@@ -90,44 +90,51 @@ export const OnboardingBudget: React.FC = () => {
   };
 
   const handleAccept = () => {
-    const budgetData = budgetItems.reduce(
-      (acc, item) => ({
-        ...acc,
-        [item.category.toLowerCase()]: {
-          limit: item.amount,
-          spent: 0,
-          percentage: item.percentage,
-        },
-      }),
-      {}
-    );
-
-    // Convertir a Budget[]
-    const budgetsArray = Object.entries(budgetData).map(([category, value]: [string, any]) => ({
-      id: category,
-      userId: '1',
-      categoryId: category,
-      monthlyLimit: value.limit,
-      spent: value.spent,
-      month: new Date().toISOString().slice(0, 7),
-      percentage: value.percentage,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }));
-    setBudgets(budgetsArray);
     updateOnboardingStep(4);
-    navigation.navigate('OnboardingConfirm' as never);
   };
 
   const handleAdjust = () => {
     // Navegar a pantalla de ajuste (futuro)
   };
 
+  const nextStep = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: -30,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setStep(s => s + 1);
+      fadeAnim.setValue(0);
+      slideAnim.setValue(30);
+    });
+  }, [fadeAnim, slideAnim]);
+
+  // Avanzar automáticamente entre intro y presupuesto
+  useEffect(() => {
+    const shouldAutoAdvance = step === 0 || step === 1;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    if (shouldAutoAdvance) {
+      timeout = setTimeout(nextStep, 1200);
+    }
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [step, nextStep]);
+
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Calculando presupuesto...</Text>
+          <Text style={[styles.loadingText, { color: colors.text_primary }]}>
+            Calculando presupuesto...
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -188,43 +195,12 @@ export const OnboardingBudget: React.FC = () => {
 
   const current = steps[step];
 
-  const nextStep = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: -30,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setStep(s => s + 1);
-      fadeAnim.setValue(0);
-      slideAnim.setValue(30);
-    });
-  }, [fadeAnim, slideAnim]);
-
-  // Avanzar automáticamente entre intro y presupuesto
-  useEffect(() => {
-    const shouldAutoAdvance = step === 0 || step === 1;
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    if (shouldAutoAdvance) {
-      timeout = setTimeout(nextStep, 1200);
-    }
-    return () => {
-      if (timeout) clearTimeout(timeout);
-    };
-  }, [step, nextStep]);
-
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
       <View style={styles.progressContainer}>
         <ProgressIndicator
           currentStep={3}
-          totalSteps={6}
+          totalSteps={7}
           stepLabels={[
             'Bienvenida',
             'Perfil',

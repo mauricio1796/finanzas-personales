@@ -7,10 +7,11 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { useFinance } from '../../state';
 import { COLORS, SPACING } from '../../constants';
+import { useTheme } from '../../state/ThemeContext';
 import { ChatBubble, OptionButton, ProgressIndicator } from '../../components/onboarding';
 
 const GOALS = [
@@ -48,13 +49,17 @@ const GOALS = [
 
 
 export const OnboardingGoal: React.FC = () => {
-  const navigation = useNavigation();
   const { updateOnboardingStep, setGoal } = useFinance();
+  const { colors } = useTheme();
 
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+
+  React.useEffect(() => {
+    Keyboard.dismiss();
+  }, []);
 
   React.useEffect(() => {
     Animated.parallel([
@@ -69,7 +74,7 @@ export const OnboardingGoal: React.FC = () => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [step]);
+  }, [step, fadeAnim, slideAnim]);
 
   const nextStep = () => {
     Animated.parallel([
@@ -91,6 +96,7 @@ export const OnboardingGoal: React.FC = () => {
   };
 
   const handleSelectGoal = (goalId: string) => {
+    if (selectedGoal !== null) return;
     setSelectedGoal(goalId);
     setTimeout(nextStep, 350);
   };
@@ -122,7 +128,6 @@ export const OnboardingGoal: React.FC = () => {
         updatedAt: new Date().toISOString(),
       });
       updateOnboardingStep(3);
-      navigation.navigate('OnboardingBudget' as never);
     }
   };
 
@@ -166,11 +171,11 @@ export const OnboardingGoal: React.FC = () => {
   const current = steps[step];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
       <View style={styles.progressContainer}>
         <ProgressIndicator
           currentStep={2}
-          totalSteps={6}
+          totalSteps={7}
           stepLabels={[
             'Bienvenida',
             'Perfil',

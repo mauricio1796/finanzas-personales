@@ -1,248 +1,377 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { 
-  User, 
-  Category, 
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { storageService } from '../services/storage/StorageService';
+import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
+import {
+  User,
+  Category,
   Transaction,
   FinancialProfile,
   FinancialGoal,
-  Budget,
-  Achievement,
   UserLevel,
+  Achievement,
   OnboardingState,
 } from '../types';
-import { storageService } from '../services/storage/StorageService';
-import { DEFAULT_CATEGORIES } from '../models/Category';
 
+// ─── New types for Phase 3 ───────────────────────────────────────────────────
+export interface PremiumState {
+  isPremium: boolean;
+  plan: 'mensual' | 'anual' | null;
+  fechaInicio: string | null;
+  fechaVencimiento: string | null;
+}
+
+export interface RetoActivo {
+  retoId: string;
+  fechaInicio: string;
+}
+
+// ─── Context shape ───────────────────────────────────────────────────────────
 interface FinanceContextType {
-  // User & Profile
+  // Core state
   user: User | null;
-  setUser: (u: User | null) => void;
-  updateUserSalary: (salary: number) => void;
-  
-  // Financial Profile (NEW)
-  profile: FinancialProfile | null;
-  setProfile: (p: FinancialProfile) => void;
-
-  // Categories
-  categories: Category[];
-  setCategories: (c: Category[]) => void;
-  updateCategory: (id: string, updates: Partial<Category>) => void;
-
-  // Transactions
   transactions: Transaction[];
-  addTransaction: (t: Transaction) => void;
-  deleteTransaction: (id: string) => void;
-
-  // Financial Goals (NEW)
+  categories: Category[];
+  profile: FinancialProfile | null;
   goal: FinancialGoal | null;
-  setGoal: (g: FinancialGoal) => void;
-  updateGoal: (updates: Partial<FinancialGoal>) => void;
-
-  // Budgets (NEW)
-  budgets: Budget[];
-  setBudgets: (b: Budget[]) => void;
-  updateBudget: (categoryId: string, updates: Partial<Budget>) => void;
-
-  // Achievements (NEW)
-  achievements: Achievement[];
-  addAchievement: (a: Achievement) => void;
-  unlockAchievement: (type: string) => void;
-
-  // User Level (NEW)
   userLevel: UserLevel | null;
-  updateUserLevel: (level: UserLevel) => void;
-
-  // Onboarding
+  achievements: Achievement[];
   isOnboarded: boolean;
-  setIsOnboarded: (value: boolean) => void;
-  onboardingState: OnboardingState;
+  onboardingState: OnboardingState | null;
+  isLoading: boolean;
+
+  // Phase 3 state
+  leccionesCompletadas: string[];
+  retoActivo: RetoActivo | null;
+  retosCompletados: string[];
+  premium: PremiumState;
+
+  // Core methods
+  setUser: (user: User | null) => void;
+  setIsOnboarded: (value: boolean) => Promise<void>;
   updateOnboardingStep: (step: number) => void;
+  setCategories: (cats: Category[]) => void;
+  setProfile: (profile: FinancialProfile) => void;
+  setGoal: (goal: FinancialGoal) => void;
+  setUserLevel: (level: UserLevel) => void;
+  addTransaction: (tx: Transaction) => void;
+  deleteTransaction: (id: string) => void;
+  addIncome: (amount: number, category: string, date: Date, description?: string) => void;
+  addExpense: (amount: number, category: string, date: Date, description?: string) => void;
 
-  // General
-  refreshData: () => void;
+  updateUserSalary: (salary: number) => void;
+  resetAll: () => Promise<void>;
+
+  // Phase 3 methods
+  completarLeccion: (leccionId: string, xp: number) => void;
+  iniciarReto: (retoId: string) => void;
+  completarReto: (retoId: string, xp?: number) => void;
+  abandonarReto: () => void;
+  setPremium: (state: PremiumState) => void;
+
+  // Category management
+  addCategory: (cat: Category) => void;
+  updateCategory: (cat: Category) => void;
+  deleteCategory: (id: string) => void;
+  markCategoryPaid: (id: string) => void;
+  unmarkCategoryPaid: (id: string) => void;
 }
 
-export const FinanceContext = createContext<FinanceContextType | null>(null);
 
-interface FinanceProviderProps {
-  children: ReactNode;
-}
+// ─── Defaults ────────────────────────────────────────────────────────────────
+const DEFAULT_PREMIUM: PremiumState = {
+  isPremium: false,
+  plan: null,
+  fechaInicio: null,
+  fechaVencimiento: null,
+};
 
-export function FinanceProvider({ children }: FinanceProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+const DEFAULT_ONBOARDING: OnboardingState = {
+  completed: false,
+  step: 0,
+  profileCompleted: false,
+  goalSelected: false,
+  budgetCreated: false,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+const FinanceContext = createContext<FinanceContextType | null>(null);
+
+export const useFinance = (): FinanceContextType => {
+  const ctx = useContext(FinanceContext);
+  if (!ctx) throw new Error('useFinance must be used within FinanceProvider');
+  return ctx;
+};
+
+// ─── Provider ────────────────────────────────────────────────────────────────
+export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUserState] = useState<User | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isOnboarded, setIsOnboarded] = useState(false);
-  // NEW: Financial Profile
-  const [profile, setProfile] = useState<FinancialProfile | null>(null);
-  // NEW: Financial Goal
-  const [goal, setGoal] = useState<FinancialGoal | null>(null);
-  // NEW: Budgets
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  // NEW: Achievements
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
-  // NEW: User Level (1-5)
-  const [userLevel, setUserLevel] = useState<UserLevel | null>(null);
-  // NEW: Onboarding State
-  const [onboardingState, setOnboardingState] = useState<OnboardingState>({
-    completed: false,
-    step: 0,
-    profileCompleted: false,
-    goalSelected: false,
-    budgetCreated: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  });
+  const [categories, setCategoriesState] = useState<Category[]>([]);
+  const [profile, setProfileState] = useState<FinancialProfile | null>(null);
+  const [goal, setGoalState] = useState<FinancialGoal | null>(null);
+  const [userLevel, setUserLevelState] = useState<UserLevel | null>(null);
+  const [achievements] = useState<Achievement[]>([]);
+  const [isOnboarded, setIsOnboardedState] = useState(false);
+  const [onboardingState, setOnboardingState] = useState<OnboardingState | null>(DEFAULT_ONBOARDING);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Sincroniza datos de onboarding con user y categorías cuando cambian profile o budgets
-  useEffect(() => {
-    if (profile && user) {
-      if (profile.monthlySalary && user.monthlySalary !== profile.monthlySalary) {
-        setUser(u => u ? { ...u, monthlySalary: profile.monthlySalary } : u);
-      }
+  // Phase 3 state
+  const [leccionesCompletadas, setLeccionesCompletadas] = useState<string[]>([]);
+  const [retoActivo, setRetoActivo] = useState<RetoActivo | null>(null);
+  const [retosCompletados, setRetosCompletados] = useState<string[]>([]);
+  const [premium, setPremiumState] = useState<PremiumState>(DEFAULT_PREMIUM);
+
+
+  // ─── Hydration ─────────────────────────────────────────────────────────────
+  const hydrate = useCallback(async () => {
+    try {
+      const [
+        storedOnboarded,
+        storedUser,
+        storedTxs,
+        storedCats,
+        storedProfile,
+        storedGoal,
+        storedLevel,
+        storedPaidIds,
+        storedLecciones,
+        storedRetoActivo,
+        storedRetosComp,
+        storedPremium,
+      ] = await Promise.all([
+        storageService.getOnboarded(),
+        storageService.getUser(),
+        storageService.getTransactions(),
+        storageService.getCategories(),
+        storageService.getProfile(),
+        storageService.getGoal(),
+        storageService.getUserLevel(),
+        storageService.getPaidTxIds(),
+        storageService.getLeccionesCompletadas(),
+        storageService.getRetoActivo(),
+        storageService.getRetosCompletados(),
+        storageService.getPremium(),
+      ]);
+
+      if (storedOnboarded) setIsOnboardedState(true);
+      if (storedUser) setUserState(storedUser);
+      if (storedTxs) setTransactions(storedTxs);
+      if (storedCats) setCategoriesState(storedCats);
+      if (storedProfile) setProfileState(storedProfile);
+      if (storedGoal) setGoalState(storedGoal);
+      if (storedLevel) setUserLevelState(storedLevel);
+      if (storedLecciones) setLeccionesCompletadas(storedLecciones);
+      if (storedRetoActivo) setRetoActivo(storedRetoActivo);
+      if (storedRetosComp) setRetosCompletados(storedRetosComp);
+      if (storedPremium) setPremiumState(storedPremium);
+    } catch (e) {
+      console.warn('Hydration error:', e);
+    } finally {
+      setIsLoading(false);
     }
-  }, [profile, user]);
-
-  useEffect(() => {
-    if (budgets && budgets.length > 0 && categories && categories.length > 0) {
-      let shouldUpdate = false;
-      const updatedCategories = categories.map(cat => {
-        const found = budgets.find(b => b.categoryId === cat.id);
-        if (found && cat.budget !== found.monthlyLimit) {
-          shouldUpdate = true;
-          return { ...cat, budget: found.monthlyLimit };
-        }
-        return cat;
-      });
-      if (shouldUpdate) {
-        setCategories(updatedCategories);
-      }
-    }
-  }, [budgets, categories]);
-
-  // Load onboarding state on mount
-  useEffect(() => {
-    loadOnboardingState();
   }, []);
 
-  const loadOnboardingState = async () => {
-    try {
-      const onboarded = await storageService.getOnboarded();
-      setIsOnboarded(onboarded);
-    } catch (error) {
-      console.error('Error loading onboarding state:', error);
+  useEffect(() => { hydrate(); }, [hydrate]);
+
+  // ─── Auto-persist ──────────────────────────────────────────────────────────
+  useEffect(() => { storageService.saveTransactions(transactions); }, [transactions]);
+  useEffect(() => { if (profile) storageService.saveProfile(profile); }, [profile]);
+  useEffect(() => { if (goal) storageService.saveGoal(goal); }, [goal]);
+  useEffect(() => { if (userLevel) storageService.saveUserLevel(userLevel); }, [userLevel]);
+  useEffect(() => { if (categories.length) storageService.saveCategories(categories); reprogramarTodasLasNotificaciones(categories); }, [categories]);
+  useEffect(() => { if (user) storageService.saveUser(user); }, [user]);
+  useEffect(() => { storageService.saveLeccionesCompletadas(leccionesCompletadas); }, [leccionesCompletadas]);
+  useEffect(() => { storageService.saveRetosCompletados(retosCompletados); }, [retosCompletados]);
+  useEffect(() => { storageService.saveRetoActivo(retoActivo); }, [retoActivo]);
+  useEffect(() => { storageService.savePremium(premium); }, [premium]);
+
+
+  // ─── Core methods ─────────────────────────────────────────────────────────
+  const setUser = (u: User | null) => setUserState(u);
+
+  const setIsOnboarded = async (value: boolean) => {
+    setIsOnboardedState(value);
+    await storageService.setOnboarded(value);
+    if (!value) {
+      setOnboardingState(DEFAULT_ONBOARDING);
     }
   };
 
-  const handleSetIsOnboarded = async (value: boolean) => {
-    try {
-      await storageService.setOnboarded(value);
-      setIsOnboarded(value);
-    } catch (error) {
-      console.error('Error saving onboarding state:', error);
-    }
-  };
-
-  // Update user salary
-  const updateUserSalary = (salary: number) => {
-    if (user) {
-      const updatedUser = { ...user, monthlySalary: salary };
-      setUser(updatedUser);
-    }
-  };
-
-  // Update category
-  const updateCategory = (id: string, updates: Partial<Category>) => {
-    setCategories(categories.map(c => (c.id === id ? { ...c, ...updates } : c)));
-  };
-
-  // Add transaction
-  const addTransaction = (t: Transaction) => {
-    setTransactions([...transactions, t]);
-  };
-
-  // Delete transaction
-  const deleteTransaction = (id: string) => {
-    setTransactions(transactions.filter(t => t.id !== id));
-  };
-
-  // NEW: Update Goal
-  const updateGoal = (updates: Partial<FinancialGoal>) => {
-    if (goal) {
-      setGoal({ ...goal, ...updates });
-    }
-  };
-
-  // NEW: Update Budget
-  const updateBudget = (categoryId: string, updates: Partial<Budget>) => {
-    setBudgets(budgets.map(b => 
-      b.categoryId === categoryId ? { ...b, ...updates } : b
-    ));
-  };
-
-  // NEW: Add Achievement
-  const addAchievement = (a: Achievement) => {
-    if (!achievements.find(ach => ach.type === a.type)) {
-      setAchievements([...achievements, a]);
-    }
-  };
-
-  // NEW: Unlock Achievement
-  const unlockAchievement = (type: string) => {
-    setAchievements(achievements.map(a => 
-      a.type === type ? { ...a, unclocked: true } : a
-    ));
-  };
-
-  // NEW: Update User Level
-  const updateUserLevel = (level: UserLevel) => {
-    setUserLevel(level);
-  };
-
-  // NEW: Update Onboarding Step
   const updateOnboardingStep = (step: number) => {
     setOnboardingState(prev => ({
-      ...prev,
+      ...(prev ?? DEFAULT_ONBOARDING),
       step,
-      profileCompleted: step > 1,
-      goalSelected: step > 2,
-      budgetCreated: step > 3,
+      updatedAt: new Date().toISOString(),
     }));
   };
 
-  // Refresh data
-  const refreshData = () => {
-    // Load from storage if needed
+  const setCategories = (cats: Category[]) => setCategoriesState(cats);
+  const setProfile = (p: FinancialProfile) => setProfileState(p);
+  const setGoal = (g: FinancialGoal) => setGoalState(g);
+  const setUserLevel = (l: UserLevel) => setUserLevelState(l);
+
+  const addTransaction = (tx: Transaction) => {
+    setTransactions(prev => [tx, ...prev]);
+  };
+
+  const deleteTransaction = (id: string) => {
+    setTransactions(prev => prev.filter(tx => tx.id !== id));
+  };
+
+  const addIncome = (amount: number, category: string, date: Date, description?: string) => {
+    addTransaction({
+      id: Date.now().toString(),
+      amount,
+      category,
+      type: 'income',
+      date: date.toISOString(),
+      ...(description?.trim() ? { description: description.trim() } : {}),
+    });
+  };
+
+  const addExpense = (amount: number, category: string, date: Date, description?: string) => {
+    addTransaction({
+      id: Date.now().toString(),
+      amount,
+      category,
+      type: 'expense',
+      date: date.toISOString(),
+      ...(description?.trim() ? { description: description.trim() } : {}),
+    });
+  };
+
+  // ─── Phase 3 methods ──────────────────────────────────────────────────────
+  const completarLeccion = (leccionId: string, xp: number) => {
+    setLeccionesCompletadas(prev => prev.includes(leccionId) ? prev : [...prev, leccionId]);
+    if (xp > 0 && userLevel) {
+      setUserLevelState(prev => prev ? { ...prev, experience: prev.experience + xp } : prev);
+    }
+  };
+
+  const iniciarReto = (retoId: string) => {
+    setRetoActivo({ retoId, fechaInicio: new Date().toISOString() });
+  };
+
+  const completarReto = (retoId: string, xp?: number) => {
+    setRetosCompletados(prev => prev.includes(retoId) ? prev : [...prev, retoId]);
+    setRetoActivo(null);
+    if (xp && xp > 0) {
+      setUserLevelState(prev => prev ? { ...prev, experience: prev.experience + xp } : prev);
+    }
+  };
+
+  const abandonarReto = () => {
+    setRetoActivo(null);
+  };
+
+  const setPremium = (state: PremiumState) => {
+    setPremiumState(state);
+  };
+
+
+  const updateUserSalary = (salary: number) => {
+    setUserState(prev => prev ? { ...prev, monthlySalary: salary } : prev);
+    setProfileState(prev => prev ? { ...prev, monthlySalary: salary } : prev);
+  };
+
+  const addCategory = (cat: Category) => {
+    setCategoriesState(prev => [...prev, cat]);
+    if (userLevel) setUserLevelState(prev => prev ? { ...prev, experience: prev.experience + 20 } : prev);
+  };
+
+  const updateCategory = (cat: Category) => {
+    setCategoriesState(prev => prev.map(c => c.id === cat.id ? cat : c));
+    if (userLevel) setUserLevelState(prev => prev ? { ...prev, experience: prev.experience + 10 } : prev);
+  };
+
+  const deleteCategory = (id: string) => {
+    setCategoriesState(prev => prev.filter(c => c.id !== id));
+  };
+
+  const markCategoryPaid = (id: string) => {
+    setCategoriesState(prev => {
+      const cat = prev.find(c => c.id === id);
+      if (cat && (cat.presupuesto ?? 0) > 0) {
+        const txId = 'budget_payment_' + id;
+        setTransactions(prev2 => {
+          if (prev2.some(t => t.id === txId)) return prev2;
+          const newTx: Transaction = {
+            id: txId,
+            amount: cat.presupuesto!,
+            category: cat.name,
+            date: new Date().toISOString(),
+            type: 'expense',
+            description: cat.tipo === 'fijo' ? 'Gasto fijo pagado' : 'Presupuesto pagado',
+          };
+          return [newTx, ...prev2];
+        });
+      }
+      return prev.map(c => c.id === id ? { ...c, pagado: true } : c);
+    });
+    if (userLevel) setUserLevelState(prev => prev ? { ...prev, experience: prev.experience + 50 } : prev);
+  };
+
+  const unmarkCategoryPaid = (id: string) => {
+    const txId = 'budget_payment_' + id;
+    setTransactions(prev => prev.filter(t => t.id !== txId));
+    setCategoriesState(prev => prev.map(c => c.id === id ? { ...c, pagado: false } : c));
+  };
+
+  const resetAll = async () => {
+    await storageService.clearAll();
+    setUserState(null);
+    setTransactions([]);
+    setCategoriesState([]);
+    setProfileState(null);
+    setGoalState(null);
+    setUserLevelState(null);
+    setIsOnboardedState(false);
+    setOnboardingState(DEFAULT_ONBOARDING);
+    setLeccionesCompletadas([]);
+    setRetoActivo(null);
+    setRetosCompletados([]);
+    setPremiumState(DEFAULT_PREMIUM);
   };
 
   const value: FinanceContextType = {
     user,
-    setUser,
-    updateUserSalary,
-    profile,
-    setProfile,
-    categories,
-    setCategories,
-    updateCategory,
     transactions,
+    categories,
+    profile,
+    goal,
+    userLevel,
+    achievements,
+    isOnboarded,
+    onboardingState,
+    isLoading,
+    leccionesCompletadas,
+    retoActivo,
+    retosCompletados,
+    premium,
+    setUser,
+    setIsOnboarded,
+    updateOnboardingStep,
+    setCategories,
+    setProfile,
+    setGoal,
+    setUserLevel,
     addTransaction,
     deleteTransaction,
-    goal,
-    setGoal,
-    updateGoal,
-    budgets,
-    setBudgets,
-    updateBudget,
-    achievements,
-    addAchievement,
-    unlockAchievement,
-    userLevel,
-    updateUserLevel,
-    isOnboarded,
-    setIsOnboarded: handleSetIsOnboarded,
-    onboardingState,
-    updateOnboardingStep,
-    refreshData,
+    addIncome,
+    addExpense,
+    completarLeccion,
+    iniciarReto,
+    completarReto,
+    abandonarReto,
+    setPremium,
+    updateUserSalary,
+    resetAll,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    markCategoryPaid,
+    unmarkCategoryPaid,
   };
 
   return (
@@ -250,12 +379,4 @@ export function FinanceProvider({ children }: FinanceProviderProps) {
       {children}
     </FinanceContext.Provider>
   );
-}
-
-export function useFinance() {
-  const context = useContext(FinanceContext);
-  if (!context) {
-    throw new Error('useFinance must be used within FinanceProvider');
-  }
-  return context;
-}
+};

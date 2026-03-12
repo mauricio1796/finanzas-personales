@@ -15,6 +15,12 @@ export interface Category {
   color?: string;
   budget?: number;
   isSelected?: boolean;
+  presupuesto?: number;
+  gastado?: number;
+  diaPago?: number;
+  pagado?: boolean;
+  tipo?: string;
+  fechaCreacion?: string;
 }
 
 // Transaction Types

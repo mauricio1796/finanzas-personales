@@ -1,378 +1,664 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   TextInput,
   Pressable,
   View,
+  Text,
   ScrollView,
+  TouchableOpacity,
   useWindowDimensions,
   Alert,
+  Platform,
 } from 'react-native';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFinance } from '@/src/core/context/FinanceContext';
+
+const formatCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
+
+// ─── Static achievement definitions ────────────────────────────────────────
+const ACHIEVEMENT_DEFS = [
+  { type: 'first_transaction', icon: '💰', title: 'Primer Paso',       description: 'Registra tu primera transacción', rarity: 'common'    },
+  { type: 'streak',            icon: '🔥', title: 'Racha de 7 días',   description: 'Registra gastos 7 días seguidos', rarity: 'rare'      },
+  { type: 'budget_control',    icon: '📊', title: 'Héroe del Presupuesto', description: 'Mantén el presupuesto bajo control un mes', rarity: 'rare' },
+  { type: 'savings_goal',      icon: '🏆', title: 'Meta de Ahorro',    description: 'Alcanza tu meta de ahorro', rarity: 'epic'          },
+  { type: 'no_debt',           icon: '🗡️', title: 'Sin Deudas',        description: 'Paga todas tus deudas', rarity: 'epic'              },
+  { type: 'custom',            icon: '🧠', title: 'Genio Financiero',  description: 'Alcanza el nivel máximo', rarity: 'legendary'       },
+] as const;
+
+const RARITY_COLORS: Record<string, string> = {
+  common:    '#6B7280',
+  rare:      '#3B82F6',
+  epic:      '#8B5CF6',
+  legendary: '#F59E0B',
+};
+
+const LEVEL_TITLES = ['Principiante', 'Aprendiz', 'Gestor', 'Experto', 'Inversionista'];
 
 interface UsuarioProps {
   onLogout?: () => void;
+  onReset?: () => void;
+  onStartTour?: () => void;
 }
 
-export function Usuario({ onLogout }: UsuarioProps) {
+export function Usuario({ onLogout, onReset, onStartTour }: UsuarioProps) {
   const { width } = useWindowDimensions();
-  const { user, updateUserSalary } = useFinance();
+  const insets = useSafeAreaInsets();
+  const { user, userLevel, achievements, transactions, updateUserSalary, resetAll } = useFinance();
   const [isEditing, setIsEditing] = useState(false);
-  const [editedName, setEditedName] = useState(user?.name || '');
-  const [editedEmail, setEditedEmail] = useState(user?.email || '');
   const [editedSalary, setEditedSalary] = useState(user?.monthlySalary?.toString() || '');
+  const [salaryFocused, setSalaryFocused] = useState(false);
 
-  const isSmallScreen = width < 768;
+  // Sync salary field when user data changes externally
+  useEffect(() => {
+    if (!isEditing) {
+      setEditedSalary(user?.monthlySalary ? Math.round(user.monthlySalary).toLocaleString('es-CO').replace(/,/g, '.') : '');
+    }
+  }, [user?.monthlySalary, isEditing]);
+
+  const isSmall = width < 768;
+  const px = isSmall ? 20 : 28;
+
+  // XP progress
+  const xpProgress  = userLevel ? (userLevel.experience % 1000) / 1000 : 0;
+  const level       = userLevel?.level ?? 1;
+  const title       = userLevel?.title ?? 'Principiante';
+  const xpCurrent   = userLevel?.experience ?? 0;
+  const xpNext      = level * 1000;
+
+  // Achievements: merge static defs with unlocked data from context
+  const unlockedTypes = new Set(achievements.filter(a => a.unclocked).map(a => a.type));
+  const achievementRows = ACHIEVEMENT_DEFS.map(def => ({
+    ...def,
+    isUnlocked: unlockedTypes.has(def.type),
+  }));
+  const unlockedCount = achievementRows.filter(a => a.isUnlocked).length;
 
   const handleSave = () => {
-    if (!editedName.trim() || !editedEmail.trim()) {
-      Alert.alert('Error', 'El nombre y email son requeridos');
-      return;
-    }
-    if (editedSalary && isNaN(parseFloat(editedSalary))) {
+    const _salNum = parseInt(editedSalary.replace(/\./g, ''), 10);
+    if (editedSalary && isNaN(_salNum)) {
       Alert.alert('Error', 'El salario debe ser un número válido');
       return;
     }
-    if (editedSalary) {
-      updateUserSalary(parseFloat(editedSalary));
-    }
+    if (editedSalary) updateUserSalary(_salNum);
     setIsEditing(false);
+  };
+
+    const handleReset = () => {
+    Alert.alert(
+      'Reiniciar App',
+      'Se borrarán todas tus transacciones, perfil, progreso y configuración. ¿Estás seguro?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Reiniciar Todo',
+          style: 'destructive',
+          onPress: async () => {
+            await resetAll();
+            onReset?.();
+          },
+        },
+      ]
+    );
   };
 
   if (!user) {
     return (
-      <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: isSmallScreen ? 16 : 24 }]}>
-        <ThemedText style={styles.title}>Perfil de Usuario</ThemedText>
-        <ThemedView style={styles.emptyState}>
-          <ThemedText style={styles.emptyStateText}>Por favor, inicia sesión primero</ThemedText>
-        </ThemedView>
-      </ScrollView>
+      <View style={[styles.scroll, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={styles.emptyText}>Por favor, inicia sesión primero</Text>
+      </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { paddingHorizontal: isSmallScreen ? 16 : 24 }]}>
-      <ThemedText type="title" style={styles.title}>
-        Mi Perfil
-      </ThemedText>
+    <ScrollView
+      style={[styles.scroll, { paddingTop: insets.top }]}
+      contentContainerStyle={[styles.content, { paddingHorizontal: px }]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerLabel}>PERFIL</Text>
+        <Text style={styles.headerTitle}>Mi Cuenta</Text>
+      </View>
 
-      {/* Avatar */}
-      <View style={styles.avatarContainer}>
-        <View style={styles.avatar}>
-          <ThemedText style={styles.avatarText}>
-            {user.name.charAt(0).toUpperCase()}
-          </ThemedText>
+      {/* Avatar + name card */}
+      <View style={styles.card}>
+        <View style={styles.avatarRow}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarLetter}>{user.name.charAt(0).toUpperCase()}</Text>
+          </View>
+          <View style={styles.avatarInfo}>
+            <Text style={styles.userName}>{user.name}</Text>
+            <Text style={styles.userEmail}>{user.email}</Text>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelBadgeText}>Nv.{level} · {title}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* XP Bar */}
+        <View style={styles.xpSection}>
+          <View style={styles.xpLabelRow}>
+            <Text style={styles.xpLabel}>EXPERIENCIA</Text>
+            <Text style={styles.xpValue}>{xpCurrent} / {xpNext} XP</Text>
+          </View>
+          <View style={styles.xpTrack}>
+            <View style={[styles.xpFill, { width: `${xpProgress * 100}%` as any }]} />
+          </View>
         </View>
       </View>
 
-      {/* User Info Cards */}
-      {!isEditing ? (
-        <ThemedView style={styles.infoSection}>
-          <View style={styles.infoCard}>
-            <ThemedText style={styles.infoLabel}>Nombre</ThemedText>
-            <ThemedText style={styles.infoValue}>{user.name}</ThemedText>
-          </View>
-
-          <View style={styles.infoCard}>
-            <ThemedText style={styles.infoLabel}>Email</ThemedText>
-            <ThemedText style={styles.infoValue}>{user.email}</ThemedText>
-          </View>
-
-          <View style={styles.infoCard}>
-            <ThemedText style={styles.infoLabel}>Salario Mensual</ThemedText>
-            <ThemedText style={styles.infoValue}>
-              {user.monthlySalary ? `$${user.monthlySalary.toFixed(2)}` : 'No establecido'}
-            </ThemedText>
-          </View>
-
-          {user.createdAt && (
-            <View style={styles.infoCard}>
-              <ThemedText style={styles.infoLabel}>Miembro desde</ThemedText>
-              <ThemedText style={styles.infoValue}>
-                {new Date(user.createdAt).toLocaleDateString('es-ES')}
-              </ThemedText>
-            </View>
+      {/* Profile fields */}
+      <View style={styles.card}>
+        <View style={styles.cardTitleRow}>
+          <Text style={styles.cardTitle}>Información</Text>
+          {!isEditing && (
+            <TouchableOpacity onPress={() => setIsEditing(true)}>
+              <Text style={styles.editLink}>Editar</Text>
+            </TouchableOpacity>
           )}
+        </View>
 
-          <Pressable style={styles.editButton} onPress={() => setIsEditing(true)}>
-            <ThemedText style={styles.editButtonText}>✏️ Editar Perfil</ThemedText>
-          </Pressable>
-        </ThemedView>
-      ) : (
-        <ThemedView style={styles.editSection}>
-          <View>
-            <ThemedText style={styles.label}>Nombre</ThemedText>
+        <View style={styles.fieldRow}>
+          <Text style={styles.fieldLabel}>NOMBRE</Text>
+          <Text style={styles.fieldValue}>{user.name}</Text>
+        </View>
+        <View style={[styles.fieldRow, styles.fieldRowBorder]}>
+          <Text style={styles.fieldLabel}>EMAIL</Text>
+          <Text style={styles.fieldValue}>{user.email}</Text>
+        </View>
+        <View style={styles.fieldRow}>
+          <Text style={styles.fieldLabel}>SALARIO MENSUAL</Text>
+          {isEditing ? (
             <TextInput
-              style={styles.input}
-              value={editedName}
-              onChangeText={setEditedName}
-              placeholder="Tu nombre"
-              placeholderTextColor="#999"
-            />
-          </View>
-
-          <View>
-            <ThemedText style={styles.label}>Email</ThemedText>
-            <TextInput
-              style={styles.input}
-              value={editedEmail}
-              onChangeText={setEditedEmail}
-              placeholder="tu@email.com"
-              placeholderTextColor="#999"
-              editable={false}
-            />
-          </View>
-
-          <View>
-            <ThemedText style={styles.label}>Salario Mensual</ThemedText>
-            <TextInput
-              style={styles.input}
+              style={[styles.salaryInput, salaryFocused && styles.salaryInputFocused]}
               value={editedSalary}
-              onChangeText={setEditedSalary}
-              placeholder="0.00"
-              placeholderTextColor="#999"
-              keyboardType="decimal-pad"
+              onChangeText={(txt) => { const d = txt.replace(/\./g, '').replace(/[^0-9]/g, ''); const n = parseInt(d, 10); setEditedSalary(isNaN(n) ? '' : n.toLocaleString('es-CO').replace(/,/g, '.')); }}
+              placeholder="0"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="numeric"
+              onFocus={() => setSalaryFocused(true)}
+              onBlur={() => setSalaryFocused(false)}
             />
-          </View>
+          ) : (
+            <Text style={styles.fieldValue}>
+              {user.monthlySalary ? formatCOP(user.monthlySalary) : 'No establecido'}
+            </Text>
+          )}
+        </View>
 
-          <View style={styles.buttonGroup}>
-            <Pressable style={[styles.button, styles.saveButton]} onPress={handleSave}>
-              <ThemedText style={styles.buttonText}>Guardar Cambios</ThemedText>
+        {isEditing && (
+          <View style={styles.editButtons}>
+            <Pressable style={styles.saveBtn} onPress={handleSave}>
+              <Text style={styles.saveBtnText}>Guardar</Text>
             </Pressable>
-            <Pressable
-              style={[styles.button, styles.cancelButton]}
-              onPress={() => {
-                setIsEditing(false);
-                setEditedName(user.name);
-                setEditedEmail(user.email);
-                setEditedSalary(user.monthlySalary?.toString() || '');
-              }}
-            >
-              <ThemedText style={styles.buttonText}>Cancelar</ThemedText>
+            <Pressable style={styles.cancelBtn} onPress={() => {
+              setEditedSalary(user.monthlySalary ? Math.round(user.monthlySalary).toLocaleString('es-CO').replace(/,/g, '.') : '');
+              setIsEditing(false);
+            }}>
+              <Text style={styles.cancelBtnText}>Cancelar</Text>
             </Pressable>
           </View>
-        </ThemedView>
+        )}
+      </View>
+
+      {/* Stats summary */}
+      <View style={styles.statsRow}>
+        <View style={[styles.statCard, { borderTopColor: '#6366F1' }]}>
+          <Text style={styles.statValue}>{transactions.filter(t => t.type === 'income').length}</Text>
+          <Text style={styles.statLabel}>Ingresos</Text>
+        </View>
+        <View style={[styles.statCard, { borderTopColor: '#EF4444' }]}>
+          <Text style={[styles.statValue, { color: '#EF4444' }]}>{transactions.filter(t => t.type === 'expense').length}</Text>
+          <Text style={styles.statLabel}>Gastos</Text>
+        </View>
+        <View style={[styles.statCard, { borderTopColor: '#10B981' }]}>
+          <Text style={[styles.statValue, { color: '#10B981' }]}>{unlockedCount}</Text>
+          <Text style={styles.statLabel}>Logros</Text>
+        </View>
+      </View>
+
+      {/* Achievements */}
+      <View style={styles.card}>
+        <View style={styles.cardTitleRow}>
+          <Text style={styles.cardTitle}>Logros</Text>
+          <Text style={styles.achieveCount}>{unlockedCount}/{achievementRows.length}</Text>
+        </View>
+
+        {/* Progress bar */}
+        <View style={styles.achieveTrack}>
+          <View style={[styles.achieveFill, { width: `${(unlockedCount / achievementRows.length) * 100}%` as any }]} />
+        </View>
+
+        {achievementRows.map((ach, i) => (
+          <View
+            key={ach.type}
+            style={[
+              styles.achRow,
+              i < achievementRows.length - 1 && styles.achRowBorder,
+              !ach.isUnlocked && styles.achRowLocked,
+            ]}
+          >
+            <View style={[styles.achIconCircle, ach.isUnlocked
+              ? { backgroundColor: RARITY_COLORS[ach.rarity] + '22', borderColor: RARITY_COLORS[ach.rarity] }
+              : styles.achIconCircleLocked
+            ]}>
+              <Text style={[styles.achIcon, !ach.isUnlocked && styles.achIconLocked]}>
+                {ach.isUnlocked ? ach.icon : '🔒'}
+              </Text>
+            </View>
+            <View style={styles.achInfo}>
+              <Text style={[styles.achTitle, !ach.isUnlocked && styles.achTitleLocked]}>
+                {ach.title}
+              </Text>
+              <Text style={styles.achDesc}>{ach.description}</Text>
+            </View>
+            <View style={[styles.rarityDot, { backgroundColor: RARITY_COLORS[ach.rarity] }]} />
+          </View>
+        ))}
+      </View>
+
+      {/* Tour button */}
+      {onStartTour && (
+        <Pressable style={styles.tourBtn} onPress={onStartTour}>
+          <Text style={styles.tourBtnIcon}>🗺️</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.tourBtnTitle}>Tour interactivo</Text>
+            <Text style={styles.tourBtnSub}>Recorre las funciones principales</Text>
+          </View>
+          <Text style={styles.tourBtnArrow}>›</Text>
+        </Pressable>
       )}
 
-      {/* Additional Info */}
-      <ThemedView style={styles.statsSection}>
-        <ThemedText style={styles.statsTitle}>📊 Información de Cuenta</ThemedText>
-        <View style={styles.statRow}>
-          <ThemedText style={styles.statLabel}>ID de Usuario</ThemedText>
-          <ThemedText style={styles.statValue}>{user.id}</ThemedText>
-        </View>
-      </ThemedView>
-
-      {/* Logout Button */}
+      {/* Logout */}
       <Pressable
-        style={styles.logoutButton}
-        onPress={() => {
-          Alert.alert(
-            'Cerrar Sesión',
-            '¿Estás seguro de que deseas cerrar sesión?',
-            [
-              { text: 'Cancelar', onPress: () => {}, style: 'cancel' },
-              {
-                text: 'Cerrar Sesión',
-                onPress: onLogout,
-                style: 'destructive',
-              },
-            ]
-          );
-        }}
+        style={styles.logoutBtn}
+        onPress={() => Alert.alert(
+          'Cerrar Sesión',
+          '¿Estás seguro?',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Cerrar Sesión', onPress: onLogout, style: 'destructive' },
+          ]
+        )}
       >
-        <ThemedText style={styles.logoutButtonText}>🚪 Cerrar Sesión</ThemedText>
+        <Text style={styles.logoutText}>Cerrar Sesión</Text>
       </Pressable>
+
+      {/* Reset */}
+      <Pressable
+        style={styles.resetBtn}
+        onPress={handleReset}
+      >
+        <Text style={styles.resetText}>Reiniciar App</Text>
+      </Pressable>
+
+            <View style={{ height: 16 }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    paddingVertical: 28,
-    gap: 24,
+  scroll: {
+    flex: 1,
+    backgroundColor: '#FAFAFA',
   },
-  title: {
-    fontSize: 32,
-    fontWeight: '800',
-    marginBottom: 24,
-    color: '#1f2937',
-    letterSpacing: 0.3,
-  },
-  avatarContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#0ea5e9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  avatarText: {
-    fontSize: 48,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  infoSection: {
-    gap: 12,
-  },
-  infoCard: {
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderLeftWidth: 4,
-    borderLeftColor: '#0ea5e9',
-  },
-  infoLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#6b7280',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1f2937',
-  },
-  editButton: {
-    marginTop: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    backgroundColor: '#0ea5e9',
-    borderRadius: 10,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  editButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  editSection: {
-    padding: 20,
-    borderRadius: 12,
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+  content: {
+    paddingTop: 20,
     gap: 16,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 8,
-    color: '#1f2937',
+
+  header: {
+    marginBottom: 4,
   },
-  input: {
+  headerLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111827',
+  },
+
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    padding: 14,
-    borderRadius: 10,
-    fontSize: 16,
-    color: '#1f2937',
-    backgroundColor: '#ffffff',
-    fontWeight: '500',
-  },
-  buttonGroup: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  saveButton: {
-    backgroundColor: '#22c55e',
-  },
-  cancelButton: {
-    backgroundColor: '#9ca3af',
-  },
-  buttonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  statsSection: {
+    borderColor: '#E5E7EB',
     padding: 20,
-    borderRadius: 12,
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderLeftWidth: 4,
-    borderLeftColor: '#f59e0b',
+    ...(Platform.OS !== 'web' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
+    } : {}),
   },
-  statsTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1f2937',
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 16,
   },
-  statRow: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  editLink: {
+    fontSize: 13,
+    color: '#6366F1',
+    fontWeight: '600',
+  },
+
+  // Avatar
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 20,
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#6366F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLetter: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  avatarInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  userEmail: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  levelBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#EEF2FF',
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    marginTop: 4,
+  },
+  levelBadgeText: {
+    fontSize: 11,
+    color: '#6366F1',
+    fontWeight: '700',
+  },
+
+  // XP
+  xpSection: {
+    gap: 8,
+  },
+  xpLabelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  statLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-  statValue: {
-    fontSize: 12,
+  xpLabel: {
+    fontSize: 10,
+    color: '#9CA3AF',
     fontWeight: '700',
-    color: '#1f2937',
+    letterSpacing: 0.8,
   },
-  logoutButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#fee2e2',
-    borderColor: '#fecaca',
+  xpValue: {
+    fontSize: 11,
+    color: '#6366F1',
+    fontWeight: '700',
+  },
+  xpTrack: {
+    height: 6,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  xpFill: {
+    height: '100%',
+    backgroundColor: '#6366F1',
+    borderRadius: 3,
+  },
+
+  // Fields
+  fieldRow: {
+    paddingVertical: 12,
+    gap: 4,
+  },
+  fieldRowBorder: {
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#F3F4F6',
+    marginVertical: 0,
+  },
+  fieldLabel: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  fieldValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  salaryInput: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 15,
+    color: '#111827',
+    fontWeight: '600',
+    backgroundColor: '#FAFAFA',
+  },
+  salaryInputFocused: {
+    borderColor: '#6366F1',
     borderWidth: 2,
+  },
+  editButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  saveBtn: {
+    flex: 1,
+    backgroundColor: '#6366F1',
+    paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
-    marginBottom: 20,
   },
-  logoutButtonText: {
-    fontSize: 16,
+  saveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '700',
-    color: '#dc2626',
   },
-  emptyState: {
-    padding: 24,
-    borderRadius: 12,
-    backgroundColor: '#fef3c7',
-    borderWidth: 1,
-    borderColor: '#fcd34d',
+  cancelBtn: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 12,
+    borderRadius: 10,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  emptyStateText: {
-    fontSize: 16,
+  cancelBtnText: {
+    color: '#6B7280',
+    fontSize: 14,
     fontWeight: '700',
-    color: '#92400e',
+  },
+
+  // Stats row
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderTopWidth: 3,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 14,
+    alignItems: 'center',
+    ...(Platform.OS !== 'web' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 2,
+    } : {}),
+  },
+  statValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#6366F1',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '600',
+  },
+
+  // Achievements
+  achieveCount: {
+    fontSize: 13,
+    color: '#6366F1',
+    fontWeight: '700',
+  },
+  achieveTrack: {
+    height: 5,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  achieveFill: {
+    height: '100%',
+    backgroundColor: '#6366F1',
+    borderRadius: 3,
+  },
+  achRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 12,
+  },
+  achRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  achRowLocked: {
+    opacity: 0.5,
+  },
+  achIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  achIconCircleLocked: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+  },
+  achIcon: {
+    fontSize: 18,
+  },
+  achIconLocked: {
+    fontSize: 16,
+  },
+  achInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  achTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  achTitleLocked: {
+    color: '#6B7280',
+  },
+  achDesc: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  rarityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+
+  // Tour button
+  tourBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    padding: 16,
+    marginBottom: 12,
+  },
+  tourBtnIcon: { fontSize: 24 },
+  tourBtnTitle: { fontSize: 14, fontWeight: '700', color: '#4338CA' },
+  tourBtnSub: { fontSize: 12, color: '#6366F1', marginTop: 1 },
+  tourBtnArrow: { fontSize: 20, color: '#6366F1', fontWeight: '300' },
+
+  // Logout
+  logoutBtn: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  logoutText: {
+    color: '#EF4444',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+
+  resetBtn: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  resetText: {
+    color: '#6B7280',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  emptyText: {
+    fontSize: 15,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
 });

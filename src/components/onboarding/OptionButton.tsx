@@ -6,7 +6,8 @@ import {
   View,
   GestureResponderEvent,
 } from 'react-native';
-import { COLORS, SPACING } from '../../constants';
+import { useTheme } from '../../state/ThemeContext';
+import { SPACING } from '../../constants';
 
 interface OptionButtonProps {
   label: string;
@@ -16,6 +17,12 @@ interface OptionButtonProps {
   icon?: React.ReactNode;
 }
 
+/**
+ * Minimalist option card.
+ * Outline: clean card with subtle border — arrow on right.
+ * Selected: teal text + teal border + ✦ mark.
+ * Primary: solid teal CTA button.
+ */
 export const OptionButton: React.FC<OptionButtonProps> = ({
   label,
   onPress,
@@ -23,85 +30,93 @@ export const OptionButton: React.FC<OptionButtonProps> = ({
   variant = 'outline',
   icon,
 }) => {
+  const { colors } = useTheme();
+
+  if (variant === 'primary') {
+    return (
+      <TouchableOpacity
+        style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+        onPress={onPress}
+        activeOpacity={0.8}
+      >
+        <Text style={[styles.primaryText, { color: colors.text_light }]}>{label}</Text>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity
-      onPress={onPress}
       style={[
-        styles.button,
-        variant === 'primary' && styles.primaryButton,
-        variant === 'secondary' && styles.secondaryButton,
-        variant === 'outline' && styles.outlineButton,
-        isSelected && styles.selectedButton,
+        styles.outlineBtn,
+        {
+          backgroundColor: isSelected
+            ? `${colors.primary}12`
+            : colors.glass_bg,
+          borderColor: isSelected ? colors.primary : colors.glass_border,
+          borderLeftWidth: isSelected ? 3 : 1,
+        },
       ]}
+      onPress={onPress}
       activeOpacity={0.7}
     >
-      <View style={styles.content}>
-        {icon && <View style={styles.icon}>{icon}</View>}
-        <Text
-          style={[
-            styles.label,
-            variant === 'primary' && styles.primaryText,
-            variant === 'secondary' && styles.secondaryText,
-            variant === 'outline' && styles.outlineText,
-            isSelected && styles.selectedText,
-          ]}
-        >
-          {label}
-        </Text>
-      </View>
+      {icon && <View style={styles.icon}>{icon}</View>}
+      <Text
+        style={[
+          styles.outlineText,
+          { color: isSelected ? colors.primary : colors.text_primary },
+        ]}
+      >
+        {label}
+      </Text>
+      {isSelected ? (
+        <Text style={[styles.selectedMark, { color: colors.primary }]}>✦</Text>
+      ) : (
+        <Text style={[styles.arrow, { color: colors.text_tertiary }]}>›</Text>
+      )}
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  button: {
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    marginVertical: SPACING.sm,
-    borderRadius: 12,
-    justifyContent: 'center',
+  primaryBtn: {
+    paddingVertical: 17,
+    borderRadius: 14,
     alignItems: 'center',
-  },
-  primaryButton: {
-    backgroundColor: COLORS.primary,
-  },
-  secondaryButton: {
-    backgroundColor: COLORS.secondary,
-  },
-  outlineButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: COLORS.gray,
-  },
-  selectedButton: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  content: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-  },
-  icon: {
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
+    marginVertical: 4,
   },
   primaryText: {
-    color: COLORS.background,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
-  secondaryText: {
-    color: COLORS.background,
+  outlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginVertical: 4,
+    gap: 12,
+  },
+  icon: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   outlineText: {
-    color: COLORS.text_primary,
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
   },
-  selectedText: {
-    color: COLORS.background,
+  selectedMark: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  arrow: {
+    fontSize: 22,
+    fontWeight: '300',
+    lineHeight: 24,
   },
 });

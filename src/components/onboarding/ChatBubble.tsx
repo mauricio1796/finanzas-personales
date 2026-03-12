@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SPACING } from '../../constants';
+import { useTheme } from '../../state/ThemeContext';
+import { SPACING } from '../../constants';
 
 interface ChatBubbleProps {
   message: string;
@@ -8,92 +9,76 @@ interface ChatBubbleProps {
   timestamp?: string;
 }
 
+/**
+ * Minimalist AI question header.
+ * AI messages: clean label + large bold text — no bubbles, no borders.
+ * User messages: subtle teal pill on the right.
+ */
 export const ChatBubble: React.FC<ChatBubbleProps> = ({
   message,
   isUser = false,
   timestamp,
 }) => {
-  return (
-    <View
-      style={[
-        styles.container,
-        isUser ? styles.userContainer : styles.aiContainer,
-      ]}
-    >
-      <View
-        style={[
-          styles.bubble,
-          isUser ? styles.userBubble : styles.aiBubble,
-        ]}
-      >
-        <Text
-          style={[
-            styles.message,
-            isUser ? styles.userText : styles.aiText,
-          ]}
-        >
-          {message}
-        </Text>
-        {timestamp && (
-          <Text
-            style={[
-              styles.timestamp,
-              isUser ? styles.userTimestamp : styles.aiTimestamp,
-            ]}
-          >
-            {timestamp}
-          </Text>
-        )}
+  const { colors } = useTheme();
+
+  if (isUser) {
+    return (
+      <View style={styles.userContainer}>
+        <View style={[styles.userBubble, { backgroundColor: colors.primary }]}>
+          <Text style={[styles.userText, { color: colors.text_light }]}>{message}</Text>
+        </View>
       </View>
+    );
+  }
+
+  return (
+    <View style={styles.aiContainer}>
+      <Text style={[styles.aiLabel, { color: colors.primary }]}>FinancyAI ·</Text>
+      <Text style={[styles.aiMessage, { color: colors.text_primary }]}>{message}</Text>
+      {timestamp && (
+        <Text style={[styles.timestamp, { color: colors.text_tertiary }]}>{timestamp}</Text>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-  },
-  userContainer: {
-    alignItems: 'flex-end',
-  },
   aiContainer: {
-    alignItems: 'flex-start',
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.md,
+    gap: 10,
   },
-  bubble: {
-    maxWidth: '80%',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: 12,
+  aiLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
-  userBubble: {
-    backgroundColor: COLORS.primary,
-    borderBottomRightRadius: 4,
-  },
-  aiBubble: {
-    backgroundColor: COLORS.background_secondary,
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: COLORS.gray,
-  },
-  message: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  userText: {
-    color: COLORS.background,
-  },
-  aiText: {
-    color: COLORS.text_primary,
+  aiMessage: {
+    fontSize: 24,
+    fontWeight: '700',
+    lineHeight: 32,
+    letterSpacing: -0.3,
   },
   timestamp: {
     fontSize: 11,
-    marginTop: SPACING.xs,
+    marginTop: 4,
   },
-  userTimestamp: {
-    color: 'rgba(255, 255, 255, 0.7)',
+  userContainer: {
+    paddingHorizontal: SPACING.lg,
+    alignItems: 'flex-end',
+    marginVertical: SPACING.sm,
   },
-  aiTimestamp: {
-    color: COLORS.text_secondary,
+  userBubble: {
+    maxWidth: '70%',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 18,
+    borderBottomRightRadius: 4,
+  },
+  userText: {
+    fontSize: 15,
+    fontWeight: '500',
   },
 });

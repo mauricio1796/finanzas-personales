@@ -4,7 +4,7 @@ import {
   TextInput,
   Pressable,
   View,
-  Modal,
+  Text,
   Animated,
   KeyboardAvoidingView,
   Platform,
@@ -15,31 +15,42 @@ import {
 
 import { useFinance } from '../../src/state';
 import { User, Transaction, AuthState } from '../../src/types';
-import { ThemedText } from '../../components/themed-text';
-import { ThemedView } from '../../components/themed-view';
+import { useTheme } from '../../src/state/ThemeContext';
+import { MobileShell } from '../../src/components/layout/MobileShell';
+import { BottomNavBar } from '../../src/components/layout/BottomNavBar';
+import { FinancialFeed } from '../../src/screens/FinancialFeed/FinancialFeed';
+import { SplashScreen } from '../../src/screens/SplashScreen';
+import { QuickAddSheet } from '../../src/components/ui/QuickAddSheet';
+import { ProductTour, APP_TOUR_STEPS } from '../../src/components/ui/ProductTour';
+import { storageService } from '../../src/services/storage/StorageService';
 
-// Import screens
-import { Dashboard } from '../../src/screens/Dashboard';
-// TODO: Import remaining screens from new structure
-// import { Ingresos } from '../../src/screens/Ingresos';
-// import { Gastos } from '../../src/screens/Gastos';
-// import { Categorias } from '../../src/screens/Categorias';
-// import { Estadisticas } from '../../src/screens/Estadisticas';
-// import { BotIA } from '../../src/screens/BotIA';
-// import { Usuario } from '../../src/screens/Usuario';
-// Import legacy screens temporarily
-import { Ingresos } from '../../src/screens/Ingresos';
+// Screens
+import { FinanzasScreen } from '../../src/screens/FinanzasScreen';
 import { Gastos } from '../../src/screens/Gastos';
 import { Categorias } from '../../src/screens/Categorias';
 import { Estadisticas } from '../../src/screens/Estadisticas';
 import { BotIA } from '../../src/screens/BotIA';
+import { ExplorarScreen } from '../../src/screens/ExplorarScreen';
+import { HistorialScreen } from '../../src/screens/HistorialScreen';
 import { Usuario } from '../../src/screens/Usuario';
-import { Navigation, type ScreenName } from '../../src/screens/Navigation';
-import { OnboardingWelcome, OnboardingProfile, OnboardingGoal, OnboardingBudget, OnboardingConfirm, OnboardingDashboardOverlay } from '../../src/screens/Onboarding';
-import OnboardingTutorial from '../../src/screens/OnboardingTutorial';
+import { type ScreenName } from '../../src/screens/Navigation';
+import {
+  OnboardingWelcome,
+  OnboardingProfile,
+  OnboardingCategories,
+  OnboardingMontos,
+  OnboardingConfirm,
+} from '../../src/screens/Onboarding';
 
 export default function HomeScreen() {
-  const { setUser, user, isOnboarded, setIsOnboarded, onboardingState } = useFinance();
+  const {
+    setUser, user, isOnboarded, setIsOnboarded, onboardingState, profile,
+    transactions, addTransaction: ctxAddTransaction, deleteTransaction: ctxDeleteTransaction,
+  } = useFinance();
+  const { colors } = useTheme();
+
+  // ==================== SPLASH ====================
+  const [showSplash, setShowSplash] = useState(true);
 
   // ==================== AUTH STATE ====================
   const [authState, setAuthState] = useState<AuthState>('login');
@@ -51,26 +62,10 @@ export default function HomeScreen() {
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
   const [authError, setAuthError] = useState('');
 
-  // ==================== FINANCE STATE ====================
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  // ==================== APP STATE ====================
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('dashboard');
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [showOnboardingOverlay, setShowOnboardingOverlay] = useState(true);
-  // Botón de reset onboarding (solo desarrollo)
-  const handleResetOnboarding = async () => {
-    if (window.confirm && !window.confirm('¿Seguro que quieres reiniciar el onboarding?')) return;
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.clear();
-    }
-    if (typeof global !== 'undefined' && global.localStorage) {
-      global.localStorage.clear();
-    }
-    // if (typeof AsyncStorage !== 'undefined') {
-    //   try { await AsyncStorage.clear(); } catch {}
-    // }
-    if (setIsOnboarded) setIsOnboarded(false);
-    window.location.reload();
-  };
+  const [quickAddMode, setQuickAddMode] = useState<'income' | 'expense' | null>(null);
+  const [showTour, setShowTour] = useState(false);
 
   // ==================== ANIMATIONS ====================
   const authAnim = useRef(new Animated.Value(0)).current;
@@ -79,6 +74,18 @@ export default function HomeScreen() {
     Animated.spring(authAnim, { toValue: 1, friction: 8, useNativeDriver: true }).start();
   }, [authState, authAnim]);
 
+  // Auto-show tour on first login
+  useEffect(() => {
+    if (!user) return;
+    storageService.getTourDone().then(done => {
+      if (!done) {
+        // Small delay so the app finishes rendering before tour starts
+        const t = setTimeout(() => setShowTour(true), 600);
+        return () => clearTimeout(t);
+      }
+    });
+  }, [user?.id]);
+
   // ==================== AUTH HANDLERS ====================
   const handleLogin = () => {
     setAuthError('');
@@ -86,14 +93,12 @@ export default function HomeScreen() {
       setAuthError('Por favor completa todos los campos');
       return;
     }
-    const user: User = {
+    const newUser: User = {
       id: Date.now().toString(),
       email: loginEmail,
       name: loginEmail.split('@')[0],
     };
-    setUser(user);
-    setAuthState('authenticated');
-    setShowTutorial(true);
+    setUser(newUser);
     setLoginEmail('');
     setLoginPassword('');
   };
@@ -112,15 +117,13 @@ export default function HomeScreen() {
       setAuthError('La contraseña debe tener al menos 6 caracteres');
       return;
     }
-    const user: User = {
+    const newUser: User = {
       id: Date.now().toString(),
       email: registerEmail,
       name: registerName,
       createdAt: new Date().toISOString(),
     };
-    setUser(user);
-    setAuthState('authenticated');
-    setShowTutorial(true);
+    setUser(newUser);
     setRegisterName('');
     setRegisterEmail('');
     setRegisterPassword('');
@@ -132,71 +135,123 @@ export default function HomeScreen() {
     setAuthState('login');
     await setIsOnboarded(false);
     setCurrentScreen('dashboard');
-    setTransactions([]);
     setLoginEmail('');
     setLoginPassword('');
+    setShowSplash(false); // don't re-show splash on logout
+  };
+
+  const handleReset = () => {
+    setUser(null);
+    setAuthState('login');
+    setCurrentScreen('dashboard');
+    setLoginEmail('');
+    setLoginPassword('');
+    setShowSplash(false);
   };
 
   // ==================== FINANCE HANDLERS ====================
-  const addTransaction = (amount: number, category: string, type: 'income' | 'expense', date: Date) => {
+  const addTransaction = (amount: number, category: string, type: 'income' | 'expense', date: Date, description?: string) => {
     const newTransaction: Transaction = {
       id: Date.now().toString(),
       amount,
       category,
       type,
       date: date.toISOString(),
+      ...(description?.trim() ? { description: description.trim() } : {}),
     };
-    setTransactions(prev => [newTransaction, ...prev]);
+    ctxAddTransaction(newTransaction);
   };
 
-  const addIncome = (amount: number, category: string, date: Date) => {
-    addTransaction(amount, category, 'income', date);
+  const addIncome = (amount: number, category: string, date: Date, description?: string) =>
+    addTransaction(amount, category, 'income', date, description);
+
+  const addExpense = (amount: number, category: string, date: Date, description?: string) =>
+    addTransaction(amount, category, 'expense', date, description);
+
+  const deleteTransaction = (id: string) => ctxDeleteTransaction(id);
+
+  const handleTourFinish = () => {
+    setShowTour(false);
+    storageService.setTourDone(true).catch(() => {});
   };
 
-  const addExpense = (amount: number, category: string, date: Date) => {
-    addTransaction(amount, category, 'expense', date);
-  };
-
-  const deleteTransaction = (id: string) => {
-    setTransactions(prev => prev.filter(t => t.id !== id));
+  const handleStartTour = () => {
+    setCurrentScreen('dashboard');
+    setTimeout(() => setShowTour(true), 300);
   };
 
   const handleNavigateToSection = (section: string) => {
+    // FAB buttons on dashboard open the quick-add sheet instead of navigating
+    if (section === 'quick_income') { setQuickAddMode('income'); return; }
+    if (section === 'quick_expense') { setQuickAddMode('expense'); return; }
     setCurrentScreen(section as ScreenName);
   };
 
-  // handleCategoriesSelected removed (unused)
+  // ==================== 0. SPLASH ====================
+  if (showSplash) {
+    return <MobileShell><SplashScreen onDone={() => setShowSplash(false)} /></MobileShell>;
+  }
 
-  // ==================== LOGIN SCREEN ====================
+  // ==================== 1. ONBOARDING AI (PRIMERO) ====================
+  // La IA recopila toda la información del usuario antes de pedir cuenta
+  const onboardingStep = onboardingState?.step ?? 0;
+  if (!isOnboarded) {
+    switch (onboardingStep) {
+      case 0:
+        return <MobileShell><OnboardingWelcome /></MobileShell>;
+      case 1:
+        return <MobileShell><OnboardingProfile /></MobileShell>;
+      case 2:
+        return <MobileShell><OnboardingCategories /></MobileShell>;
+      case 3:
+        return <MobileShell><OnboardingMontos /></MobileShell>;
+      case 4:
+        return <MobileShell><OnboardingConfirm /></MobileShell>;
+      default:
+        return <MobileShell><OnboardingWelcome /></MobileShell>;
+    }
+  }
+
+  // ==================== 2. AUTH (DESPUÉS DEL ONBOARDING) ====================
+  // El perfil financiero ya está cargado; ahora el usuario crea su cuenta
   if (!user) {
     if (authState === 'login') {
       return (
-        <Modal visible transparent animationType="fade">
+        <MobileShell>
           <KeyboardAvoidingView
             style={styles.authContainer}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={80}
           >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <ThemedView style={styles.authContent}>
+              <View style={styles.authContent}>
                 <Animated.View
                   style={[
                     styles.authBox,
                     {
                       transform: [{ scale: authAnim }],
                       opacity: authAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
+                      backgroundColor: colors.glass_bg_medium,
+                      borderColor: colors.glass_border,
                     },
                   ]}
                 >
-                  <ThemedText style={styles.authTitle}>Bienvenido 👋</ThemedText>
-                  <ThemedText style={styles.authSubtitle}>Inicia sesión en tu cuenta</ThemedText>
+                  {/* Badge de perfil listo */}
+                  <View style={styles.profileReadyBadge}>
+                    <Text style={[styles.profileReadyText, { color: colors.primary }]}>✦ Tu perfil financiero está listo</Text>
+                  </View>
+
+                  <Text style={[styles.authTitle, { color: colors.text_primary }]}>¡Bienvenido{profile?.monthlySalary ? '' : ''} 🎉</Text>
+                  <Text style={[styles.authSubtitle, { color: colors.text_secondary }]}>
+                    Inicia sesión para acceder a tu app personalizada
+                  </Text>
 
                   <View style={styles.inputGroup}>
-                    <ThemedText style={styles.label}>Correo</ThemedText>
+                    <Text style={[styles.label, { color: colors.text_secondary }]}>Correo</Text>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, { color: colors.text_primary, borderColor: colors.glass_border, backgroundColor: colors.glass_bg }]}
                       placeholder="usuario@ejemplo.com"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={colors.text_tertiary}
                       value={loginEmail}
                       onChangeText={setLoginEmail}
                       keyboardType="email-address"
@@ -204,49 +259,48 @@ export default function HomeScreen() {
                   </View>
 
                   <View style={styles.inputGroup}>
-                    <ThemedText style={styles.label}>Contraseña</ThemedText>
+                    <Text style={[styles.label, { color: colors.text_secondary }]}>Contraseña</Text>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, { color: colors.text_primary, borderColor: colors.glass_border, backgroundColor: colors.glass_bg }]}
                       placeholder="••••••••"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={colors.text_tertiary}
                       value={loginPassword}
                       onChangeText={setLoginPassword}
                       secureTextEntry
                     />
                   </View>
 
-                  {authError ? (
-                    <ThemedText style={styles.errorText}>{authError}</ThemedText>
-                  ) : null}
+                  {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
 
-                  <Pressable style={styles.primaryButton} onPress={handleLogin}>
-                    <ThemedText style={styles.primaryButtonText}>Iniciar Sesión</ThemedText>
+                  <Pressable style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={handleLogin}>
+                    <Text style={[styles.primaryButtonText, { color: colors.background }]}>Iniciar Sesión</Text>
                   </Pressable>
 
                   <Pressable onPress={() => setAuthState('register')}>
-                    <ThemedText style={styles.toggleText}>
-                      ¿No tienes cuenta? <ThemedText style={styles.toggleLink}>Regístrate</ThemedText>
-                    </ThemedText>
+                    <Text style={[styles.toggleText, { color: colors.text_secondary }]}>
+                      ¿No tienes cuenta?{' '}
+                      <Text style={[styles.toggleLink, { color: colors.primary }]}>Crear cuenta</Text>
+                    </Text>
                   </Pressable>
                 </Animated.View>
-              </ThemedView>
+              </View>
             </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
-        </Modal>
+        </MobileShell>
       );
     }
 
-    // ==================== REGISTER SCREEN ====================
+    // ==================== REGISTER ====================
     if (authState === 'register') {
       return (
-        <Modal visible transparent animationType="fade">
+        <MobileShell>
           <KeyboardAvoidingView
             style={styles.authContainer}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={80}
           >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <ThemedView style={styles.authContent}>
+              <View style={styles.authContent}>
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                   <Animated.View
                     style={[
@@ -254,29 +308,38 @@ export default function HomeScreen() {
                       {
                         transform: [{ scale: authAnim }],
                         opacity: authAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
+                        backgroundColor: colors.glass_bg_medium,
+                        borderColor: colors.glass_border,
                       },
                     ]}
                   >
-                    <ThemedText style={styles.authTitle}>Crea tu Cuenta 🚀</ThemedText>
-                    <ThemedText style={styles.authSubtitle}>Completa tu información</ThemedText>
+                    {/* Badge de perfil listo */}
+                    <View style={styles.profileReadyBadge}>
+                      <Text style={[styles.profileReadyText, { color: colors.primary }]}>✦ Tu perfil financiero está listo</Text>
+                    </View>
+
+                    <Text style={[styles.authTitle, { color: colors.text_primary }]}>Crea tu Cuenta 🚀</Text>
+                    <Text style={[styles.authSubtitle, { color: colors.text_secondary }]}>
+                      Último paso — guarda tu perfil personalizado
+                    </Text>
 
                     <View style={styles.inputGroup}>
-                      <ThemedText style={styles.label}>Nombre</ThemedText>
+                      <Text style={[styles.label, { color: colors.text_secondary }]}>Nombre</Text>
                       <TextInput
-                        style={styles.input}
+                        style={[styles.input, { color: colors.text_primary, borderColor: colors.glass_border, backgroundColor: colors.glass_bg }]}
                         placeholder="Tu nombre"
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={colors.text_tertiary}
                         value={registerName}
                         onChangeText={setRegisterName}
                       />
                     </View>
 
                     <View style={styles.inputGroup}>
-                      <ThemedText style={styles.label}>Correo</ThemedText>
+                      <Text style={[styles.label, { color: colors.text_secondary }]}>Correo</Text>
                       <TextInput
-                        style={styles.input}
+                        style={[styles.input, { color: colors.text_primary, borderColor: colors.glass_border, backgroundColor: colors.glass_bg }]}
                         placeholder="usuario@ejemplo.com"
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={colors.text_tertiary}
                         value={registerEmail}
                         onChangeText={setRegisterEmail}
                         keyboardType="email-address"
@@ -284,11 +347,11 @@ export default function HomeScreen() {
                     </View>
 
                     <View style={styles.inputGroup}>
-                      <ThemedText style={styles.label}>Contraseña</ThemedText>
+                      <Text style={[styles.label, { color: colors.text_secondary }]}>Contraseña</Text>
                       <TextInput
-                        style={styles.input}
+                        style={[styles.input, { color: colors.text_primary, borderColor: colors.glass_border, backgroundColor: colors.glass_bg }]}
                         placeholder="••••••••"
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={colors.text_tertiary}
                         value={registerPassword}
                         onChangeText={setRegisterPassword}
                         secureTextEntry
@@ -296,153 +359,106 @@ export default function HomeScreen() {
                     </View>
 
                     <View style={styles.inputGroup}>
-                      <ThemedText style={styles.label}>Confirmar Contraseña</ThemedText>
+                      <Text style={[styles.label, { color: colors.text_secondary }]}>Confirmar Contraseña</Text>
                       <TextInput
-                        style={styles.input}
+                        style={[styles.input, { color: colors.text_primary, borderColor: colors.glass_border, backgroundColor: colors.glass_bg }]}
                         placeholder="••••••••"
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={colors.text_tertiary}
                         value={registerConfirmPassword}
                         onChangeText={setRegisterConfirmPassword}
                         secureTextEntry
                       />
                     </View>
 
-                    {authError ? (
-                      <ThemedText style={styles.errorText}>{authError}</ThemedText>
-                    ) : null}
+                    {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
 
-                    <Pressable style={styles.primaryButton} onPress={handleRegister}>
-                      <ThemedText style={styles.primaryButtonText}>Registrarse</ThemedText>
+                    <Pressable style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={handleRegister}>
+                      <Text style={[styles.primaryButtonText, { color: colors.background }]}>Crear Cuenta y Comenzar</Text>
                     </Pressable>
 
                     <Pressable onPress={() => setAuthState('login')}>
-                      <ThemedText style={styles.toggleText}>
-                        ¿Ya tienes cuenta? <ThemedText style={styles.toggleLink}>Inicia sesión</ThemedText>
-                      </ThemedText>
+                      <Text style={[styles.toggleText, { color: colors.text_secondary }]}>
+                        ¿Ya tienes cuenta?{' '}
+                        <Text style={[styles.toggleLink, { color: colors.primary }]}>Inicia sesión</Text>
+                      </Text>
                     </Pressable>
                   </Animated.View>
                 </ScrollView>
-              </ThemedView>
+              </View>
             </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
-        </Modal>
+        </MobileShell>
       );
     }
   }
 
-  // ==================== CATEGORY SELECTION SCREEN ====================
-  if (showTutorial) {
-    return (
-      <>
-        <View style={styles.dummyBackground} />
-        <OnboardingTutorial
-          visible={showTutorial}
-          onComplete={() => setShowTutorial(false)}
-        />
-      </>
-    );
-  }
-
-  // FLUJO DE ONBOARDING MULTIPANTALLA usando contexto global
-  const onboardingStep = onboardingState?.step ?? 0;
-  if (!isOnboarded) {
-    switch (onboardingStep) {
-      case 0:
-        return <OnboardingWelcome />;
-      case 1:
-        return <OnboardingProfile />;
-      case 2:
-        return <OnboardingGoal />;
-      case 3:
-        return <OnboardingBudget />;
-      case 4:
-        return <OnboardingConfirm />;
-      case 5:
-        // Dashboard como paso final del onboarding
-        return (
-          <>
-            <View style={styles.dashboardOnboardingContainer}>
-              <Dashboard transactions={transactions} monthlySalary={user?.monthlySalary || 0} onNavigateToSection={() => {}} />
-            </View>
-            <OnboardingDashboardOverlay
-              visible={showOnboardingOverlay}
-              onComplete={() => setShowOnboardingOverlay(false)}
-            />
-          </>
-        );
-      default:
-        return <OnboardingWelcome />;
-    }
-  }
-
-  // ==================== MOBILE DASHBOARD ====================
+  // ==================== 3. MAIN APP (CON DATOS DEL PERFIL CARGADOS) ====================
   return (
-    <View style={styles.mobileContainer}>
-      <View style={styles.mobileHeader}>
-        <ThemedText style={styles.mobileHeaderTitle}>
-          {currentScreen === 'dashboard' && '📊 Dashboard'}
-          {currentScreen === 'ingresos' && '📈 Ingresos'}
-          {currentScreen === 'gastos' && '💸 Gastos'}
-          {currentScreen === 'categorias' && '🗂️ Categorías'}
-          {currentScreen === 'estadisticas' && '📉 Estadísticas'}
-          {currentScreen === 'bot' && '🤖 Asistente IA'}
-          {currentScreen === 'perfil' && '👤 Perfil'}
-        </ThemedText>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Pressable style={styles.logoutBtn} onPress={handleLogout}>
-            <ThemedText style={styles.logoutBtnText}>Cerrar sesión</ThemedText>
-          </Pressable>
-          <Pressable style={[styles.logoutBtn, { backgroundColor: '#e0e7ff' }]} onPress={handleResetOnboarding}>
-            <ThemedText style={[styles.logoutBtnText, { color: '#3730a3' }]}>Reset Onboarding</ThemedText>
-          </Pressable>
+    <MobileShell>
+      <View style={styles.appContainer}>
+        <View style={styles.screenContent}>
+          {currentScreen === 'dashboard' && (
+            <FinancialFeed
+              transactions={transactions}
+              onNavigateToSection={handleNavigateToSection}
+            />
+          )}
+          {currentScreen === 'ingresos' && <FinanzasScreen />}
+          {currentScreen === 'gastos' && (
+            <Gastos
+              transactions={transactions}
+              onAddExpense={addExpense}
+              onDeleteTransaction={deleteTransaction}
+            />
+          )}
+          {currentScreen === 'categorias' && <Categorias onCategoryUpdate={() => {}} />}
+          {currentScreen === 'estadisticas' && (
+            <Estadisticas transactions={transactions} monthlySalary={profile?.monthlySalary || 0} />
+          )}
+          {currentScreen === 'bot' && (
+            <BotIA transactions={transactions} monthlySalary={profile?.monthlySalary || 0} />
+          )}
+          {currentScreen === 'perfil' && (
+            <Usuario onLogout={handleLogout} onReset={handleReset} onStartTour={handleStartTour} />
+          )}
+          {currentScreen === 'explorar' && (
+            <ExplorarScreen />
+          )}
+          {currentScreen === 'historial' && (
+            <HistorialScreen />
+          )}
         </View>
+        <BottomNavBar
+          currentScreen={currentScreen}
+          onScreenChange={setCurrentScreen}
+        />
       </View>
-      <View style={styles.screenContent}>
-        {currentScreen === 'dashboard' && (
-          <Dashboard
-            transactions={transactions}
-            monthlySalary={0}
-            onNavigateToSection={handleNavigateToSection}
-          />
-        )}
-        {currentScreen === 'ingresos' && (
-          <Ingresos
-            transactions={transactions}
-            onAddIncome={addIncome}
-            onDeleteTransaction={deleteTransaction}
-          />
-        )}
-        {currentScreen === 'gastos' && (
-          <Gastos
-            transactions={transactions}
-            onAddExpense={addExpense}
-            onDeleteTransaction={deleteTransaction}
-          />
-        )}
-        {currentScreen === 'categorias' && <Categorias onCategoryUpdate={() => {}} />}
-        {currentScreen === 'estadisticas' && (
-          <Estadisticas transactions={transactions} monthlySalary={0} />
-        )}
-        {currentScreen === 'bot' && (
-          <BotIA transactions={transactions} monthlySalary={0} />
-        )}
-        {currentScreen === 'perfil' && (
-          <Usuario onLogout={handleLogout} />
-        )}
-      </View>
-      <Navigation
-        currentScreen={currentScreen}
-        onScreenChange={setCurrentScreen}
-        userName={user?.name}
+
+      {/* Product Tour */}
+      <ProductTour
+        steps={APP_TOUR_STEPS}
+        visible={showTour}
+        onFinish={handleTourFinish}
       />
-    </View>
+
+      {/* Quick Add Bottom Sheet */}
+      <QuickAddSheet
+        visible={quickAddMode !== null}
+        mode={quickAddMode ?? 'expense'}
+        onClose={() => setQuickAddMode(null)}
+        onAdd={(amount, category, type, date) => {
+          addTransaction(amount, category, type, date);
+          setQuickAddMode(null);
+        }}
+      />
+    </MobileShell>
   );
 }
 
 const styles = StyleSheet.create({
+  // Auth
   authContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -450,131 +466,96 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
+    width: '100%',
   },
   scrollContent: {
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 40,
+    width: '100%',
   },
   authBox: {
     width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    borderRadius: 20,
+    padding: 28,
+    borderWidth: 1,
+  },
+  profileReadyBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(0, 212, 170, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 170, 0.30)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginBottom: 16,
+  },
+  profileReadyText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   authTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
-    color: '#1f2937',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   authSubtitle: {
     fontSize: 14,
-    color: '#6b7280',
     marginBottom: 24,
     fontWeight: '500',
+    lineHeight: 20,
   },
   inputGroup: {
     marginBottom: 16,
   },
   label: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#374151',
-    marginBottom: 6,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    fontSize: 16,
-    color: '#1f2937',
-    backgroundColor: '#f9fafb',
+    borderRadius: 10,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    fontSize: 15,
   },
   errorText: {
-    color: '#dc2626',
+    color: '#FF3B30',
     fontSize: 13,
     fontWeight: '500',
     marginBottom: 12,
     textAlign: 'center',
   },
   primaryButton: {
-    backgroundColor: '#0ea5e9',
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: 15,
+    borderRadius: 12,
     alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: 14,
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 4,
   },
   primaryButtonText: {
-    color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
   },
   toggleText: {
     textAlign: 'center',
-    color: '#6b7280',
     fontSize: 14,
     fontWeight: '500',
   },
   toggleLink: {
-    color: '#0ea5e9',
     fontWeight: '700',
   },
-
-  // Mobile Layout
-  mobileContainer: {
+  // App layout
+  appContainer: {
     flex: 1,
-    backgroundColor: '#f9fafb',
-  },
-  mobileHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    marginTop: 10,
-  },
-  mobileHeaderTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1f2937',
-  },
-  logoutBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: '#fee2e2',
-    borderRadius: 6,
-  },
-  logoutBtnText: {
-    color: '#dc2626',
-    fontSize: 13,
-    fontWeight: '600',
   },
   screenContent: {
-    flex: 1,
-    paddingBottom: 80,
-    overflow: 'hidden',
-  },
-  dummyBackground: {
-    flex: 1,
-    backgroundColor: '#f9fafb',
-  },
-  dashboardOnboardingContainer: {
     flex: 1,
   },
 });
