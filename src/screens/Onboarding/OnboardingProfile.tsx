@@ -1,116 +1,205 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, Animated, SafeAreaView,
-  TouchableOpacity, TextInput, KeyboardAvoidingView,
-  Platform, Keyboard,
+  Animated, Keyboard, KeyboardAvoidingView, Platform,
+  StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useFinance } from '../../state';
 import { useTheme } from '../../state/ThemeContext';
-import { ChatBubble, ProgressIndicator } from '../../components/onboarding';
+import { Icon, FeatherName } from '../../components/ui/Icon';
+import { OnboardingShell } from '../../components/onboarding/OnboardingShell';
 
-const fmtCOP = (raw: string) => {
-  const num = parseInt(raw.replace(/\./g, ''), 10);
-  if (isNaN(num)) return '';
-  return num.toLocaleString('es-CO').replace(/,/g, '.');
-};
+interface Props { onNext: () => void; onBack: () => void; }
 
-export const OnboardingProfile: React.FC = () => {
-  const { updateOnboardingStep, setProfile, profile } = useFinance();
+type EmpType = 'employed' | 'freelance' | 'business' | 'student';
+const EMP_OPTIONS: { key: EmpType; label: string; icon: FeatherName }[] = [
+  { key: 'employed',  label: 'Empleado',   icon: 'briefcase'   },
+  { key: 'freelance', label: 'Freelancer', icon: 'code'        },
+  { key: 'business',  label: 'Empresario', icon: 'trending-up' },
+  { key: 'student',   label: 'Estudiante', icon: 'book-open'   },
+];
+
+export const OnboardingProfile: React.FC<Props> = ({ onNext, onBack }) => {
+  const { setProfile, profile } = useFinance();
   const { colors } = useTheme();
-  const [income, setIncome] = useState('');
+  const [nombre, setNombre] = useState(profile?.mainFinancialConcern ?? '');
+  const [empType, setEmpType] = useState<EmpType | null>(
+    (profile?.employmentType as EmpType) ?? null
+  );
   const [focused, setFocused] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  const [showSecond, setShowSecond] = useState(
+    !!(profile?.mainFinancialConcern && profile.mainFinancialConcern.length >= 2)
+  );
 
-  const nombre = profile?.mainFinancialConcern ?? 'amigo';
+  const bubble1  = useRef(new Animated.Value(0)).current;
+  const bubble2  = useRef(new Animated.Value(0)).current;
+  const optAnims = useRef(EMP_OPTIONS.map(() => new Animated.Value(0))).current;
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const runSecondBubble = () => {
+    Animated.sequence([
+      Animated.spring(bubble2, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
+      Animated.stagger(60, optAnims.map(a =>
+        Animated.spring(a, { toValue: 1, tension: 70, friction: 9, useNativeDriver: true })
+      )),
+    ]).start();
+  };
 
   useEffect(() => {
-    Keyboard.dismiss();
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
-    ]).start();
+    Animated.spring(bubble1, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }).start();
+    if (showSecond) runSecondBubble();
   }, []);
 
-  const handleContinue = () => {
+  const handleNameChange = (text: string) => {
+    setNombre(text);
+    if (debounce.current) clearTimeout(debounce.current);
+    if (text.trim().length >= 2 && !showSecond) {
+      debounce.current = setTimeout(() => { setShowSecond(true); runSecondBubble(); }, 800);
+    }
+  };
+
+  const handleSelectEmp = (key: EmpType) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setEmpType(key);
+  };
+
+  const canContinue = nombre.trim().length >= 2 && empType !== null;
+
+  const handleNext = () => {
+    if (!canContinue) return;
     Keyboard.dismiss();
-    const salario = parseInt(income.replace(/\./g, ''), 10) || 0;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setProfile({
-      ...(profile as any),
       id: profile?.id ?? Date.now().toString(),
       userId: '1',
-      employmentType: profile?.employmentType ?? 'employed',
+      employmentType: empType!,
       incomeType: 'fixed',
-      monthlySalary: salario,
-      hasDebts: false,
-      mainFinancialConcern: profile?.mainFinancialConcern ?? '',
+      monthlySalary: profile?.monthlySalary ?? 0,
+      hasDebts: profile?.hasDebts ?? false,
+      mainFinancialConcern: nombre.trim(),
       currencyPreference: 'COP',
       createdAt: profile?.createdAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
-    updateOnboardingStep(2);
+    onNext();
   };
 
-  const canContinue = income.replace(/\./g, '').length > 0 && parseInt(income.replace(/\./g, ''), 10) > 0;
+  const bubbleSlide = (a: Animated.Value) => ({
+    opacity: a,
+    transform: [{ translateX: a.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }],
+  });
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.progress}>
-        <ProgressIndicator currentStep={1} totalSteps={5} />
-      </View>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.kav}>
-        <Animated.View style={[styles.inner, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-          <ChatBubble
-            message={"Mucho gusto, " + nombre + "! Para ayudarte bien necesito saber con cuanto dinero cuentas cada mes. Cual es tu ingreso mensual aproximado?"}
-            isUser={false}
-          />
-          <View style={styles.inputBlock}>
-            <TextInput
-              style={[styles.input, { color: colors.text_primary, borderColor: focused ? colors.primary : '#E5E7EB', backgroundColor: '#FFFFFF', borderWidth: focused ? 2 : 1 }]}
-              placeholder='Ej: 2.500.000'
-              placeholderTextColor='#9CA3AF'
-              value={income}
-              onChangeText={(txt) => {
-                const digits = txt.replace(/\./g, '').replace(/[^0-9]/g, '');
-                const num = parseInt(digits, 10);
-                setIncome(isNaN(num) ? '' : num.toLocaleString('es-CO').replace(/,/g, '.'));
-              }}
-              keyboardType='numeric'
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-              returnKeyType='done'
-              onSubmitEditing={canContinue ? handleContinue : undefined}
-              autoFocus
-            />
-            {income.length > 0 && (
-              <Text style={[styles.preview, { color: colors.primary }]}>
-                {}
+    <OnboardingShell step={1} totalSteps={5} onBack={onBack}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <View style={[s.inner, { paddingHorizontal: 24 }]}>
+          <View style={s.finnRow}>
+            <View style={[s.finnAvatar, { backgroundColor: colors.primary }]}>
+              <Text style={s.finnLetter}>F</Text>
+            </View>
+            <Animated.View style={[s.bubble, { backgroundColor: colors.card, borderColor: colors.border }, bubbleSlide(bubble1)]}>
+              <Text style={[s.bubbleText, { color: colors.textPrimary }]}>
+                Como te llamas? Asi puedo personalizarte mejor
               </Text>
-            )}
+            </Animated.View>
           </View>
+
+          <TextInput
+            style={[
+              s.nameInput,
+              {
+                color: colors.textPrimary,
+                borderBottomColor: focused ? colors.primary : colors.border,
+                borderBottomWidth: focused ? 2 : 1,
+              },
+            ]}
+            placeholder="Tu nombre..."
+            placeholderTextColor={colors.textTertiary}
+            value={nombre}
+            onChangeText={handleNameChange}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            autoFocus
+            returnKeyType="next"
+          />
+
+          {showSecond && (
+            <>
+              <View style={[s.finnRow, { marginTop: 20 }]}>
+                <View style={[s.finnAvatar, { backgroundColor: colors.primary }]}>
+                  <Text style={s.finnLetter}>F</Text>
+                </View>
+                <Animated.View style={[s.bubble, { backgroundColor: colors.card, borderColor: colors.border }, bubbleSlide(bubble2)]}>
+                  <Text style={[s.bubbleText, { color: colors.textPrimary }]}>
+                    {nombre.trim()
+                      ? 'Hola ' + nombre.trim().split(' ')[0] + '! A que te dedicas?'
+                      : 'A que te dedicas?'}
+                  </Text>
+                </Animated.View>
+              </View>
+
+              <View style={s.empGrid}>
+                {EMP_OPTIONS.map((opt, i) => {
+                  const sel = empType === opt.key;
+                  return (
+                    <Animated.View
+                      key={opt.key}
+                      style={{
+                        width: '48%',
+                        opacity: optAnims[i],
+                        transform: [{ scale: optAnims[i].interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }],
+                      }}
+                    >
+                      <TouchableOpacity
+                        style={[
+                          s.empCard,
+                          {
+                            backgroundColor: sel ? colors.primaryLight : colors.card,
+                            borderColor: sel ? colors.primary : colors.border,
+                            borderWidth: sel ? 1.5 : 0.5,
+                          },
+                        ]}
+                        onPress={() => handleSelectEmp(opt.key)}
+                        activeOpacity={0.8}
+                      >
+                        <Icon name={opt.icon} size={24} color={sel ? colors.primary : colors.textSecondary} />
+                        <Text style={[s.empLabel, { color: sel ? colors.primary : colors.textPrimary }]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    </Animated.View>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          <View style={{ flex: 1 }} />
           <TouchableOpacity
-            style={[styles.btn, { backgroundColor: colors.primary }, !canContinue && styles.btnDisabled]}
-            onPress={handleContinue}
+            style={[s.btn, { backgroundColor: colors.primary, opacity: canContinue ? 1 : 0.4 }]}
+            onPress={handleNext}
             disabled={!canContinue}
-            activeOpacity={0.82}
+            activeOpacity={0.85}
           >
-            <Text style={styles.btnText}>Continuar</Text>
+            <Text style={s.btnText}>Continuar</Text>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </OnboardingShell>
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
-  kav: { flex: 1 },
-  progress: { marginBottom: 4 },
-  inner: { flex: 1, paddingHorizontal: 24, paddingTop: 32, gap: 20 },
-  inputBlock: { gap: 8 },
-  input: { borderRadius: 12, paddingHorizontal: 16, paddingVertical: 16, fontSize: 22, fontWeight: '700' },
-  preview: { fontSize: 13, fontWeight: '600', textAlign: 'right' },
-  btn: { paddingVertical: 17, borderRadius: 14, alignItems: 'center', marginTop: 8 },
-  btnDisabled: { opacity: 0.4 },
-  btnText: { fontSize: 17, fontWeight: '700', color: '#FFFFFF' },
+const s = StyleSheet.create({
+  inner:      { flex: 1, paddingTop: 8, paddingBottom: 24, gap: 8 },
+  finnRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  finnAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
+  finnLetter: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+  bubble:     { flex: 1, borderRadius: 14, borderTopLeftRadius: 4, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
+  bubbleText: { fontSize: 15, lineHeight: 22 },
+  nameInput:  { fontSize: 24, fontWeight: '500', paddingVertical: 12, marginTop: 8 },
+  empGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  empCard:    { borderRadius: 14, padding: 14, alignItems: 'center', gap: 8 },
+  empLabel:   { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  btn:        { borderRadius: 16, padding: 16, alignItems: 'center', marginTop: 8 },
+  btnText:    { fontSize: 16, fontWeight: '500', color: '#FFFFFF' },
 });

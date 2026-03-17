@@ -45,13 +45,13 @@ export const ConfirmarPagoModal: React.FC<Props> = ({ visible, compromiso, onClo
 
   const handleConfirm = () => {
     Keyboard.dismiss();
-    const montoPagado = parseInt(monto.replace(/[.]/g, ""), 10) || (compromiso?.presupuesto || 0);
+    const montoPagado = parseInt(monto.replace(/[.]/g, ""), 10) || (compromiso?.budget || 0);
     setStep("analyzing");
     animateDots();
     setTimeout(() => {
       markCategoryPaid(compromiso.id);
       const salario = profile?.monthlySalary || 0;
-      const total = categories.filter((c: any) => c.tipo).reduce((s: number, c: any) => s + (c.presupuesto || 0), 0);
+      const total = categories.filter((c: any) => c.tipo).reduce((s: number, c: any) => s + (c.budget || 0), 0);
       const msg = (aiService as any).analyzePago
         ? (aiService as any).analyzePago(compromiso, montoPagado, new Date(), salario, total)
         : "Pago registrado. Ganas +50 XP!";
@@ -97,7 +97,7 @@ return (
                       <Text style={s.catIcon}>{compromiso.icon || "📦"}</Text>
                       <View style={{ flex: 1 }}>
                         <Text style={s.catName}>{compromiso.name}</Text>
-                        <Text style={s.catBudget}>Presupuesto: {fmtCOP(compromiso.presupuesto || 0)}</Text>
+                        <Text style={s.catBudget}>Presupuesto: {fmtCOP(compromiso.budget || 0)}</Text>
                         {compromiso.diaPago ? (
                           <Text style={s.catDay}>Dia de pago: {compromiso.diaPago === 0 ? "Ultimo del mes" : "Dia " + compromiso.diaPago}</Text>
                         ) : null}
@@ -106,7 +106,7 @@ return (
                     <Text style={s.inputLabel}>Monto pagado (COP)</Text>
                     <TextInput
                       style={[s.montoInput, focused && s.montoInputFocused]}
-                      placeholder={fmtCOP(compromiso.presupuesto || 0)}
+                      placeholder={fmtCOP(compromiso.budget || 0)}
                       placeholderTextColor="#9CA3AF"
                       keyboardType="numeric"
                       value={monto}

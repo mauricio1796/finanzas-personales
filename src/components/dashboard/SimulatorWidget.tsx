@@ -100,7 +100,7 @@ export const SimulatorWidget: React.FC<SimulatorWidgetProps> = ({
           <TextInput
             style={styles.input}
             placeholder="$0.00"
-            placeholderTextColor={COLORS.text_secondary}
+            placeholderTextColor={COLORS.textSecondary}
             value={simulatedAmount}
             onChangeText={setSimulatedAmount}
             keyboardType="decimal-pad"
@@ -158,7 +158,7 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, color }) => (
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.background_secondary,
+    backgroundColor: COLORS.cardSecondary,
     borderRadius: 12,
     padding: SPACING.lg,
     gap: SPACING.md,
@@ -169,11 +169,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
   },
   subtitle: {
     fontSize: 12,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 11,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     fontWeight: '500',
   },
   statValue: {
@@ -202,15 +202,15 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
   },
   input: {
     borderWidth: 1,
-    borderColor: COLORS.gray,
+    borderColor: COLORS.border,
     borderRadius: 8,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
     fontSize: 14,
   },
   resultContainer: {
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   resultText: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -238,13 +238,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     borderWidth: 1,
-    borderColor: COLORS.gray,
+    borderColor: COLORS.border,
     borderRadius: 8,
     paddingVertical: SPACING.sm,
     alignItems: 'center',
   },
   clearButtonText: {
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
     fontSize: 13,
     fontWeight: '600',
   },

@@ -103,7 +103,7 @@ export const UserLevelBadge: React.FC<UserLevelBadgeProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.background_secondary,
+    backgroundColor: COLORS.cardSecondary,
     borderRadius: 12,
     padding: SPACING.lg,
     gap: SPACING.lg,
@@ -137,11 +137,11 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 14,
     fontWeight: '700',
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
   },
   levelTitle: {
     fontSize: 12,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     fontWeight: '500',
   },
   experienceContainer: {
@@ -163,11 +163,11 @@ const styles = StyleSheet.create({
   experienceLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
   },
   experienceToNext: {
     fontSize: 11,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
   },
   milestoneContainer: {
     flexDirection: 'row',
@@ -187,13 +187,13 @@ const styles = StyleSheet.create({
   },
   milestoneLabel: {
     fontSize: 11,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     fontWeight: '500',
   },
   milestoneValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
     marginTop: SPACING.xs,
   },
 });

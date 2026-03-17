@@ -13,15 +13,15 @@ export interface Category {
   name: string;
   icon?: string;
   color?: string;
-  budget?: number;
+  budget?: number;       // canonical monthly budget amount (replaces presupuesto)
   isSelected?: boolean;
-  presupuesto?: number;
-  gastado?: number;
   diaPago?: number;
   pagado?: boolean;
-  tipo?: string;
+  tipo?: 'gasto' | 'ingreso' | 'fijo' | 'variable';
   fechaCreacion?: string;
 }
+
+export type CategoryUpdate = Partial<Omit<Category, 'id'>>;
 
 // Transaction Types
 export interface Transaction {

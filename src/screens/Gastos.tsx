@@ -22,9 +22,10 @@ interface GastosProps {
   transactions: Transaction[];
   onAddExpense: (amount: number, category: string, date: Date, description?: string) => void;
   onDeleteTransaction: (id: string) => void;
+  onBack?: () => void;
 }
 
-export function Gastos({ transactions, onAddExpense, onDeleteTransaction }: GastosProps) {
+export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack }: GastosProps) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { categories } = useFinance();
@@ -90,6 +91,11 @@ export function Gastos({ transactions, onAddExpense, onDeleteTransaction }: Gast
     >
       {/* Header */}
       <View style={styles.header}>
+        {onBack && (
+          <Pressable onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.backBtn}>
+            <Icon name="arrow-left" size={20} color="#111827" />
+          </Pressable>
+        )}
         <Text style={styles.headerLabel}>FINANZAS</Text>
         <Text style={styles.headerTitle}>Registrar Gastos</Text>
       </View>
@@ -201,6 +207,7 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 4,
   },
+  backBtn: { marginBottom: 8 },
   headerLabel: {
     fontSize: 11,
     color: '#9CA3AF',

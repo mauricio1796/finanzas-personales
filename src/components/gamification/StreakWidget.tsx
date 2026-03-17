@@ -152,7 +152,7 @@ export const StreakWidget: React.FC<StreakWidgetProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.background_secondary,
+    backgroundColor: COLORS.cardSecondary,
     borderRadius: 12,
     padding: SPACING.lg,
     gap: SPACING.md,
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   },
   streakLabel: {
     fontSize: 12,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     fontWeight: '500',
   },
   streakDays: {
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   },
   timeRemaining: {
     fontSize: 11,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     fontStyle: 'italic',
   },
   warningBadge: {
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.background_secondary,
+    backgroundColor: COLORS.cardSecondary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   },
   bestStreakLabel: {
     fontSize: 11,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     fontWeight: '500',
   },
   bestStreakValue: {
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   },
   motivationText: {
     fontSize: 12,
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
     fontWeight: '500',
     lineHeight: 18,
   },

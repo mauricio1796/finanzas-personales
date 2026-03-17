@@ -23,7 +23,7 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({
 }) => {
   const { colors } = useTheme();
   return (
-    <View style={[styles.container, { backgroundColor: colors.glass_bg, borderColor: colors.glass_border }]}>
+    <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Text style={styles.title}>{title}</Text>
 
       <View style={styles.distributionRow}>

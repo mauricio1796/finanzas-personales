@@ -8,9 +8,9 @@ import { RETOS_DISPONIBLES, RetoComunidad, calcularProgresoReto, getDiasRestante
 const DIFICULTAD_COLORS = { facil: '#10B981', medio: '#F59E0B', dificil: '#EF4444' };
 const DIFICULTAD_LABELS = { facil: 'Facil', medio: 'Medio', dificil: 'Dificil' };
 
-interface RetosScreenProps { onPremiumPress?: () => void; }
+interface RetosScreenProps { onPremiumPress?: () => void; onBack?: () => void; }
 
-export const RetosScreen: React.FC<RetosScreenProps> = ({ onPremiumPress }) => {
+export const RetosScreen: React.FC<RetosScreenProps> = ({ onPremiumPress, onBack }) => {
   const insets = useSafeAreaInsets();
   const { retoActivo, retosCompletados, iniciarReto, completarReto, abandonarReto, transactions, premium } = useFinance();
 
@@ -44,7 +44,12 @@ export const RetosScreen: React.FC<RetosScreenProps> = ({ onPremiumPress }) => {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Retos</Text>
+        {onBack ? (
+          <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+            <Icon name="arrow-left" size={20} color="#111827" />
+          </TouchableOpacity>
+        ) : null}
+        <Text style={[styles.headerTitle, onBack && { flex: 1, textAlign: 'center' }]}>Retos</Text>
         <Icon name="award" size={20} color="#6366F1" />
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>

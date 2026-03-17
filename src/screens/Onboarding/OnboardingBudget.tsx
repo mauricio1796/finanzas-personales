@@ -132,7 +132,7 @@ export const OnboardingBudget: React.FC = () => {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { color: colors.text_primary }]}>
+          <Text style={[styles.loadingText, { color: colors.textPrimary }]}>
             Calculando presupuesto...
           </Text>
         </View>
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
   },
   budgetContainer: {
     marginVertical: SPACING.lg,
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   },
   adjustButton: {
     flex: 1,
-    backgroundColor: COLORS.background_secondary,
+    backgroundColor: COLORS.cardSecondary,
     paddingVertical: SPACING.md,
     borderRadius: 12,
     alignItems: 'center',

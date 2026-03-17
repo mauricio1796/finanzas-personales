@@ -164,8 +164,8 @@ function PresupuestoTab() {
   const [editingCat, setEditingCat] = useState<any>(undefined);
   const [pagoModal, setPagoModal] = useState<{ visible: boolean; compromiso: any | null }>({ visible: false, compromiso: null });
 
-  const budgetCats = useMemo(() => categories.filter((c: any) => c.tipo || (c.presupuesto ?? 0) > 0), [categories]);
-  const totalPresupuesto = useMemo(() => budgetCats.reduce((s: number, c: any) => s + (c.presupuesto ?? 0), 0), [budgetCats]);
+  const budgetCats = useMemo(() => categories.filter((c: any) => c.tipo || (c.budget ?? 0) > 0), [categories]);
+  const totalPresupuesto = useMemo(() => budgetCats.reduce((s: number, c: any) => s + (c.budget ?? 0), 0), [budgetCats]);
 
   const getMesActual = () => { const n = new Date(); return n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0"); };
 
@@ -242,13 +242,14 @@ function PresupuestoTab() {
         editing={editingCat}
         existingCount={categories.length}
         onClose={() => setModalVisible(false)}
-        onSave={cat => { if (editingCat) { updateCategory(cat); } else { addCategory(cat); } }}
+        onSave={cat => { if (editingCat) { updateCategory(cat.id, cat); } else { addCategory(cat); } }}
       />
     </ScrollView>
   );
 }
 // --- Main Screen ---
-export const FinanzasScreen: React.FC = () => {
+interface FinanzasScreenProps { onBack?: () => void; }
+export const FinanzasScreen: React.FC<FinanzasScreenProps> = ({ onBack }) => {
   const insets = useSafeAreaInsets();
   const { deleteTransaction } = useFinance();
   const [subTab, setSubTab] = useState<SubTab>("historial");
@@ -261,7 +262,15 @@ export const FinanzasScreen: React.FC = () => {
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Text style={s.headerTitle}>Finanzas</Text>
+        <View style={s.headerTopRow}>
+          {onBack ? (
+            <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+              <Icon name="arrow-left" size={20} color="#111827" />
+            </TouchableOpacity>
+          ) : <View style={{ width: 28 }} />}
+          <Text style={s.headerTitle}>Finanzas</Text>
+          <View style={{ width: 28 }} />
+        </View>
         <View style={s.subTabBar}>
           {(["historial", "presupuesto"] as SubTab[]).map(tab => (
             <TouchableOpacity key={tab} style={[s.subTab, subTab === tab && s.subTabActive]} onPress={() => setSubTab(tab)} activeOpacity={0.7}>
@@ -280,7 +289,8 @@ const s = StyleSheet.create({
   fill: { flex: 1 },
   tabContent: { padding: 16, paddingBottom: 32, gap: 12 },
   header: { backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderBottomColor: "#E5E7EB", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 0 },
-  headerTitle: { fontSize: 22, fontWeight: "800", color: "#111827", marginBottom: 12 },
+  headerTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  headerTitle: { fontSize: 22, fontWeight: "800", color: "#111827", flex: 1, textAlign: "center" },
   subTabBar: { flexDirection: "row", gap: 4 },
   subTab: { flex: 1, paddingVertical: 10, alignItems: "center", borderBottomWidth: 3, borderBottomColor: "transparent" },
   subTabActive: { borderBottomColor: "#6366F1" },

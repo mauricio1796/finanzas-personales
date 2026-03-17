@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   TextInput,
@@ -11,6 +11,7 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   ScrollView,
+  BackHandler,
 } from 'react-native';
 
 import { useFinance } from '../../src/state';
@@ -23,28 +24,53 @@ import { SplashScreen } from '../../src/screens/SplashScreen';
 import { QuickAddSheet } from '../../src/components/ui/QuickAddSheet';
 import { ProductTour, APP_TOUR_STEPS } from '../../src/components/ui/ProductTour';
 import { storageService } from '../../src/services/storage/StorageService';
+import { ResumenSemanalScreen } from '../../src/screens/ResumenSemanalScreen';
+import { GamificacionScreen } from '../../src/screens/GamificacionScreen';
+import { ConfiguracionScreen } from '../../src/screens/ConfiguracionScreen';
+import { ResumenSemanalCard } from '../../src/components/finanzas/ResumenSemanalCard';
+import { programarResumenSemanal } from '../../src/services/NotificacionesService';
+import * as Notifications from 'expo-notifications';
 
 // Screens
 import { FinanzasScreen } from '../../src/screens/FinanzasScreen';
 import { Gastos } from '../../src/screens/Gastos';
 import { Categorias } from '../../src/screens/Categorias';
+import { CategoriasScreen } from '../../src/screens/CategoriasScreen';
 import { Estadisticas } from '../../src/screens/Estadisticas';
 import { BotIA } from '../../src/screens/BotIA';
 import { ExplorarScreen } from '../../src/screens/ExplorarScreen';
 import { HistorialScreen } from '../../src/screens/HistorialScreen';
+import { RetosScreen } from '../../src/screens/RetosScreen';
+import { CalendarioScreen } from '../../src/screens/CalendarioScreen';
+import { AcademiaScreen } from '../../src/screens/AcademiaScreen';
+import { ProyeccionesScreen } from '../../src/screens/ProyeccionesScreen';
 import { Usuario } from '../../src/screens/Usuario';
 import { type ScreenName } from '../../src/screens/Navigation';
 import {
   OnboardingWelcome,
   OnboardingProfile,
+  OnboardingSalario,
   OnboardingCategories,
   OnboardingMontos,
   OnboardingConfirm,
 } from '../../src/screens/Onboarding';
 
+type OnboardingStep = 'welcome' | 'profile' | 'salario' | 'categories' | 'montos' | 'confirm';
+const ONBOARDING_STEPS: OnboardingStep[] = ['welcome', 'profile', 'salario', 'categories', 'montos', 'confirm'];
+
+const TAB_KEYS = ['dashboard', 'categorias', 'estadisticas', 'perfil'];
+function getTabActivo(screen: string): string {
+  if (TAB_KEYS.includes(screen)) return screen;
+  if (screen === 'configuracion') return 'perfil';
+  return 'dashboard';
+}
+function mostrarBottomNav(screen: string): boolean {
+  return TAB_KEYS.includes(screen);
+}
+
 export default function HomeScreen() {
   const {
-    setUser, user, isOnboarded, setIsOnboarded, onboardingState, profile,
+    setUser, user, isOnboarded, setIsOnboarded, onboardingState, updateOnboardingStep, profile,
     transactions, addTransaction: ctxAddTransaction, deleteTransaction: ctxDeleteTransaction,
   } = useFinance();
   const { colors } = useTheme();
@@ -64,8 +90,43 @@ export default function HomeScreen() {
 
   // ==================== APP STATE ====================
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('dashboard');
+  const [navHistory, setNavHistory] = useState<string[]>([]);
   const [quickAddMode, setQuickAddMode] = useState<'income' | 'expense' | null>(null);
   const [showTour, setShowTour] = useState(false);
+  const [botInitialMessage, setBotInitialMessage] = useState<string | undefined>(undefined);
+
+  // ==================== NAVIGATION STACK ====================
+  const transitionAnim = useRef(new Animated.Value(1)).current;
+
+  const navegarA = useCallback((screen: string) => {
+    if (screen === currentScreen) return;
+    setNavHistory(prev => [...prev, currentScreen].slice(-10));
+    Animated.timing(transitionAnim, { toValue: 0, duration: 110, useNativeDriver: true }).start(() => {
+      setCurrentScreen(screen as ScreenName);
+      Animated.timing(transitionAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    });
+  }, [currentScreen, transitionAnim]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const volver = useCallback(() => {
+    const prev = navHistory.length > 0 ? navHistory[navHistory.length - 1] : 'dashboard';
+    setNavHistory(h => h.slice(0, -1));
+    Animated.timing(transitionAnim, { toValue: 0, duration: 90, useNativeDriver: true }).start(() => {
+      setCurrentScreen(prev as ScreenName);
+      Animated.timing(transitionAnim, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+    });
+  }, [navHistory, transitionAnim]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const navegarATab = useCallback((screen: string) => {
+    setNavHistory([]);
+    setCurrentScreen(screen as ScreenName);
+  }, []);
+
+  // ==================== ONBOARDING STEP MACHINE ====================
+  const storedIdx = onboardingState?.step ?? 0;
+  const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>(
+    ONBOARDING_STEPS[Math.min(storedIdx, ONBOARDING_STEPS.length - 1)] ?? 'welcome'
+  );
+  const onboardingAnim = useRef(new Animated.Value(1)).current;
 
   // ==================== ANIMATIONS ====================
   const authAnim = useRef(new Animated.Value(0)).current;
@@ -74,7 +135,7 @@ export default function HomeScreen() {
     Animated.spring(authAnim, { toValue: 1, friction: 8, useNativeDriver: true }).start();
   }, [authState, authAnim]);
 
-  // Auto-show tour on first login
+  // Auto-show tour on first login + schedule weekly summary notification
   useEffect(() => {
     if (!user) return;
     storageService.getTourDone().then(done => {
@@ -84,7 +145,18 @@ export default function HomeScreen() {
         return () => clearTimeout(t);
       }
     });
+    programarResumenSemanal().catch(() => {});
   }, [user?.id]);
+
+  // Notification tap listener → open weekly summary
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener(response => {
+      if (response.notification.request.content.data?.type === 'weekly_summary') {
+        setCurrentScreen('resumenSemanal');
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   // ==================== AUTH HANDLERS ====================
   const handleLogin = () => {
@@ -181,11 +253,21 @@ export default function HomeScreen() {
   };
 
   const handleNavigateToSection = (section: string) => {
-    // FAB buttons on dashboard open the quick-add sheet instead of navigating
     if (section === 'quick_income') { setQuickAddMode('income'); return; }
     if (section === 'quick_expense') { setQuickAddMode('expense'); return; }
-    setCurrentScreen(section as ScreenName);
+    navegarA(section);
   };
+
+  // ── Android hardware back button ──────────────────────────────────────────
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (quickAddMode !== null) { setQuickAddMode(null); return true; }
+      if (TAB_KEYS.includes(currentScreen)) return false; // let OS handle (exit app)
+      volver();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [quickAddMode, currentScreen, volver]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ==================== 0. SPLASH ====================
   if (showSplash) {
@@ -193,23 +275,42 @@ export default function HomeScreen() {
   }
 
   // ==================== 1. ONBOARDING AI (PRIMERO) ====================
-  // La IA recopila toda la información del usuario antes de pedir cuenta
-  const onboardingStep = onboardingState?.step ?? 0;
-  if (!isOnboarded) {
-    switch (onboardingStep) {
-      case 0:
-        return <MobileShell><OnboardingWelcome /></MobileShell>;
-      case 1:
-        return <MobileShell><OnboardingProfile /></MobileShell>;
-      case 2:
-        return <MobileShell><OnboardingCategories /></MobileShell>;
-      case 3:
-        return <MobileShell><OnboardingMontos /></MobileShell>;
-      case 4:
-        return <MobileShell><OnboardingConfirm /></MobileShell>;
-      default:
-        return <MobileShell><OnboardingWelcome /></MobileShell>;
+
+  const goNext = () => {
+    const idx = ONBOARDING_STEPS.indexOf(onboardingStep);
+    if (idx < ONBOARDING_STEPS.length - 1) {
+      const nextStep = ONBOARDING_STEPS[idx + 1];
+      updateOnboardingStep(idx + 1);
+      onboardingAnim.setValue(0);
+      setOnboardingStep(nextStep);
+      Animated.timing(onboardingAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
     }
+  };
+
+  const goBack = () => {
+    const idx = ONBOARDING_STEPS.indexOf(onboardingStep);
+    if (idx > 0) {
+      onboardingAnim.setValue(0);
+      setOnboardingStep(ONBOARDING_STEPS[idx - 1]);
+      Animated.timing(onboardingAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+    }
+  };
+
+  if (!isOnboarded) {
+    const slideX = onboardingAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
+    const wrapStyle = { flex: 1, opacity: onboardingAnim, transform: [{ translateX: slideX }] };
+    return (
+      <MobileShell>
+        <Animated.View style={wrapStyle}>
+          {onboardingStep === 'welcome'    && <OnboardingWelcome    onNext={goNext} />}
+          {onboardingStep === 'profile'    && <OnboardingProfile    onNext={goNext} onBack={goBack} />}
+          {onboardingStep === 'salario'    && <OnboardingSalario    onNext={goNext} onBack={goBack} />}
+          {onboardingStep === 'categories' && <OnboardingCategories onNext={goNext} onBack={goBack} />}
+          {onboardingStep === 'montos'     && <OnboardingMontos     onNext={goNext} onBack={goBack} />}
+          {onboardingStep === 'confirm'    && <OnboardingConfirm    onDone={goNext} />}
+        </Animated.View>
+      </MobileShell>
+    );
   }
 
   // ==================== 2. AUTH (DESPUÉS DEL ONBOARDING) ====================
@@ -231,8 +332,8 @@ export default function HomeScreen() {
                     {
                       transform: [{ scale: authAnim }],
                       opacity: authAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
-                      backgroundColor: colors.glass_bg_medium,
-                      borderColor: colors.glass_border,
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
                     },
                   ]}
                 >
@@ -241,17 +342,17 @@ export default function HomeScreen() {
                     <Text style={[styles.profileReadyText, { color: colors.primary }]}>✦ Tu perfil financiero está listo</Text>
                   </View>
 
-                  <Text style={[styles.authTitle, { color: colors.text_primary }]}>¡Bienvenido{profile?.monthlySalary ? '' : ''} 🎉</Text>
-                  <Text style={[styles.authSubtitle, { color: colors.text_secondary }]}>
+                  <Text style={[styles.authTitle, { color: colors.textPrimary }]}>¡Bienvenido{profile?.monthlySalary ? '' : ''} 🎉</Text>
+                  <Text style={[styles.authSubtitle, { color: colors.textSecondary }]}>
                     Inicia sesión para acceder a tu app personalizada
                   </Text>
 
                   <View style={styles.inputGroup}>
-                    <Text style={[styles.label, { color: colors.text_secondary }]}>Correo</Text>
+                    <Text style={[styles.label, { color: colors.textSecondary }]}>Correo</Text>
                     <TextInput
-                      style={[styles.input, { color: colors.text_primary, borderColor: colors.glass_border, backgroundColor: colors.glass_bg }]}
+                      style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.inputBg }]}
                       placeholder="usuario@ejemplo.com"
-                      placeholderTextColor={colors.text_tertiary}
+                      placeholderTextColor={colors.textTertiary}
                       value={loginEmail}
                       onChangeText={setLoginEmail}
                       keyboardType="email-address"
@@ -259,11 +360,11 @@ export default function HomeScreen() {
                   </View>
 
                   <View style={styles.inputGroup}>
-                    <Text style={[styles.label, { color: colors.text_secondary }]}>Contraseña</Text>
+                    <Text style={[styles.label, { color: colors.textSecondary }]}>Contraseña</Text>
                     <TextInput
-                      style={[styles.input, { color: colors.text_primary, borderColor: colors.glass_border, backgroundColor: colors.glass_bg }]}
+                      style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.inputBg }]}
                       placeholder="••••••••"
-                      placeholderTextColor={colors.text_tertiary}
+                      placeholderTextColor={colors.textTertiary}
                       value={loginPassword}
                       onChangeText={setLoginPassword}
                       secureTextEntry
@@ -277,7 +378,7 @@ export default function HomeScreen() {
                   </Pressable>
 
                   <Pressable onPress={() => setAuthState('register')}>
-                    <Text style={[styles.toggleText, { color: colors.text_secondary }]}>
+                    <Text style={[styles.toggleText, { color: colors.textSecondary }]}>
                       ¿No tienes cuenta?{' '}
                       <Text style={[styles.toggleLink, { color: colors.primary }]}>Crear cuenta</Text>
                     </Text>
@@ -308,8 +409,8 @@ export default function HomeScreen() {
                       {
                         transform: [{ scale: authAnim }],
                         opacity: authAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
-                        backgroundColor: colors.glass_bg_medium,
-                        borderColor: colors.glass_border,
+                        backgroundColor: colors.card,
+                        borderColor: colors.border,
                       },
                     ]}
                   >
@@ -318,28 +419,28 @@ export default function HomeScreen() {
                       <Text style={[styles.profileReadyText, { color: colors.primary }]}>✦ Tu perfil financiero está listo</Text>
                     </View>
 
-                    <Text style={[styles.authTitle, { color: colors.text_primary }]}>Crea tu Cuenta 🚀</Text>
-                    <Text style={[styles.authSubtitle, { color: colors.text_secondary }]}>
+                    <Text style={[styles.authTitle, { color: colors.textPrimary }]}>Crea tu Cuenta 🚀</Text>
+                    <Text style={[styles.authSubtitle, { color: colors.textSecondary }]}>
                       Último paso — guarda tu perfil personalizado
                     </Text>
 
                     <View style={styles.inputGroup}>
-                      <Text style={[styles.label, { color: colors.text_secondary }]}>Nombre</Text>
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Nombre</Text>
                       <TextInput
-                        style={[styles.input, { color: colors.text_primary, borderColor: colors.glass_border, backgroundColor: colors.glass_bg }]}
+                        style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.inputBg }]}
                         placeholder="Tu nombre"
-                        placeholderTextColor={colors.text_tertiary}
+                        placeholderTextColor={colors.textTertiary}
                         value={registerName}
                         onChangeText={setRegisterName}
                       />
                     </View>
 
                     <View style={styles.inputGroup}>
-                      <Text style={[styles.label, { color: colors.text_secondary }]}>Correo</Text>
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Correo</Text>
                       <TextInput
-                        style={[styles.input, { color: colors.text_primary, borderColor: colors.glass_border, backgroundColor: colors.glass_bg }]}
+                        style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.inputBg }]}
                         placeholder="usuario@ejemplo.com"
-                        placeholderTextColor={colors.text_tertiary}
+                        placeholderTextColor={colors.textTertiary}
                         value={registerEmail}
                         onChangeText={setRegisterEmail}
                         keyboardType="email-address"
@@ -347,11 +448,11 @@ export default function HomeScreen() {
                     </View>
 
                     <View style={styles.inputGroup}>
-                      <Text style={[styles.label, { color: colors.text_secondary }]}>Contraseña</Text>
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Contraseña</Text>
                       <TextInput
-                        style={[styles.input, { color: colors.text_primary, borderColor: colors.glass_border, backgroundColor: colors.glass_bg }]}
+                        style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.inputBg }]}
                         placeholder="••••••••"
-                        placeholderTextColor={colors.text_tertiary}
+                        placeholderTextColor={colors.textTertiary}
                         value={registerPassword}
                         onChangeText={setRegisterPassword}
                         secureTextEntry
@@ -359,11 +460,11 @@ export default function HomeScreen() {
                     </View>
 
                     <View style={styles.inputGroup}>
-                      <Text style={[styles.label, { color: colors.text_secondary }]}>Confirmar Contraseña</Text>
+                      <Text style={[styles.label, { color: colors.textSecondary }]}>Confirmar Contraseña</Text>
                       <TextInput
-                        style={[styles.input, { color: colors.text_primary, borderColor: colors.glass_border, backgroundColor: colors.glass_bg }]}
+                        style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.inputBg }]}
                         placeholder="••••••••"
-                        placeholderTextColor={colors.text_tertiary}
+                        placeholderTextColor={colors.textTertiary}
                         value={registerConfirmPassword}
                         onChangeText={setRegisterConfirmPassword}
                         secureTextEntry
@@ -377,7 +478,7 @@ export default function HomeScreen() {
                     </Pressable>
 
                     <Pressable onPress={() => setAuthState('login')}>
-                      <Text style={[styles.toggleText, { color: colors.text_secondary }]}>
+                      <Text style={[styles.toggleText, { color: colors.textSecondary }]}>
                         ¿Ya tienes cuenta?{' '}
                         <Text style={[styles.toggleLink, { color: colors.primary }]}>Inicia sesión</Text>
                       </Text>
@@ -396,42 +497,84 @@ export default function HomeScreen() {
   return (
     <MobileShell>
       <View style={styles.appContainer}>
-        <View style={styles.screenContent}>
+        <Animated.View style={[styles.screenContent, { opacity: transitionAnim }]}>
           {currentScreen === 'dashboard' && (
             <FinancialFeed
-              transactions={transactions}
-              onNavigateToSection={handleNavigateToSection}
+              onNavigate={handleNavigateToSection}
+              onOpenBot={(msg) => {
+                setBotInitialMessage(msg);
+                navegarA('bot');
+              }}
             />
           )}
-          {currentScreen === 'ingresos' && <FinanzasScreen />}
+          {currentScreen === 'ingresos' && <FinanzasScreen onBack={volver} />}
           {currentScreen === 'gastos' && (
             <Gastos
               transactions={transactions}
               onAddExpense={addExpense}
               onDeleteTransaction={deleteTransaction}
+              onBack={volver}
             />
           )}
-          {currentScreen === 'categorias' && <Categorias onCategoryUpdate={() => {}} />}
+          {currentScreen === 'categorias' && <CategoriasScreen onNavigate={navegarA} />}
           {currentScreen === 'estadisticas' && (
-            <Estadisticas transactions={transactions} monthlySalary={profile?.monthlySalary || 0} />
+            <Estadisticas
+              onBack={volver}
+              onNavigate={navegarA}
+            />
           )}
           {currentScreen === 'bot' && (
-            <BotIA transactions={transactions} monthlySalary={profile?.monthlySalary || 0} />
+            <BotIA transactions={transactions} monthlySalary={profile?.monthlySalary || 0} onBack={volver} />
           )}
           {currentScreen === 'perfil' && (
-            <Usuario onLogout={handleLogout} onReset={handleReset} onStartTour={handleStartTour} />
+            <Usuario
+              onLogout={handleLogout}
+              onReset={handleReset}
+              onStartTour={handleStartTour}
+              onNavigate={navegarA}
+            />
           )}
           {currentScreen === 'explorar' && (
-            <ExplorarScreen />
+            <ExplorarScreen onBack={volver} />
           )}
           {currentScreen === 'historial' && (
-            <HistorialScreen />
+            <HistorialScreen onBack={volver} />
           )}
-        </View>
-        <BottomNavBar
-          currentScreen={currentScreen}
-          onScreenChange={setCurrentScreen}
-        />
+          {currentScreen === 'resumenSemanal' && (
+            <ResumenSemanalScreen
+              onBack={volver}
+              onOpenBot={(msg) => {
+                setBotInitialMessage(msg);
+                navegarA('bot');
+              }}
+            />
+          )}
+          {currentScreen === 'gamificacion' && (
+            <GamificacionScreen onNavigate={navegarA} onBack={volver} />
+          )}
+          {currentScreen === 'configuracion' && (
+            <ConfiguracionScreen onBack={volver} />
+          )}
+          {currentScreen === 'retos' && (
+            <RetosScreen onBack={volver} />
+          )}
+          {currentScreen === 'calendario' && (
+            <CalendarioScreen onBack={volver} />
+          )}
+          {currentScreen === 'academia' && (
+            <AcademiaScreen onBack={volver} />
+          )}
+          {currentScreen === 'proyecciones' && (
+            <ProyeccionesScreen onBack={volver} />
+          )}
+        </Animated.View>
+        {mostrarBottomNav(currentScreen) && (
+          <BottomNavBar
+            currentScreen={getTabActivo(currentScreen)}
+            onNavigate={navegarATab}
+            onQuickAdd={() => setQuickAddMode('expense')}
+          />
+        )}
       </View>
 
       {/* Product Tour */}

@@ -40,7 +40,7 @@ async function programarCompromiso(cat: any): Promise<void> {
   const hoy = new Date();
   const fechaPago = diaDePago(cat.diaPago, hoy);
   const nombre = cat.name || "Compromiso";
-  const monto = cat.presupuesto ? "$" + Math.round(cat.presupuesto).toLocaleString("es-CO").replace(/,/g, ".") : "";
+  const monto = cat.budget ? "$" + Math.round(cat.budget).toLocaleString("es-CO").replace(/,/g, ".") : "";
 
   const notifs: Array<{ title: string; body: string; segundosAntes: number }> = [
     { title: "Recordatorio: " + nombre, body: (monto ? monto + " vence" : "Vence") + " en 3 dias. Revisa tu saldo.", segundosAntes: 3 * 24 * 3600 },
@@ -68,6 +68,32 @@ export async function cancelarNotificacionesCompromiso(catId: string): Promise<v
   }
 }
 
+export async function programarResumenSemanal(): Promise<void> {
+  const granted = await requestPermissions();
+  if (!granted) return;
+  // Cancel any previous weekly summary notification
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  for (var n of scheduled) {
+    if (n.content?.data?.type === 'weekly_summary') {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    }
+  }
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: '📊 Tu semana en números',
+      body: 'Ya está listo tu resumen financiero semanal. ¡Míralo!',
+      data: { type: 'weekly_summary' },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+      weekday: 2, // Monday (1=Sun, 2=Mon, ... in Expo)
+      hour: 9,
+      minute: 0,
+      repeats: true,
+    } as any,
+  });
+}
+
 export async function reprogramarTodasLasNotificaciones(categories: any[]): Promise<void> {
   const granted = await requestPermissions();
   if (!granted) return;
@@ -79,7 +105,7 @@ export async function reprogramarTodasLasNotificaciones(categories: any[]): Prom
     }
   }
   // Schedule new ones for each active (unpaid) category
-  var activos = categories.filter(function(c) { return (c.tipo || (c.presupuesto ?? 0) > 0) && !c.pagado; });
+  var activos = categories.filter(function(c) { return (c.tipo || (c.budget ?? 0) > 0) && !c.pagado; });
   for (var cat of activos) {
     try { await programarCompromiso(cat); } catch(e) { /* ignore */ }
   }

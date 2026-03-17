@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: SPACING.md,
     padding: SPACING.md,
-    backgroundColor: COLORS.background_secondary,
+    backgroundColor: COLORS.cardSecondary,
     borderRadius: 12,
   },
   featureIcon: {
@@ -165,11 +165,11 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
   },
   featureDescription: {
     fontSize: 12,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     lineHeight: 16,
   },
   buttonContainer: {
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   },
   tipsText: {
     fontSize: 12,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     textAlign: 'center',
     fontStyle: 'italic',
     marginTop: SPACING.md,

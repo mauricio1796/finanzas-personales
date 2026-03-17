@@ -1,58 +1,165 @@
-/**
- * Color constants — Minimalist Finance Theme (White + Indigo)
- * DARK_COLORS = Light minimalist palette (indigo accent, white surface)
- * LIGHT_COLORS = Same palette (single theme)
- */
+// ─── Color token interface ────────────────────────────────────────────────────
+export interface AppColors {
+  // Fondos
+  background: string;
+  card: string;
+  cardSecondary: string;
+  inputBg: string;
+  // Bordes
+  border: string;
+  borderSubtle: string;
+  // Texto
+  textPrimary: string;
+  textSecondary: string;
+  textTertiary: string;
+  textInverse: string;
+  // Marca
+  primary: string;
+  primaryLight: string;
+  primaryDark: string;
+  primaryText: string;
+  // Semánticos
+  income: string;
+  incomeLight: string;
+  incomeText: string;
+  expense: string;
+  expenseLight: string;
+  expenseText: string;
+  warning: string;
+  warningLight: string;
+  warningText: string;
+  ai: string;
+  aiLight: string;
+  aiText: string;
+  // Navegación
+  tabBar: string;
+  tabBarBorder: string;
+  tabActive: string;
+  tabInactive: string;
+  tabActiveBg: string;
+  // Header
+  headerBg: string;
+  headerText: string;
+  headerSubtext: string;
+  headerIcon: string;
+  headerXpTrack: string;
+  headerXpFill: string;
+  // Estados
+  success: string;
+  successLight: string;
+  danger: string;
+  dangerLight: string;
+  // Overlay
+  overlay: string;
+  overlayLight: string;
+  // Misc
+  skeleton: string;
+  skeletonHighlight: string;
+  divider: string;
+  statusBar: 'dark-content' | 'light-content';
+}
 
-export const DARK_COLORS = {
-  // ── Primary (Indigo accent) ───────────────────────────────────────
-  primary:        '#6366F1',   // indigo-500
-  primary_light:  '#EEF2FF',   // indigo-50 (tinted bg for badges)
-  primary_dark:   '#4338CA',   // indigo-700
-
-  // ── Secondary / AI ────────────────────────────────────────────────
-  secondary:       '#8B5CF6',  // violet-500 (AI purple)
-  secondary_light: '#F5F3FF',  // violet-50
-  secondary_dark:  '#6D28D9',  // violet-700
-
-  // ── Finance accents ───────────────────────────────────────────────
-  accent_gold:   '#F59E0B',    // amber (savings / warning)
-  accent_danger: '#EF4444',    // red-500 (expense)
-  accent_purple: '#8B5CF6',    // violet (AI / goals)
-
-  // ── Status ────────────────────────────────────────────────────────
-  success: '#10B981',           // emerald-500 (income)
-  warning: '#F59E0B',           // amber
-  error:   '#EF4444',           // red-500
-  info:    '#6366F1',           // indigo
-
-  // ── Backgrounds ───────────────────────────────────────────────────
-  background:           '#FAFAFA',  // near-white page
-  background_secondary: '#F3F4F6',  // gray-100 subtle section bg
-  background_surface:   '#FFFFFF',  // pure white card
-
-  // ── Surfaces / Cards ──────────────────────────────────────────────
-  glass_bg:          '#FFFFFF',               // white card
-  glass_bg_medium:   'rgba(255,255,255,0.80)', // semi-transparent overlay
-  glass_bg_strong:   '#F9FAFB',               // gray-50 alt surface
-  glass_border:      '#E5E7EB',               // gray-200 border
-  glass_border_strong: '#D1D5DB',             // gray-300 stronger border
-
-  // ── Text ──────────────────────────────────────────────────────────
-  text_primary:   '#111827',   // gray-900
-  text_secondary: '#6B7280',   // gray-500
-  text_tertiary:  '#9CA3AF',   // gray-400
-  text_light:     '#FFFFFF',   // white (for colored button text)
-
-  // ── Neutrals ──────────────────────────────────────────────────────
-  white:        '#FFFFFF',
-  black:        '#111827',
-  gray:         '#E5E7EB',
-  gray_light:   '#F3F4F6',
-  gray_lighter: '#FAFAFA',
+// ─── Light palette ─────────────────────────────────────────────────────────────
+export const LIGHT_COLORS: AppColors = {
+  background:        '#FAFAFA',
+  card:              '#FFFFFF',
+  cardSecondary:     '#F9FAFB',
+  inputBg:           '#F3F4F6',
+  border:            '#E5E7EB',
+  borderSubtle:      '#F3F4F6',
+  textPrimary:       '#111827',
+  textSecondary:     '#6B7280',
+  textTertiary:      '#9CA3AF',
+  textInverse:       '#FFFFFF',
+  primary:           '#6366F1',
+  primaryLight:      '#EEF2FF',
+  primaryDark:       '#4F46E5',
+  primaryText:       '#3730A3',
+  income:            '#10B981',
+  incomeLight:       '#D1FAE5',
+  incomeText:        '#065F46',
+  expense:           '#EF4444',
+  expenseLight:      '#FEE2E2',
+  expenseText:       '#991B1B',
+  warning:           '#F59E0B',
+  warningLight:      '#FEF3C7',
+  warningText:       '#92400E',
+  ai:                '#8B5CF6',
+  aiLight:           '#EDE9FE',
+  aiText:            '#5B21B6',
+  tabBar:            '#FFFFFF',
+  tabBarBorder:      '#E5E7EB',
+  tabActive:         '#6366F1',
+  tabInactive:       '#9CA3AF',
+  tabActiveBg:       '#EEF2FF',
+  headerBg:          '#6366F1',
+  headerText:        '#FFFFFF',
+  headerSubtext:     'rgba(255,255,255,0.75)',
+  headerIcon:        '#FFFFFF',
+  headerXpTrack:     'rgba(255,255,255,0.2)',
+  headerXpFill:      '#FFFFFF',
+  success:           '#10B981',
+  successLight:      '#D1FAE5',
+  danger:            '#EF4444',
+  dangerLight:       '#FEE2E2',
+  overlay:           'rgba(0,0,0,0.5)',
+  overlayLight:      'rgba(0,0,0,0.08)',
+  skeleton:          '#F3F4F6',
+  skeletonHighlight: '#E5E7EB',
+  divider:           '#F3F4F6',
+  statusBar:         'dark-content',
 };
 
-export const LIGHT_COLORS = DARK_COLORS;
+// ─── Dark palette ──────────────────────────────────────────────────────────────
+export const DARK_COLORS: AppColors = {
+  background:        '#0F0F11',
+  card:              '#1C1C1F',
+  cardSecondary:     '#252528',
+  inputBg:           '#2A2A2E',
+  border:            '#2E2E33',
+  borderSubtle:      '#252528',
+  textPrimary:       '#F4F4F5',
+  textSecondary:     '#A1A1AA',
+  textTertiary:      '#71717A',
+  textInverse:       '#111827',
+  primary:           '#818CF8',
+  primaryLight:      '#1E1B4B',
+  primaryDark:       '#6366F1',
+  primaryText:       '#C7D2FE',
+  income:            '#34D399',
+  incomeLight:       '#064E3B',
+  incomeText:        '#6EE7B7',
+  expense:           '#F87171',
+  expenseLight:      '#450A0A',
+  expenseText:       '#FCA5A5',
+  warning:           '#FBBF24',
+  warningLight:      '#451A03',
+  warningText:       '#FDE68A',
+  ai:                '#A78BFA',
+  aiLight:           '#2E1065',
+  aiText:            '#DDD6FE',
+  tabBar:            '#1C1C1F',
+  tabBarBorder:      '#2E2E33',
+  tabActive:         '#818CF8',
+  tabInactive:       '#71717A',
+  tabActiveBg:       '#1E1B4B',
+  headerBg:          '#312E81',
+  headerText:        '#FFFFFF',
+  headerSubtext:     'rgba(255,255,255,0.6)',
+  headerIcon:        '#FFFFFF',
+  headerXpTrack:     'rgba(255,255,255,0.15)',
+  headerXpFill:      '#A5B4FC',
+  success:           '#34D399',
+  successLight:      '#064E3B',
+  danger:            '#F87171',
+  dangerLight:       '#450A0A',
+  overlay:           'rgba(0,0,0,0.7)',
+  overlayLight:      'rgba(0,0,0,0.2)',
+  skeleton:          '#2A2A2E',
+  skeletonHighlight: '#3F3F46',
+  divider:           '#2E2E33',
+  statusBar:         'light-content',
+};
 
 // Backward compatibility
-export const COLORS = DARK_COLORS;
+export const COLORS = LIGHT_COLORS;

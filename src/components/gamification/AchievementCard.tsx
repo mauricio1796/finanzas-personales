@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: COLORS.background_secondary,
+    borderColor: COLORS.cardSecondary,
   },
   unlockIcon: {
     color: COLORS.background,
@@ -180,10 +180,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '700',
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
   },
   lockedText: {
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
   },
   rarity: {
     fontSize: 10,
@@ -192,16 +192,16 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 12,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     lineHeight: 16,
   },
   lockedDescription: {
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     opacity: 0.6,
   },
   lockedLabel: {
     fontSize: 10,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     fontWeight: '600',
     marginTop: SPACING.xs,
   },

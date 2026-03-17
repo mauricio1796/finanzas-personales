@@ -25,7 +25,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
     return (
       <View style={styles.userContainer}>
         <View style={[styles.userBubble, { backgroundColor: colors.primary }]}>
-          <Text style={[styles.userText, { color: colors.text_light }]}>{message}</Text>
+          <Text style={[styles.userText, { color: colors.textInverse }]}>{message}</Text>
         </View>
       </View>
     );
@@ -34,9 +34,9 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
   return (
     <View style={styles.aiContainer}>
       <Text style={[styles.aiLabel, { color: colors.primary }]}>FinancyAI ·</Text>
-      <Text style={[styles.aiMessage, { color: colors.text_primary }]}>{message}</Text>
+      <Text style={[styles.aiMessage, { color: colors.textPrimary }]}>{message}</Text>
       {timestamp && (
-        <Text style={[styles.timestamp, { color: colors.text_tertiary }]}>{timestamp}</Text>
+        <Text style={[styles.timestamp, { color: colors.textTertiary }]}>{timestamp}</Text>
       )}
     </View>
   );

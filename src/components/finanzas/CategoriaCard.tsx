@@ -22,7 +22,7 @@ function getDueDayStatus(diaPago?: number): { label: string; color: string } | n
 }
 
 export const CategoriaCard: React.FC<Props> = ({ category, gastado, onEdit, onDelete, onTogglePaid }) => {
-  const presupuesto = category.presupuesto ?? 0;
+  const presupuesto = category.budget ?? 0;
   const pct = presupuesto > 0 ? Math.min(100, (gastado / presupuesto) * 100) : 0;
   const barColor = pct >= 100 ? "#F07070" : pct >= 80 ? "#FBBF24" : "#4CAF82";
   const amountColor = gastado === 0 ? "#9CA3AF" : gastado >= presupuesto ? "#F07070" : "#111827";

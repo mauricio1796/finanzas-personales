@@ -19,7 +19,7 @@ export const ModalCategoria: React.FC<Props> = ({ visible, editing, existingCoun
     if (visible) {
       if (editing) {
         setNombre(editing.name);
-        setPresupuesto(String(editing.presupuesto ?? ""));
+        setPresupuesto(String(editing.budget ?? ""));
         setTipo((editing.tipo as any) ?? "fijo");
         setEmoji(editing.icon ?? "🏠");
         setDiaPago(editing.diaPago ? String(editing.diaPago) : "");
@@ -51,7 +51,7 @@ export const ModalCategoria: React.FC<Props> = ({ visible, editing, existingCoun
       name: nombre.trim(),
       icon: emoji,
       color: editing?.color ?? autoColor,
-      presupuesto: monto,
+      budget: monto,
       pagado: editing?.pagado ?? false,
       tipo: tipo,
       diaPago: dia >= 1 && dia <= 28 ? dia : undefined,

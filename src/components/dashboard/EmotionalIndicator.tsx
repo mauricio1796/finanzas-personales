@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
   },
   message: {
     fontSize: 12,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     lineHeight: 16,
   },
 });

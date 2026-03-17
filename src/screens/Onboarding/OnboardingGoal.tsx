@@ -238,11 +238,11 @@ const styles = StyleSheet.create({
   goalCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.background_secondary,
+    backgroundColor: COLORS.cardSecondary,
     borderRadius: 12,
     padding: SPACING.md,
     borderWidth: 2,
-    borderColor: COLORS.gray,
+    borderColor: COLORS.border,
     gap: SPACING.md,
   },
   goalCardSelected: {
@@ -258,12 +258,12 @@ const styles = StyleSheet.create({
   goalLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
     marginBottom: SPACING.xs,
   },
   goalDescription: {
     fontSize: 12,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     lineHeight: 16,
   },
   checkmark: {
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   continueButtonDisabled: {
-    backgroundColor: COLORS.gray,
+    backgroundColor: COLORS.border,
     opacity: 0.5,
   },
   continueButtonText: {

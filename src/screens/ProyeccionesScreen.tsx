@@ -65,7 +65,7 @@ function StepRow({ label, value, min, max, step, formato, onChange }: StepRowPro
   );
 }
 
-export const ProyeccionesScreen: React.FC = () => {
+export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
   const insets = useSafeAreaInsets();
   const { profile, premium } = useFinance();
   const [escenario, setEscenario] = useState<Escenario>('meta');
@@ -91,7 +91,12 @@ export const ProyeccionesScreen: React.FC = () => {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Proyecciones</Text>
+          {onBack ? (
+            <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+              <Icon name="arrow-left" size={20} color="#111827" />
+            </TouchableOpacity>
+          ) : null}
+          <Text style={[styles.headerTitle, onBack && { flex: 1, textAlign: 'center' }]}>Proyecciones</Text>
           <Icon name="trending-up" size={20} color="#6366F1" />
         </View>
         <View style={styles.lockContainer}>

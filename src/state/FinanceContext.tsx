@@ -4,6 +4,7 @@ import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesSer
 import {
   User,
   Category,
+  CategoryUpdate,
   Transaction,
   FinancialProfile,
   FinancialGoal,
@@ -70,7 +71,7 @@ interface FinanceContextType {
 
   // Category management
   addCategory: (cat: Category) => void;
-  updateCategory: (cat: Category) => void;
+  updateCategory: (id: string, update: CategoryUpdate) => void;
   deleteCategory: (id: string) => void;
   markCategoryPaid: (id: string) => void;
   unmarkCategoryPaid: (id: string) => void;
@@ -157,7 +158,27 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (storedOnboarded) setIsOnboardedState(true);
       if (storedUser) setUserState(storedUser);
       if (storedTxs) setTransactions(storedTxs);
-      if (storedCats) setCategoriesState(storedCats);
+      if (storedCats) {
+        // Migration 1: rename legacy presupuesto → budget, drop gastado
+        // Migration 2: ensure isSelected=true for categories without the flag
+        //              (fix for onboarding bug where isSelected was not set)
+        const migrated = storedCats.map((c: any) => {
+          const { presupuesto, gastado, ...rest } = c;
+          if (presupuesto !== undefined && rest.budget === undefined) {
+            rest.budget = presupuesto;
+          }
+          // Fix missing isSelected — any saved category was intentionally added
+          if (rest.isSelected === undefined || rest.isSelected === null) {
+            rest.isSelected = true;
+          }
+          // Fix tipo: 'variable' → 'gasto' (legacy onboarding set wrong tipo)
+          if (rest.tipo === 'variable' || rest.tipo === 'fijo') {
+            rest.tipo = 'gasto';
+          }
+          return rest as Category;
+        });
+        setCategoriesState(migrated);
+      }
       if (storedProfile) setProfileState(storedProfile);
       if (storedGoal) setGoalState(storedGoal);
       if (storedLevel) setUserLevelState(storedLevel);
@@ -280,8 +301,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (userLevel) setUserLevelState(prev => prev ? { ...prev, experience: prev.experience + 20 } : prev);
   };
 
-  const updateCategory = (cat: Category) => {
-    setCategoriesState(prev => prev.map(c => c.id === cat.id ? cat : c));
+  const updateCategory = (id: string, update: CategoryUpdate) => {
+    setCategoriesState(prev => prev.map(c => c.id === id ? { ...c, ...update } : c));
     if (userLevel) setUserLevelState(prev => prev ? { ...prev, experience: prev.experience + 10 } : prev);
   };
 
@@ -292,13 +313,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const markCategoryPaid = (id: string) => {
     setCategoriesState(prev => {
       const cat = prev.find(c => c.id === id);
-      if (cat && (cat.presupuesto ?? 0) > 0) {
+      if (cat && (cat.budget ?? 0) > 0) {
         const txId = 'budget_payment_' + id;
         setTransactions(prev2 => {
           if (prev2.some(t => t.id === txId)) return prev2;
           const newTx: Transaction = {
             id: txId,
-            amount: cat.presupuesto!,
+            amount: cat.budget!,
             category: cat.name,
             date: new Date().toISOString(),
             type: 'expense',

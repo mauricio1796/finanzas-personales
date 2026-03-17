@@ -1,147 +1,265 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, ScrollView,
-  TouchableOpacity, TextInput, Keyboard,
+  Animated, PanResponder, ScrollView, StyleSheet,
+  Text, TouchableOpacity, View,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useFinance } from '../../state';
 import { useTheme } from '../../state/ThemeContext';
-import { ChatBubble, ProgressIndicator } from '../../components/onboarding';
+import { Icon } from '../../components/ui/Icon';
+import { OnboardingShell } from '../../components/onboarding/OnboardingShell';
 
-const DIA_CHIPS = [1, 5, 10, 15, 20, 25, 0]; // 0 = ultimo dia
+interface Props { onNext: () => void; onBack: () => void; }
 
-const fmtCOP = (digits: string) => {
-  const num = parseInt(digits.replace(/\./g, ''), 10);
-  if (isNaN(num) || num === 0) return '';
-  return num.toLocaleString('es-CO').replace(/,/g, '.');
+const fmtCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
+
+const SUGERIDOS: Record<string, number> = {
+  alimentacion:    0.25,
+  transporte:      0.10,
+  vivienda:        0.30,
+  salud:           0.05,
+  educacion:       0.08,
+  entretenimiento: 0.05,
+  ropa:            0.05,
+  servicios:       0.08,
+  gym:             0,
+  mascotas:        0,
+  ahorro:          0.20,
+  otros:           0,
+};
+const SUGERIDOS_FIJOS: Record<string, number> = {
+  gym: 100000,
+  mascotas: 80000,
+  otros: 50000,
 };
 
-interface MontoState {
-  monto: string;
-  diaPago: number | null;
+interface SliderItemProps {
+  cat: { id: string; name: string; icon: string; color?: string };
+  value: number;
+  maxValue: number;
+  onChange: (v: number) => void;
 }
 
-export const OnboardingMontos: React.FC = () => {
-  const { updateOnboardingStep, categories, updateCategory } = useFinance();
+const STEP = 10000;
+
+const SliderItem: React.FC<SliderItemProps> = ({ cat, value, maxValue, onChange }) => {
   const { colors } = useTheme();
+  const trackWidth = useRef(0);
+  const panX = useRef(0);
+  const fillAnim = useRef(new Animated.Value(value / Math.max(maxValue, 1))).current;
 
-  const compromisos = categories.filter((c: any) => c.tipo === 'fijo');
+  useEffect(() => {
+    Animated.timing(fillAnim, {
+      toValue: value / Math.max(maxValue, 1),
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [value, maxValue]);
 
-  const [montos, setMontos] = useState<Record<string, MontoState>>(() => {
-    const init: Record<string, MontoState> = {};
-    compromisos.forEach((c: any) => { init[c.id] = { monto: '', diaPago: null }; });
-    return init;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder:  () => true,
+      onPanResponderGrant: (e) => {
+        const loc = e.nativeEvent.locationX;
+        const pct = Math.max(0, Math.min(1, loc / Math.max(trackWidth.current, 1)));
+        const raw = pct * maxValue;
+        const snapped = Math.round(raw / STEP) * STEP;
+        onChange(snapped);
+        panX.current = loc;
+      },
+      onPanResponderMove: (_, gs) => {
+        const loc = panX.current + gs.dx;
+        const pct = Math.max(0, Math.min(1, loc / Math.max(trackWidth.current, 1)));
+        const raw = pct * maxValue;
+        const snapped = Math.round(raw / STEP) * STEP;
+        onChange(snapped);
+      },
+    })
+  ).current;
+
+  const fillWidth = fillAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
   });
-
-  useEffect(() => { Keyboard.dismiss(); }, []);
-
-  const setMonto = (id: string, raw: string) => {
-    const digits = raw.replace(/\./g, '').replace(/[^0-9]/g, '');
-    const num = parseInt(digits, 10);
-    setMontos(prev => ({ ...prev, [id]: { ...prev[id], monto: isNaN(num) ? '' : fmtCOP(digits) } }));
-  };
-
-  const setDia = (id: string, dia: number) => {
-    setMontos(prev => ({ ...prev, [id]: { ...prev[id], diaPago: dia } }));
-  };
-
-  const canContinue = compromisos.every((c: any) => {
-    const s = montos[c.id];
-    return s && s.monto.length > 0 && s.diaPago !== null;
-  });
-
-  const handleContinue = () => {
-    Keyboard.dismiss();
-    compromisos.forEach((cat: any) => {
-      const s = montos[cat.id];
-      if (!s) return;
-      const monto = parseInt(s.monto.replace(/\./g, ''), 10) || 0;
-      updateCategory({ ...cat, presupuesto: monto, diaPago: s.diaPago ?? undefined });
-    });
-    updateOnboardingStep(4);
-  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.progress}>
-        <ProgressIndicator currentStep={3} totalSteps={5} />
+    <View style={[si.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={si.header}>
+        <View style={[si.iconWrap, { backgroundColor: (cat.color || colors.primary) + '20' }]}>
+          <Icon name={cat.icon as any} size={20} color={cat.color || colors.primary} />
+        </View>
+        <Text style={[si.catName, { color: colors.textPrimary }]}>{cat.name}</Text>
+        <Text style={[si.valueText, { color: value > 0 ? colors.primary : colors.textTertiary }]}>
+          {value > 0 ? fmtCOP(value) : '$0'}
+        </Text>
       </View>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps='handled' showsVerticalScrollIndicator={false}>
-        <ChatBubble
-          message='Casi listo. Dime cuanto pagas por cada uno y que dia del mes vence cada pago.'
-          isUser={false}
+
+      <View
+        style={[si.trackWrap, { backgroundColor: colors.inputBg }]}
+        onLayout={e => { trackWidth.current = e.nativeEvent.layout.width; }}
+        {...panResponder.panHandlers}
+      >
+        <Animated.View style={[si.fill, { width: fillWidth, backgroundColor: colors.primary }]} />
+        <Animated.View
+          style={[
+            si.thumb,
+            {
+              left: fillWidth,
+              borderColor: colors.primary,
+              backgroundColor: colors.card,
+            },
+          ]}
         />
-        {compromisos.map((cat: any) => (
-          <View key={cat.id} style={[styles.card, { borderColor: cat.color + '40' || '#E5E7EB' }]}>
-            <View style={styles.cardHeader}>
-              <View style={[styles.iconCircle, { backgroundColor: (cat.color || '#6366F1') + '20' }]}>
-                <Text style={styles.iconText}>{cat.icon || '◈'}</Text>
-              </View>
-              <Text style={[styles.catName, { color: '#111827' }]}>{cat.name}</Text>
-            </View>
-            <Text style={styles.fieldLabel}>Cuanto pagas?</Text>
-            <TextInput
-              style={[styles.input, { borderColor: montos[cat.id]?.monto ? colors.primary : '#E5E7EB', color: '#111827' }]}
-              placeholder='Ej: 800.000'
-              placeholderTextColor='#9CA3AF'
-              keyboardType='numeric'
-              value={montos[cat.id]?.monto || ''}
-              onChangeText={(t) => setMonto(cat.id, t)}
-            />
-            <Text style={styles.fieldLabel}>Que dia del mes vence?</Text>
-            <View style={styles.chipRow}>
-              {DIA_CHIPS.map(d => (
-                <TouchableOpacity
-                  key={d}
-                  style={[styles.chip, montos[cat.id]?.diaPago === d && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                  onPress={() => { Keyboard.dismiss(); setDia(cat.id, d); }}
-                >
-                  <Text style={[styles.chipText, montos[cat.id]?.diaPago === d && { color: '#FFFFFF' }]}>
-                    {d === 0 ? 'Ultimo' : String(d)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        ))}
-        <TouchableOpacity
-          style={[styles.btn, { backgroundColor: colors.primary }, !canContinue && styles.btnDisabled]}
-          onPress={handleContinue}
-          disabled={!canContinue}
-          activeOpacity={0.82}
-        >
-          <Text style={styles.btnText}>Ver mi panel</Text>
-        </TouchableOpacity>
-        <View style={{ height: 32 }} />
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+
+      <View style={si.rangeRow}>
+        <Text style={[si.rangeLabel, { color: colors.textTertiary }]}>$0</Text>
+        <Text style={[si.rangeLabel, { color: colors.textTertiary }]}>
+          {fmtCOP(maxValue)}
+        </Text>
+      </View>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
-  progress: { marginBottom: 4 },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 12, gap: 14 },
-  card: {
-    backgroundColor: '#FFFFFF', borderRadius: 16,
-    borderWidth: 1, padding: 16, gap: 10,
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
-  iconCircle: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  iconText: { fontSize: 20 },
-  catName: { fontSize: 16, fontWeight: '700' },
-  fieldLabel: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
-  input: {
-    borderRadius: 10, borderWidth: 1.5, paddingHorizontal: 14,
-    paddingVertical: 12, fontSize: 18, fontWeight: '700', color: '#111827', backgroundColor: '#F9FAFB',
-  },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-    borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB',
-  },
-  chipText: { fontSize: 13, fontWeight: '700', color: '#374151' },
-  btn: { paddingVertical: 17, borderRadius: 14, alignItems: 'center', marginTop: 8 },
-  btnDisabled: { opacity: 0.4 },
-  btnText: { fontSize: 17, fontWeight: '700', color: '#FFFFFF' },
+const si = StyleSheet.create({
+  card:       { borderRadius: 16, borderWidth: 1, padding: 16, gap: 12 },
+  header:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  iconWrap:   { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  catName:    { flex: 1, fontSize: 15, fontWeight: '600' },
+  valueText:  { fontSize: 15, fontWeight: '700' },
+  trackWrap:  { height: 6, borderRadius: 3, position: 'relative', justifyContent: 'center' },
+  fill:       { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 3 },
+  thumb:      { position: 'absolute', width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, marginLeft: -11, top: -8, elevation: 2, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } },
+  rangeRow:   { flexDirection: 'row', justifyContent: 'space-between' },
+  rangeLabel: { fontSize: 10 },
+});
+
+export const OnboardingMontos: React.FC<Props> = ({ onNext, onBack }) => {
+  const { categories, updateCategory, profile } = useFinance();
+  const { colors } = useTheme();
+  const sal = profile?.monthlySalary || 0;
+  const maxSlider = Math.max(Math.round(sal * 0.8), 2000000);
+
+  const budgetCats = categories.filter(c => c.tipo === 'gasto' || c.tipo === 'variable' || c.tipo === 'fijo' || !c.tipo);
+
+  const [budgets, setBudgets] = useState<Record<string, number>>(() => {
+    const init: Record<string, number> = {};
+    budgetCats.forEach(c => {
+      const pct = SUGERIDOS[c.id] ?? 0;
+      const fixed = SUGERIDOS_FIJOS[c.id] ?? 0;
+      init[c.id] = c.budget ?? (pct > 0 ? Math.round(sal * pct / STEP) * STEP : fixed);
+    });
+    return init;
+  });
+
+  const totalAsignado = Object.values(budgets).reduce((s, v) => s + v, 0);
+  const pctTotal = sal > 0 ? Math.min(totalAsignado / sal, 1) : 0;
+  const overBudget = totalAsignado > sal && sal > 0;
+
+  const barAnim = useRef(new Animated.Value(pctTotal)).current;
+  const bubbleAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(bubbleAnim, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }).start();
+  }, []);
+
+  useEffect(() => {
+    Animated.timing(barAnim, { toValue: pctTotal, duration: 250, useNativeDriver: false }).start();
+    if (overBudget) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  }, [pctTotal]);
+
+  const handleChange = (id: string, val: number) => {
+    setBudgets(prev => ({ ...prev, [id]: val }));
+  };
+
+  const handleNext = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    budgetCats.forEach(cat => {
+      updateCategory(cat.id, { budget: budgets[cat.id] ?? 0 });
+    });
+    onNext();
+  };
+
+  const bubbleSlide = {
+    opacity: bubbleAnim,
+    transform: [{ translateX: bubbleAnim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }],
+  };
+
+  const barWidth = barAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
+
+  return (
+    <OnboardingShell step={4} totalSteps={5} onBack={onBack} keyboardAvoiding={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={[s.scrollContent, { paddingHorizontal: 16 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        {/* Finn bubble */}
+        <View style={[s.finnRow, { marginBottom: 16 }]}>
+          <View style={[s.finnAvatar, { backgroundColor: colors.primary }]}>
+            <Text style={s.finnLetter}>F</Text>
+          </View>
+          <Animated.View style={[s.bubble, { backgroundColor: colors.card, borderColor: colors.border }, bubbleSlide]}>
+            <Text style={[s.bubbleText, { color: colors.textPrimary }]}>
+              Asigna un presupuesto mensual a cada categoria
+            </Text>
+          </Animated.View>
+        </View>
+
+        {/* Sliders */}
+        {budgetCats.map(cat => (
+          <View key={cat.id} style={{ marginBottom: 12 }}>
+            <SliderItem
+              cat={cat}
+              value={budgets[cat.id] ?? 0}
+              maxValue={maxSlider}
+              onChange={v => handleChange(cat.id, v)}
+            />
+          </View>
+        ))}
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+
+      {/* Fixed bottom: budget indicator + button */}
+      <View style={[s.footer, { backgroundColor: colors.background, borderTopColor: colors.border, paddingHorizontal: 16, paddingBottom: 16 }]}>
+        <View style={[s.budgetCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={s.budgetRow}>
+            <Text style={[s.budgetLabel, { color: colors.textSecondary }]}>Asignado</Text>
+            <Text style={[s.budgetValue, { color: overBudget ? colors.expense : colors.textPrimary }]}>
+              {fmtCOP(totalAsignado)}
+              <Text style={[s.budgetOf, { color: colors.textTertiary }]}>{sal > 0 ? ' / ' + fmtCOP(sal) : ''}</Text>
+            </Text>
+          </View>
+          <View style={[s.budgetTrack, { backgroundColor: colors.border }]}>
+            <Animated.View style={[s.budgetFill, { width: barWidth, backgroundColor: overBudget ? colors.expense : colors.income }]} />
+          </View>
+        </View>
+        <TouchableOpacity
+          style={[s.btn, { backgroundColor: colors.primary }]}
+          onPress={handleNext}
+          activeOpacity={0.85}
+        >
+          <Text style={s.btnText}>Confirmar presupuestos</Text>
+        </TouchableOpacity>
+      </View>
+    </OnboardingShell>
+  );
+};
+
+const s = StyleSheet.create({
+  scrollContent: { paddingTop: 8, paddingBottom: 16 },
+  finnRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  finnAvatar:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
+  finnLetter:    { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+  bubble:        { flex: 1, borderRadius: 14, borderTopLeftRadius: 4, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
+  bubbleText:    { fontSize: 15, lineHeight: 22 },
+  footer:        { borderTopWidth: 1, paddingTop: 12, gap: 10 },
+  budgetCard:    { borderRadius: 12, borderWidth: 1, padding: 12, gap: 8 },
+  budgetRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  budgetLabel:   { fontSize: 12, fontWeight: '500' },
+  budgetValue:   { fontSize: 15, fontWeight: '700' },
+  budgetOf:      { fontSize: 12, fontWeight: '400' },
+  budgetTrack:   { height: 6, borderRadius: 3, overflow: 'hidden' },
+  budgetFill:    { height: '100%', borderRadius: 3 },
+  btn:           { borderRadius: 16, padding: 16, alignItems: 'center' },
+  btnText:       { fontSize: 16, fontWeight: '500', color: '#FFFFFF' },
 });

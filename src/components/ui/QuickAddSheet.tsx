@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useFinance } from '../../state';
 import { Icon, getCategoryIcon } from './Icon';
+import { useTheme } from '../../state/ThemeContext';
 
 // ─── Quick categories ──────────────────────────────────────────────────
 const INCOME_CATS = [
@@ -44,7 +45,8 @@ interface QuickAddSheetProps {
 }
 
 export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onClose, onAdd }) => {
-  const { categories } = useFinance();
+  const { colors } = useTheme();
+  const { categories, updateUserSalary } = useFinance();
   const slideAnim  = useRef(new Animated.Value(400)).current;
   const backdropOp = useRef(new Animated.Value(0)).current;
 
@@ -53,8 +55,8 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
   const [amountFocused, setAmountFocused] = useState(false);
 
   const isIncome = mode === 'income';
-  const accent   = isIncome ? '#10B981' : '#EF4444';
-  const accentBg = isIncome ? '#ECFDF5' : '#FEF2F2';
+  const accent   = isIncome ? colors.income : colors.expense;
+  const accentBg = isIncome ? colors.incomeLight : colors.expenseLight;
   // Use user budget categories for expenses if available, fallback to defaults
   const userExpCats = !isIncome
     ? categories.map((cat: any) => ({ id: cat.id, label: cat.name }))
@@ -86,6 +88,9 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
     const parsed = parseInt(amount.replace(/\./g, ''), 10);
     if (!parsed || parsed <= 0 || !selectedCat) return;
     onAdd(parsed, selectedCat, mode, new Date());
+    if (isIncome && selectedCat === 'salario') {
+      updateUserSalary(parsed);
+    }
     handleClose();
   };
 
@@ -102,13 +107,13 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
       >
         {/* Backdrop — cierra al tocar fuera */}
         <TouchableWithoutFeedback onPress={handleClose}>
-          <Animated.View style={[styles.backdrop, { opacity: backdropOp }]} />
+          <Animated.View style={[styles.backdrop, { opacity: backdropOp, backgroundColor: colors.overlay }]} />
         </TouchableWithoutFeedback>
 
         {/* Sheet — sube automáticamente con el teclado */}
-        <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
+        <Animated.View style={[styles.sheet, { backgroundColor: colors.card, transform: [{ translateY: slideAnim }] }]}>
           {/* Handle */}
-          <View style={styles.handle} />
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
           {/* Header */}
           <View style={styles.sheetHeader}>
@@ -117,8 +122,8 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
                 {isIncome ? '↑ Ingreso' : '↓ Gasto'}
               </Text>
             </View>
-            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-              <Icon name="x" size={16} color="#6B7280" />
+            <TouchableOpacity onPress={handleClose} style={[styles.closeBtn, { backgroundColor: colors.inputBg }]}>
+              <Icon name="x" size={16} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -126,9 +131,9 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
           <View style={styles.amountRow}>
             <Text style={[styles.currencySymbol, { color: accent }]}>$</Text>
             <TextInput
-              style={[styles.amountInput, { color: accent, borderBottomColor: amountFocused ? accent : '#E5E7EB' }]}
+              style={[styles.amountInput, { color: accent, borderBottomColor: amountFocused ? accent : colors.border }]}
               placeholder="0"
-              placeholderTextColor="#D1D5DB"
+              placeholderTextColor={colors.border}
               keyboardType="numeric"
               value={amount}
               onChangeText={(txt) => { const d = txt.replace(/\./g, '').replace(/[^0-9]/g, ''); const n = parseInt(d, 10); setAmount(isNaN(n) ? '' : n.toLocaleString('es-CO').replace(/,/g, '.')); }}
@@ -138,7 +143,7 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
           </View>
 
           {/* Category chips */}
-          <Text style={styles.catLabel}>CATEGORÍA</Text>
+          <Text style={[styles.catLabel, { color: colors.textTertiary }]}>CATEGORÍA</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -150,12 +155,16 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
               return (
                 <TouchableOpacity
                   key={cat.id}
-                  style={[styles.catChip, active && { backgroundColor: accent, borderColor: accent }]}
+                  style={[
+                    styles.catChip,
+                    { borderColor: colors.border, backgroundColor: colors.cardSecondary },
+                    active && { backgroundColor: accent, borderColor: accent },
+                  ]}
                   onPress={() => setSelectedCat(cat.id)}
                   activeOpacity={0.7}
                 >
-                  <Icon name={getCategoryIcon(cat.id)} size={15} color={active ? '#FFFFFF' : '#6B7280'} />
-                  <Text style={[styles.catChipLabel, active && styles.catChipLabelActive]}>
+                  <Icon name={getCategoryIcon(cat.id)} size={15} color={active ? '#FFFFFF' : colors.textSecondary} />
+                  <Text style={[styles.catChipLabel, { color: colors.textPrimary }, active && styles.catChipLabelActive]}>
                     {cat.label}
                   </Text>
                 </TouchableOpacity>
@@ -165,12 +174,12 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
 
           {/* Confirm button */}
           <TouchableOpacity
-            style={[styles.confirmBtn, { backgroundColor: canConfirm ? accent : '#E5E7EB' }]}
+            style={[styles.confirmBtn, { backgroundColor: canConfirm ? accent : colors.border }]}
             onPress={handleConfirm}
             disabled={!canConfirm}
             activeOpacity={0.8}
           >
-            <Text style={[styles.confirmBtnText, !canConfirm && styles.confirmBtnTextDisabled]}>
+            <Text style={[styles.confirmBtnText, !canConfirm && { color: colors.textTertiary }]}>
               {isIncome ? 'Registrar Ingreso' : 'Registrar Gasto'}
             </Text>
           </TouchableOpacity>
@@ -187,11 +196,9 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
   },
   sheet: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 24,
@@ -208,7 +215,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#E5E7EB',
     alignSelf: 'center',
     marginTop: 12,
     marginBottom: 4,
@@ -233,7 +239,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -262,7 +267,6 @@ const styles = StyleSheet.create({
   // Categories
   catLabel: {
     fontSize: 11,
-    color: '#9CA3AF',
     fontWeight: '700',
     letterSpacing: 0.8,
     marginBottom: 10,
@@ -278,15 +282,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 100,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
     marginRight: 8,
   },
 
   catChipLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
   },
   catChipLabelActive: {
     color: '#FFFFFF',
@@ -302,8 +303,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: '#FFFFFF',
-  },
-  confirmBtnTextDisabled: {
-    color: '#9CA3AF',
   },
 });

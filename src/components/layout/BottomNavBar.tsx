@@ -1,177 +1,197 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  Platform,
+  Animated,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../state/ThemeContext';
-import { Icon, UI_ICONS, FeatherName } from '../ui/Icon';
-import { TourRegistry } from '../../utils/TourRegistry';
+import { Icon } from '../ui/Icon';
+import type { FeatherName } from '../ui/Icon';
 
-type ScreenName = 'dashboard' | 'ingresos' | 'gastos' | 'categorias' | 'estadisticas' | 'bot' | 'perfil' | 'explorar';
+// ── Tab config ───────────────────────────────────────────────────────────────
 
-interface Tab {
-  id: ScreenName;
+interface TabConfig {
+  key: string;
   icon: FeatherName;
   label: string;
 }
 
-const TABS: Tab[] = [
-  { id: 'dashboard',    icon: UI_ICONS.home,     label: 'Inicio'   },
-  { id: 'explorar',     icon: 'compass',         label: 'Explorar' },
-  { id: 'bot',          icon: UI_ICONS.ai,       label: 'IA'       },
-  { id: 'ingresos',     icon: UI_ICONS.finanzas, label: 'Finanzas' },
-  { id: 'perfil',       icon: UI_ICONS.perfil,   label: 'Perfil'   },
+const LEFT_TABS: TabConfig[] = [
+  { key: 'dashboard',  icon: 'home', label: 'Inicio'     },
+  { key: 'categorias', icon: 'tag',  label: 'Categorías' },
 ];
 
-interface BottomNavBarProps {
-  currentScreen: ScreenName;
-  onScreenChange: (screen: ScreenName) => void;
-  userName?: string;
+const RIGHT_TABS: TabConfig[] = [
+  { key: 'estadisticas', icon: 'bar-chart-2', label: 'Stats'  },
+  { key: 'perfil',       icon: 'user',        label: 'Perfil' },
+];
+
+// ── TabItem ───────────────────────────────────────────────────────────────────
+
+interface TabItemProps {
+  tabKey: string;
+  icon: FeatherName;
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  colors: any;
 }
 
-export const BottomNavBar: React.FC<BottomNavBarProps> = ({
-  currentScreen,
-  onScreenChange,
-}) => {
-  const { colors } = useTheme();
+const TabItem: React.FC<TabItemProps> = ({ icon, label, active, onPress, colors }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  // Register tab refs for product tour
-  const tabRefs = useRef<Map<string, React.RefObject<View>>>(
-    new Map(TABS.map(t => [t.id, React.createRef<View>()]))
-  );
-
-  useEffect(() => {
-    TABS.forEach(t => {
-      const ref = tabRefs.current.get(t.id);
-      if (ref) TourRegistry.register('tab_' + t.id, ref as any);
-    });
-    return () => { TABS.forEach(t => TourRegistry.unregister('tab_' + t.id)); };
-  }, []);
-
-  const activeTab = (currentScreen === 'gastos' || currentScreen === 'categorias')
-    ? 'ingresos'
-    : currentScreen === 'estadisticas'
-    ? 'explorar'
-    : currentScreen;
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 0.88, duration: 80, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, tension: 200, friction: 10, useNativeDriver: true }),
+    ]).start();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    onPress();
+  };
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E5E7EB',
-        },
-      ]}
+    <TouchableOpacity
+      onPress={handlePress}
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 8 }}
+      activeOpacity={1}
     >
-      <View style={styles.tabs}>
-        {TABS.map(tab => {
-          const isActive = tab.id === activeTab;
-          const tabRef = tabRefs.current.get(tab.id);
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              ref={tabRef as any}
-              onPress={() => onScreenChange(tab.id)}
-              style={styles.tab}
-              activeOpacity={0.7}
-              accessibilityLabel={tab.label}
-              accessibilityRole="button"
-            >
-              <View style={[
-                styles.iconWrapper,
-                isActive && { backgroundColor: '#EEF2FF' },
-              ]}>
-                <Icon
-                  name={tab.icon}
-                  size={20}
-                  color={isActive ? colors.primary : '#9CA3AF'}
-                />
-                {tab.id === 'bot' && (
-                  <View style={[styles.aiBadge, { backgroundColor: colors.primary }]} />
-                )}
-              </View>
-              <Text style={[
-                styles.label,
-                { color: isActive ? colors.primary : '#9CA3AF' },
-                isActive && styles.labelActive,
-              ]}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <Animated.View style={{ transform: [{ scale: scaleAnim }], alignItems: 'center', gap: 3 }}>
+        {active ? (
+          <View style={{
+            backgroundColor: colors.tabActiveBg,
+            borderRadius: 20,
+            paddingHorizontal: 12,
+            paddingVertical: 4,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+          }}>
+            <Icon name={icon} size={15} color={colors.tabActive} />
+            <Text style={{ fontSize: 11, fontWeight: '600', color: colors.tabActive }}>
+              {label}
+            </Text>
+          </View>
+        ) : (
+          <>
+            <Icon name={icon} size={20} color={colors.tabInactive} />
+            <Text style={{ fontSize: 9, fontWeight: '500', color: colors.tabInactive }}>
+              {label}
+            </Text>
+          </>
+        )}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
 
-      <View style={styles.homeIndicatorArea}>
-        <View style={styles.homeIndicator} />
-      </View>
+// ── FABCenter ─────────────────────────────────────────────────────────────────
+
+const FABCenter: React.FC<{ onPress: () => void; colors: any }> = ({ onPress, colors }) => {
+  const scaleAnim  = useRef(new Animated.Value(1)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  const handlePress = () => {
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(scaleAnim,  { toValue: 0.9, duration: 80,  useNativeDriver: true }),
+        Animated.spring(scaleAnim,  { toValue: 1,   tension: 200, friction: 8,  useNativeDriver: true }),
+      ]),
+      Animated.sequence([
+        Animated.timing(rotateAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+        Animated.timing(rotateAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+      ]),
+    ]).start();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    onPress();
+  };
+
+  const rotate = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] });
+
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 0 }}>
+      <TouchableOpacity onPress={handlePress} activeOpacity={1}>
+        <Animated.View style={{
+          width: 52,
+          height: 52,
+          borderRadius: 26,
+          backgroundColor: colors.primary,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginTop: -14,
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.4,
+          shadowRadius: 8,
+          elevation: 8,
+          transform: [{ scale: scaleAnim }],
+        }}>
+          <Animated.View style={{ transform: [{ rotate }] }}>
+            <Icon name="plus" size={22} color="#FFFFFF" />
+          </Animated.View>
+        </Animated.View>
+      </TouchableOpacity>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    borderTopWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 12,
-  },
-  tabs: {
-    flexDirection: 'row',
-    paddingTop: 8,
-    paddingBottom: 4,
-    paddingHorizontal: 4,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-    minHeight: 48,
-    paddingVertical: 4,
-  },
-  iconWrapper: {
-    width: 40,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  icon: {
-    fontSize: 19,
-  },
-  aiBadge: {
-    position: 'absolute',
-    top: 3,
-    right: 5,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  label: {
-    fontSize: 10,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  labelActive: {
-    fontWeight: '700',
-  },
-  homeIndicatorArea: {
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  homeIndicator: {
-    width: 120,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#E5E7EB',
-  },
-});
+// ── BottomNavBar ──────────────────────────────────────────────────────────────
+
+interface BottomNavBarProps {
+  currentScreen: string;
+  onNavigate: (screen: string) => void;
+  onQuickAdd: () => void;
+}
+
+export const BottomNavBar: React.FC<BottomNavBarProps> = ({
+  currentScreen,
+  onNavigate,
+  onQuickAdd,
+}) => {
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+
+  return (
+    <View style={{
+      backgroundColor: colors.tabBar,
+      borderTopWidth: 0.5,
+      borderTopColor: colors.tabBarBorder,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      paddingBottom: insets.bottom,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 12,
+    }}>
+      {LEFT_TABS.map(tab => (
+        <TabItem
+          key={tab.key}
+          tabKey={tab.key}
+          icon={tab.icon}
+          label={tab.label}
+          active={currentScreen === tab.key}
+          onPress={() => onNavigate(tab.key)}
+          colors={colors}
+        />
+      ))}
+
+      <FABCenter onPress={onQuickAdd} colors={colors} />
+
+      {RIGHT_TABS.map(tab => (
+        <TabItem
+          key={tab.key}
+          tabKey={tab.key}
+          icon={tab.icon}
+          label={tab.label}
+          active={currentScreen === tab.key}
+          onPress={() => onNavigate(tab.key)}
+          colors={colors}
+        />
+      ))}
+    </View>
+  );
+};

@@ -1,120 +1,166 @@
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  Animated,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform, SafeAreaView, StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity, View,
-} from 'react-native';
-import { ProgressIndicator } from '../../components/onboarding';
-import { useFinance } from '../../state';
+import React, { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../state/ThemeContext';
+import { Icon, FeatherName } from '../../components/ui/Icon';
 
-export const OnboardingWelcome: React.FC = () => {
-  const { updateOnboardingStep, setProfile } = useFinance();
+interface Props {
+  onNext: () => void;
+  onSkip?: () => void;
+}
+
+const VALUE_CARDS: { icon: FeatherName; label: string; colorKey: 'primary' | 'income' | 'warning' }[] = [
+  { icon: 'bar-chart-2', label: 'Controla\ntus gastos',   colorKey: 'primary' },
+  { icon: 'target',      label: 'Alcanza\ntus metas',     colorKey: 'income'  },
+  { icon: 'zap',         label: 'Con IA\npersonalizada',  colorKey: 'warning' },
+];
+
+export const OnboardingWelcome: React.FC<Props> = ({ onNext, onSkip }) => {
   const { colors } = useTheme();
-  const [nombre, setNombre] = useState('');
-  const [focused, setFocused] = useState(false);
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
 
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(32)).current;
+  const finnOpacity = useRef(new Animated.Value(0)).current;
+  const finnScale   = useRef(new Animated.Value(0.3)).current;
+  const text1       = useRef(new Animated.Value(0)).current;
+  const text2       = useRef(new Animated.Value(0)).current;
+  const text3       = useRef(new Animated.Value(0)).current;
+  const card1       = useRef(new Animated.Value(0)).current;
+  const card2       = useRef(new Animated.Value(0)).current;
+  const card3       = useRef(new Animated.Value(0)).current;
+  const ctaAnim     = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.14, duration: 1800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,    duration: 1800, useNativeDriver: true }),
-      ])
-    ).start();
-    Animated.parallel([
-      Animated.timing(fadeAnim,  { toValue: 1, duration: 600, delay: 150, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 600, delay: 150, useNativeDriver: true }),
+    Animated.sequence([
+      Animated.delay(100),
+      Animated.parallel([
+        Animated.spring(finnScale,   { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
+        Animated.timing(finnOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+      ]),
+      Animated.delay(200),
+      Animated.stagger(180, [
+        Animated.timing(text1, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(text2, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(text3, { toValue: 1, duration: 350, useNativeDriver: true }),
+      ]),
+      Animated.delay(300),
+      Animated.stagger(80, [
+        Animated.timing(card1, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(card2, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(card3, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]),
+      Animated.delay(200),
+      Animated.spring(ctaAnim, { toValue: 1, tension: 50, friction: 9, useNativeDriver: true }),
     ]).start();
   }, []);
 
-  const handleContinue = () => {
-    Keyboard.dismiss();
-    setProfile({
-      id: Date.now().toString(),
-      userId: '1',
-      employmentType: 'employed',
-      incomeType: 'fixed',
-      monthlySalary: 0,
-      hasDebts: false,
-      mainFinancialConcern: nombre.trim(),
-      currencyPreference: 'COP',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    updateOnboardingStep(1);
-  };
+  const textStyle = (anim: Animated.Value) => ({
+    opacity: anim,
+    transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+  });
+
+  const cardStyle = (anim: Animated.Value) => ({
+    opacity: anim,
+    transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+  });
+
+  const cardAnims = [card1, card2, card3];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ProgressIndicator currentStep={0} totalSteps={5} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.kav}>
-        <View style={styles.inner}>
-          <View style={styles.orbArea}>
-            <Animated.View style={[styles.orbRing, { borderColor: colors.primary, transform: [{ scale: pulseAnim }] }]} />
-            <Animated.View style={[styles.orb, { backgroundColor: colors.primary, transform: [{ scale: pulseAnim }] }]}>
-              <Text style={styles.orbSymbol}>{String.fromCharCode(9672)}</Text>
-            </Animated.View>
-          </View>
-          <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <Text style={[styles.brand, { color: colors.primary }]}>FinancyAI</Text>
-            <Text style={[styles.headline, { color: colors.text_primary }]}>{'Nunca mas olvides un pago'}</Text>
-            <Text style={[styles.subtitle, { color: colors.text_secondary }]}>
-              {'Soy Finn, tu asistente de pagos. Te ayudo a organizar todos tus compromisos financieros.'}
-            </Text>
-            <View style={styles.inputBlock}>
-              <Text style={[styles.inputLabel, { color: colors.text_secondary }]}>Hola, como te llamas?</Text>
-              <TextInput
-                style={[styles.input, { color: colors.text_primary, borderColor: focused ? colors.primary : '#E5E7EB', backgroundColor: '#FFFFFF', borderWidth: focused ? 2 : 1 }]}
-                placeholder='Tu nombre...'
-                placeholderTextColor='#9CA3AF'
-                value={nombre}
-                onChangeText={setNombre}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                returnKeyType='done'
-                onSubmitEditing={nombre.trim().length > 0 ? handleContinue : undefined}
-                autoFocus
-              />
-            </View>
-            <TouchableOpacity
-              style={[styles.cta, { backgroundColor: colors.primary }, !nombre.trim() && styles.ctaDisabled]}
-              onPress={handleContinue}
-              disabled={!nombre.trim()}
-              activeOpacity={0.82}
-            >
-              <Text style={styles.ctaText}>Continuar</Text>
-            </TouchableOpacity>
-          </Animated.View>
+    <View style={[s.root, { backgroundColor: colors.background, paddingTop: insets.top + 8 }]}>
+      {/* Finn avatar */}
+      <Animated.View
+        style={[
+          s.finnWrap,
+          { marginTop: height * 0.08 },
+          { opacity: finnOpacity, transform: [{ scale: finnScale }] },
+        ]}
+      >
+        <View style={[s.finn, { backgroundColor: colors.primary }]}>
+          <Text style={s.finnLetter}>F</Text>
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      </Animated.View>
+
+      {/* Welcome text */}
+      <View style={s.textBlock}>
+        <Animated.Text style={[s.line1, { color: colors.textPrimary }, textStyle(text1)]}>
+          Hola, soy Finn
+        </Animated.Text>
+        <Animated.Text style={[s.line2, { color: colors.textSecondary }, textStyle(text2)]}>
+          Tu asistente financiero
+        </Animated.Text>
+        <Animated.Text style={[s.line2, { color: colors.textSecondary }, textStyle(text3)]}>
+          personal en Colombia
+        </Animated.Text>
+      </View>
+
+      {/* Value cards */}
+      <View style={[s.cardsRow, { paddingHorizontal: 24, marginTop: 32 }]}>
+        {VALUE_CARDS.map((c, i) => (
+          <Animated.View
+            key={c.icon}
+            style={[
+              s.valueCard,
+              { backgroundColor: colors.card, borderColor: colors.border },
+              cardStyle(cardAnims[i]),
+            ]}
+          >
+            <Icon name={c.icon} size={20} color={colors[c.colorKey]} />
+            <Text style={[s.cardLabel, { color: colors.textSecondary }]}>{c.label}</Text>
+          </Animated.View>
+        ))}
+      </View>
+
+      {/* Spacer */}
+      <View style={{ flex: 1 }} />
+
+      {/* CTA area */}
+      <Animated.View
+        style={[
+          s.ctaWrap,
+          { paddingHorizontal: 24, paddingBottom: insets.bottom + 24 },
+          {
+            opacity: ctaAnim,
+            transform: [{ translateY: ctaAnim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] }) }],
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={[s.cta, { backgroundColor: colors.primary }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onNext();
+          }}
+          activeOpacity={0.85}
+        >
+          <Text style={s.ctaText}>Comenzar</Text>
+        </TouchableOpacity>
+
+        {onSkip && (
+          <TouchableOpacity onPress={onSkip} style={s.skipBtn} activeOpacity={0.7}>
+            <Text style={[s.skipText, { color: colors.textTertiary }]}>Ya tengo cuenta</Text>
+          </TouchableOpacity>
+        )}
+      </Animated.View>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
-  kav: { flex: 1 },
-  inner: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 28 },
-  orbArea: { width: 110, height: 110, alignItems: 'center', justifyContent: 'center' },
-  orbRing: { position: 'absolute', width: 110, height: 110, borderRadius: 55, borderWidth: 1.5, opacity: 0.35 },
-  orb: { width: 74, height: 74, borderRadius: 37, alignItems: 'center', justifyContent: 'center' },
-  orbSymbol: { fontSize: 32, color: '#fff', fontWeight: '700' },
-  content: { width: '100%', gap: 14, alignItems: 'stretch' },
-  brand: { fontSize: 12, fontWeight: '700', letterSpacing: 2.5, textTransform: 'uppercase', textAlign: 'center' },
-  headline: { fontSize: 34, fontWeight: '800', lineHeight: 42, textAlign: 'center', letterSpacing: -0.8 },
-  subtitle: { fontSize: 14, lineHeight: 22, textAlign: 'center', fontWeight: '400' },
-  inputBlock: { gap: 8, marginTop: 4 },
-  inputLabel: { fontSize: 13, fontWeight: '600' },
-  input: { borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, fontWeight: '500' },
-  cta: { paddingVertical: 17, borderRadius: 14, alignItems: 'center', marginTop: 4 },
-  ctaDisabled: { opacity: 0.4 },
-  ctaText: { fontSize: 17, fontWeight: '700', letterSpacing: 0.2, color: '#FFFFFF' },
+const s = StyleSheet.create({
+  root:      { flex: 1, alignItems: 'center' },
+  finnWrap:  { alignItems: 'center', marginBottom: 24 },
+  finn:      { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
+  finnLetter:{ fontSize: 32, fontWeight: '500', color: '#FFFFFF' },
+  textBlock: { alignItems: 'center', gap: 8 },
+  line1:     { fontSize: 28, fontWeight: '500', textAlign: 'center' },
+  line2:     { fontSize: 18, fontWeight: '400', textAlign: 'center' },
+  cardsRow:  { flexDirection: 'row', gap: 10, width: '100%' },
+  valueCard: { flex: 1, borderRadius: 16, borderWidth: 1, padding: 14, alignItems: 'center', gap: 8 },
+  cardLabel: { fontSize: 11, fontWeight: '500', textAlign: 'center', lineHeight: 16 },
+  ctaWrap:   { width: '100%', gap: 12 },
+  cta:       { borderRadius: 16, padding: 16, alignItems: 'center' },
+  ctaText:   { fontSize: 16, fontWeight: '500', color: '#FFFFFF' },
+  skipBtn:   { alignItems: 'center', paddingVertical: 4 },
+  skipText:  { fontSize: 13 },
 });

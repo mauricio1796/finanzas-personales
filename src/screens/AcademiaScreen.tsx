@@ -9,9 +9,9 @@ type TabNivel = 'todos' | 'basico' | 'intermedio' | 'avanzado';
 const NIVEL_COLORS = { basico: '#10B981', intermedio: '#F59E0B', avanzado: '#EF4444' };
 const NIVEL_LABELS = { basico: 'Basico', intermedio: 'Intermedio', avanzado: 'Avanzado' };
 
-interface AcademiaScreenProps { onPremiumPress?: () => void; }
+interface AcademiaScreenProps { onPremiumPress?: () => void; onBack?: () => void; }
 
-export const AcademiaScreen: React.FC<AcademiaScreenProps> = ({ onPremiumPress }) => {
+export const AcademiaScreen: React.FC<AcademiaScreenProps> = ({ onPremiumPress, onBack }) => {
   const insets = useSafeAreaInsets();
   const { leccionesCompletadas, premium } = useFinance();
   const [tabNivel, setTabNivel] = useState<TabNivel>('todos');
@@ -27,7 +27,12 @@ export const AcademiaScreen: React.FC<AcademiaScreenProps> = ({ onPremiumPress }
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Academia</Text>
+        {onBack ? (
+          <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+            <Icon name="arrow-left" size={20} color="#111827" />
+          </TouchableOpacity>
+        ) : null}
+        <Text style={[styles.headerTitle, onBack && { flex: 1, textAlign: 'center' }]}>Academia</Text>
         <Icon name="book-open" size={20} color="#6366F1" />
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>

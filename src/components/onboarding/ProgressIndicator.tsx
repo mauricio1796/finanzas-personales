@@ -20,7 +20,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
   const progress = Math.min((currentStep / totalSteps) * 100, 100);
 
   return (
-    <View style={[styles.track, { backgroundColor: colors.glass_border }]}>
+    <View style={[styles.track, { backgroundColor: colors.border }]}>
       <View
         style={[
           styles.fill,

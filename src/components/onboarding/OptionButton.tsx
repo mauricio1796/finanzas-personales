@@ -39,7 +39,7 @@ export const OptionButton: React.FC<OptionButtonProps> = ({
         onPress={onPress}
         activeOpacity={0.8}
       >
-        <Text style={[styles.primaryText, { color: colors.text_light }]}>{label}</Text>
+        <Text style={[styles.primaryText, { color: colors.textInverse }]}>{label}</Text>
       </TouchableOpacity>
     );
   }
@@ -51,8 +51,8 @@ export const OptionButton: React.FC<OptionButtonProps> = ({
         {
           backgroundColor: isSelected
             ? `${colors.primary}12`
-            : colors.glass_bg,
-          borderColor: isSelected ? colors.primary : colors.glass_border,
+            : colors.card,
+          borderColor: isSelected ? colors.primary : colors.border,
           borderLeftWidth: isSelected ? 3 : 1,
         },
       ]}
@@ -63,7 +63,7 @@ export const OptionButton: React.FC<OptionButtonProps> = ({
       <Text
         style={[
           styles.outlineText,
-          { color: isSelected ? colors.primary : colors.text_primary },
+          { color: isSelected ? colors.primary : colors.textPrimary },
         ]}
       >
         {label}
@@ -71,7 +71,7 @@ export const OptionButton: React.FC<OptionButtonProps> = ({
       {isSelected ? (
         <Text style={[styles.selectedMark, { color: colors.primary }]}>✦</Text>
       ) : (
-        <Text style={[styles.arrow, { color: colors.text_tertiary }]}>›</Text>
+        <Text style={[styles.arrow, { color: colors.textTertiary }]}>›</Text>
       )}
     </TouchableOpacity>
   );

@@ -1,1013 +1,1020 @@
-import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import {
-  StyleSheet,
-  ScrollView,
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  TextInput,
-  Alert,
-  Animated,
-  useWindowDimensions,
-  Platform,
+  View, Text, ScrollView, TouchableOpacity,
+  StyleSheet, Animated, Alert, Dimensions,
 } from 'react-native';
-import { Transaction, calculateTotalExpenses, expensesByCategory } from '@/src/core/financeEngine';
-import { useFinance } from '@/src/core/context/FinanceContext';
-import Svg, { Circle, G, Path } from 'react-native-svg';
-import { aiService } from '../services/ai/AIService';
-import { storageService } from '../services/storage/StorageService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Icon, getCategoryIcon } from '../components/ui/Icon';
+import Svg, {
+  Rect, Circle, Path, Line,
+  Text as SvgText, Defs, LinearGradient, Stop,
+} from 'react-native-svg';
 
-const formatCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
+import { useFinance } from '../state';
+import { useTheme } from '../state/ThemeContext';
+import { Icon } from '../components/ui/Icon';
+import { calcularMetricasFinancieras } from '../utils/ingresoUtils';
+import {
+  getMesLabel, getMesLabelLargo, getDiaLabel,
+  getBarData, getAreaData, getHeatmapData, getDonutData, getTreemapData,
+  getResumenMetricas, buildSmoothPath,
+  getHeatIntensity, getHeatColor,
+  type HeatCell,
+} from '../utils/statsUtils';
 
-const CAT_COLORS = [
-  '#6366F1', '#10B981', '#EF4444', '#F59E0B',
-  '#8B5CF6', '#06B6D4', '#F97316', '#EC4899',
-];
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const fmtCOP = (n: number) =>
+  '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
+const fmtShort = (n: number) => {
+  if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000)     return '$' + Math.round(n / 1_000) + 'k';
+  return '$' + Math.round(n);
+};
+function capitalize(s: string) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
-const webShadow = (s: string) =>
-  Platform.OS === 'web' ? ({ boxShadow: s } as any) : {};
+const { width: SCREEN_W } = Dimensions.get('window');
+const CARD_PADDING = 16;
+const CHART_W = SCREEN_W - 32 - CARD_PADDING * 2;
+const C = 251.3; // circumference r=40
 
-interface EstadisticasProps {
-  transactions: Transaction[];
-  monthlySalary: number;
+// ── Types ──────────────────────────────────────────────────────────────────────
+type PeriodoBars = 3 | 6 | 12;
+
+// ── Props ──────────────────────────────────────────────────────────────────────
+interface Props {
+  onBack?: () => void;
+  onNavigate?: (screen: string) => void;
+  // legacy props (ignored, data comes from context)
+  transactions?: any[];
+  monthlySalary?: number;
 }
 
-type Period = '1m' | 'prev' | '3m' | '6m';
-type ChartType = 'dona' | 'barras' | 'linea';
-
-const PERIODS: { id: Period; label: string }[] = [
-  { id: '1m',   label: 'Este mes' },
-  { id: 'prev', label: 'Mes ant.' },
-  { id: '3m',   label: '3 meses' },
-  { id: '6m',   label: '6 meses' },
-];
-
-const CHART_TYPES: { id: ChartType; label: string; icon: string }[] = [
-  { id: 'dona',   label: 'Dona',   icon: '◎' },
-  { id: 'barras', label: 'Barras', icon: '▦' },
-  { id: 'linea',  label: 'Línea',  icon: '∿' },
-];
-
-// ─── Bar Chart ────────────────────────────────────────────────────────
-interface BarItem { name: string; value: number; color: string; icon?: string; }
-
-function BarChartView({ data }: { data: BarItem[] }) {
-  const maxVal = Math.max(...data.map(d => d.value), 1);
-  if (data.length === 0) {
-    return (
-      <View style={{ alignItems: 'center', paddingVertical: 28 }}>
-        <Text style={{ fontSize: 30, marginBottom: 8 }}>📊</Text>
-        <Text style={{ fontSize: 13, color: '#9CA3AF', textAlign: 'center' }}>Sin gastos en este período</Text>
-      </View>
-    );
-  }
-  return (
-    <View style={{ gap: 14 }}>
-      {data.map((item, i) => {
-        const pct = (item.value / maxVal) * 100;
-        return (
-          <View key={i} style={{ gap: 5 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151' }} numberOfLines={1}>
-                {item.icon ? item.icon + ' ' : ''}{item.name}
-              </Text>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: item.color }}>{formatCOP(item.value)}</Text>
-            </View>
-            <View style={{ height: 8, backgroundColor: '#F3F4F6', borderRadius: 4, overflow: 'hidden' }}>
-              <Animated.View style={{ width: `${pct}%` as any, height: '100%', backgroundColor: item.color, borderRadius: 4 }} />
-            </View>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-// ─── Line Chart ───────────────────────────────────────────────────────
-interface DailyPoint { label: string; amount: number; }
-
-function LineChartView({ data, chartWidth }: { data: DailyPoint[]; chartWidth: number }) {
-  if (data.length < 2) {
-    return (
-      <View style={{ alignItems: 'center', paddingVertical: 28 }}>
-        <Text style={{ fontSize: 30, marginBottom: 8 }}>📈</Text>
-        <Text style={{ fontSize: 13, color: '#9CA3AF', textAlign: 'center' }}>
-          Registra más transacciones para ver la tendencia diaria
-        </Text>
-      </View>
-    );
-  }
-  const W = Math.max(chartWidth - 8, 100);
-  const H = 130;
-  const maxVal = Math.max(...data.map(d => d.amount), 1);
-  const pts = data.map((d, i) => ({
-    x: (i / (data.length - 1)) * W,
-    y: H - (d.amount / maxVal) * (H - 12),
-  }));
-  const linePath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const areaPath = `${linePath} L${W.toFixed(1)},${H} L0,${H} Z`;
-
-  return (
-    <View>
-      <Svg width={W} height={H + 4} style={{ overflow: 'visible' }}>
-        <Path d={areaPath} fill="rgba(99,102,241,0.08)" />
-        <Path d={linePath} stroke="#6366F1" strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        {pts.map((p, i) => (
-          <Circle key={i} cx={p.x} cy={p.y} r={3.5} fill="#6366F1" />
-        ))}
-      </Svg>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-        <Text style={{ fontSize: 10, color: '#9CA3AF', fontWeight: '600' }}>{data[0]?.label}</Text>
-        <Text style={{ fontSize: 10, color: '#9CA3AF', fontWeight: '600' }}>{data[data.length - 1]?.label}</Text>
-      </View>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
-        <Text style={{ fontSize: 11, color: '#EF4444', fontWeight: '700' }}>{formatCOP(data[0]?.amount ?? 0)}</Text>
-        <Text style={{ fontSize: 11, color: '#EF4444', fontWeight: '700' }}>{formatCOP(data[data.length - 1]?.amount ?? 0)}</Text>
-      </View>
-    </View>
-  );
-}
-
-// ─── Donut Chart ──────────────────────────────────────────────────────
-interface ChartSlice { value: number; color: string; }
-
-function DonutChart({ data, size = 200, strokeWidth = 26 }: {
-  data: ChartSlice[];
-  size?: number;
-  strokeWidth?: number;
-}) {
-  const r    = (size - strokeWidth) / 2;
-  const circ = 2 * Math.PI * r;
-
-  if (data.length === 0) {
-    // Fallback: anillo verde completo (salario sin categorías)
-    if (Platform.OS === 'web') {
-      const holeR = size * 0.62;
-      return (
-        <View style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center',
-          ...({ backgroundImage: `conic-gradient(#10B981 0% 100%)` } as any) }}>
-          <View style={{ width: holeR, height: holeR, borderRadius: holeR / 2, backgroundColor: '#FFFFFF' }} />
-        </View>
-      );
-    }
-    return (
-      <Svg width={size} height={size}>
-        <Circle cx={size / 2} cy={size / 2} r={r} stroke="#10B981" strokeWidth={strokeWidth} fill="none" />
-      </Svg>
-    );
-  }
-
-  if (Platform.OS === 'web') {
-    let cum = 0;
-    const stops = data.map(s => {
-      const from = cum;
-      cum += s.value;
-      return `${s.color} ${from.toFixed(2)}% ${cum.toFixed(2)}%`;
-    });
-    const holeR = size * 0.62;
-    return (
-      <View style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center',
-        ...({ backgroundImage: `conic-gradient(${stops.join(', ')})` } as any) }}>
-        <View style={{ width: holeR, height: holeR, borderRadius: holeR / 2, backgroundColor: '#FFFFFF' }} />
-      </View>
-    );
-  }
-
-  let offset = 0;
-  return (
-    <Svg width={size} height={size}>
-      <G rotation="-90" origin={`${size / 2},${size / 2}`}>
-        {data.map((s, i) => {
-          const arcLen = (s.value / 100) * circ;
-          const el = (
-            <Circle
-              key={i}
-              cx={size / 2} cy={size / 2} r={r}
-              stroke={s.color}
-              strokeWidth={strokeWidth}
-              strokeDasharray={`${arcLen} ${circ}`}
-              strokeDashoffset={-offset}
-              fill="none"
-            />
-          );
-          offset += arcLen;
-          return el;
-        })}
-      </G>
-    </Svg>
-  );
-}
-
-// ─── Confetti ─────────────────────────────────────────────────────────
-const CONFETTI_COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EC4899', '#06B6D4', '#EF4444'];
-const N_PIECES = 18;
-
-function ConfettiBurst({ visible }: { visible: boolean }) {
-  const anims = useRef(
-    Array.from({ length: N_PIECES }, () => ({
-      x: new Animated.Value(0), y: new Animated.Value(0),
-      op: new Animated.Value(1), rot: new Animated.Value(0),
-    }))
-  ).current;
-
-  React.useEffect(() => {
-    if (!visible) return;
-    const animations = anims.map(a => {
-      const dx = (Math.random() - 0.5) * 200;
-      const dy = -(Math.random() * 140 + 60);
-      a.x.setValue(0); a.y.setValue(0); a.op.setValue(1); a.rot.setValue(0);
-      return Animated.parallel([
-        Animated.timing(a.x,   { toValue: dx, duration: 600, useNativeDriver: true }),
-        Animated.timing(a.y,   { toValue: dy, duration: 600, useNativeDriver: true }),
-        Animated.timing(a.op,  { toValue: 0,  duration: 600, useNativeDriver: true }),
-        Animated.timing(a.rot, { toValue: Math.random() * 4 - 2, duration: 600, useNativeDriver: true }),
-      ]);
-    });
-    Animated.stagger(20, animations).start();
-  }, [visible]);
-
-  if (!visible) return null;
-  return (
-    <View style={confettiStyles.container} pointerEvents="none">
-      {anims.map((a, i) => (
-        <Animated.View
-          key={i}
-          style={[confettiStyles.piece, {
-            backgroundColor: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-            transform: [
-              { translateX: a.x }, { translateY: a.y },
-              { rotate: a.rot.interpolate({ inputRange: [-2, 2], outputRange: ['-180deg', '180deg'] }) },
-            ],
-            opacity: a.op,
-          }]}
-        />
-      ))}
-    </View>
-  );
-}
-
-const confettiStyles = StyleSheet.create({
-  container: {
-    position: 'absolute', alignItems: 'center', justifyContent: 'center',
-    width: '100%', bottom: 60, zIndex: 100, pointerEvents: 'none' as any,
-  },
-  piece: { position: 'absolute', width: 8, height: 8, borderRadius: 2 },
-});
-
-function filterByPeriod(txs: Transaction[], period: Period): Transaction[] {
-  const now = new Date();
-  return txs.filter(t => {
-    const d = new Date(t.date);
-    if (period === '1m') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    if (period === 'prev') {
-      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      return d.getMonth() === prev.getMonth() && d.getFullYear() === prev.getFullYear();
-    }
-    if (period === '3m') return d >= new Date(now.getFullYear(), now.getMonth() - 2, 1);
-    return d >= new Date(now.getFullYear(), now.getMonth() - 5, 1);
-  });
-}
-
-// ─── Main Component ───────────────────────────────────────────────────
-export function Estadisticas({ transactions, monthlySalary }: EstadisticasProps) {
-  const { width } = useWindowDimensions();
-  const { categories, updateCategory, profile, goal } = useFinance();
-  const isSmall = width < 768;
-
+// ── Component ──────────────────────────────────────────────────────────────────
+export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
   const insets = useSafeAreaInsets();
-  const [period, setPeriod] = useState<Period>('1m');
-  const [chartType, setChartType] = useState<ChartType>('dona');
-  const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
-  const [editAmount, setEditAmount] = useState('');
-  const [editFocused, setEditFocused] = useState(false);
-  const [paidCatIds, setPaidCatIds] = useState<Set<string>>(new Set());
-  const [confettiKey, setConfettiKey] = useState(0);
-  const [showConfetti, setShowConfetti] = useState(false);
+  const { colors, isDark } = useTheme();
+  const { transactions, categories, profile, goal } = useFinance();
 
-  // Load paid category IDs from storage on mount
-  useEffect(() => {
-    storageService.getPaidTxIds().then(ids => {
-      if (ids && ids.length > 0) setPaidCatIds(new Set(ids));
-    });
-  }, []);
+  // ── State ──────────────────────────────────────────────────────────────────
+  const now = useMemo(() => new Date(), []);
+  const [mesSeleccionado, setMesSeleccionado] = useState({
+    mes: now.getMonth(),
+    año: now.getFullYear(),
+  });
+  const [periodoBars, setPeriodoBars] = useState<PeriodoBars>(3);
+  const [selectedHeatCell, setSelectedHeatCell] = useState<HeatCell | null>(null);
 
-  // Sync edit amount when a category is selected
-  useEffect(() => {
-    if (selectedCatId) {
-      const cat = categories.find(c => c.id === selectedCatId);
-      setEditAmount(cat?.budget ? cat.budget.toString() : '');
-    }
-  }, [selectedCatId]);
+  // Animated values
+  const barProgress  = useRef(new Animated.Value(0)).current;
+  const areaOpacity  = useRef(new Animated.Value(0)).current;
+  const heatOpacity  = useRef(new Animated.Value(0)).current;
+  const treemapAnim  = useRef(new Animated.Value(0)).current;
 
-  const filteredTxs = useMemo(() => filterByPeriod(transactions, period), [transactions, period]);
+  // Donut: individual Animated.Values per segment
+  const donutAnimRef = useRef<Animated.Value[]>([]);
+  const [donutDashes, setDonutDashes] = useState<number[]>([]);
 
-  // Expense stats for the period
-  const stats = useMemo(() => {
-    const expByCategory = expensesByCategory(filteredTxs);
-    const totalExpenses = calculateTotalExpenses(filteredTxs);
-    const expenses = filteredTxs.filter(t => t.type === 'expense');
-    const spendingPercentage = monthlySalary > 0 ? (totalExpenses / monthlySalary) * 100 : 0;
-    return {
-      totalExpenses, expByCategory, spendingPercentage,
-      averageExpense: expenses.length > 0 ? totalExpenses / expenses.length : 0,
-      transactionCount: expenses.length,
-    };
-  }, [filteredTxs, monthlySalary]);
+  // Bar heights driven by barProgress listener
+  const [barHCurr, setBarHCurr] = useState<number[]>([]);
+  const [barHPrev, setBarHPrev] = useState<number[]>([]);
 
-  // ── Budget allocation data (drives the donut) ──────────────────────
-  const budgetData = useMemo(() => {
-    const budgeted = categories
-      .filter(c => (c.budget ?? 0) > 0)
-      .map((c, i) => ({
-        id: c.id,
-        name: c.name,
-        icon: c.icon ?? '📦',
-        budget: c.budget!,
-        pct: monthlySalary > 0 ? Math.min((c.budget! / monthlySalary) * 100, 100) : 0,
-        color: c.color ?? CAT_COLORS[i % CAT_COLORS.length],
-        spent: stats.expByCategory[c.id] ?? 0,
-      }));
+  // ── Memos ──────────────────────────────────────────────────────────────────
+  const { mes, año } = mesSeleccionado;
+  const salary = profile?.monthlySalary ?? 0;
 
-    const totalBudgeted = budgeted.reduce((s, b) => s + b.budget, 0);
-    const remaining = Math.max(0, monthlySalary - totalBudgeted);
-    return { budgeted, remaining, totalBudgeted };
-  }, [categories, monthlySalary, stats.expByCategory]);
-
-  // Donut slices: verde = salario libre, colores = categorías que lo "muerden"
-  // El verde siempre va primero (base del salario), luego las categorías encima
-  const donutSlices = useMemo((): ChartSlice[] => {
-    if (monthlySalary <= 0) return [{ value: 100, color: '#10B981' }];
-    // Si no hay categorías, todo verde
-    if (budgetData.budgeted.length === 0) return [{ value: 100, color: '#10B981' }];
-    // Disponible (verde) va al principio como base
-    const categorySlices = budgetData.budgeted.map(b => ({ value: b.pct, color: b.color }));
-    const remainingPct = budgetData.remaining > 0
-      ? (budgetData.remaining / monthlySalary) * 100
-      : 0;
-    // Verde al final (lo que queda libre)
-    if (remainingPct > 0) {
-      categorySlices.push({ value: remainingPct, color: '#10B981' });
-    }
-    return categorySlices;
-  }, [budgetData, monthlySalary]);
-
-  // Expense slices by category (actual spending, reactive)
-  const expenseSlices = useMemo((): BarItem[] => {
-    return Object.entries(stats.expByCategory)
-      .map(([catId, amount], i) => {
-        const cat = categories.find(c => c.id === catId);
-        return {
-          name: cat?.name ?? catId,
-          value: amount,
-          color: cat?.color ?? CAT_COLORS[i % CAT_COLORS.length],
-          icon: cat?.icon,
-        };
-      })
-      .sort((a, b) => b.value - a.value);
-  }, [stats.expByCategory, categories]);
-
-  // Donut slices for actual spending (not budget)
-  const expenseDonutSlices = useMemo((): ChartSlice[] => {
-    const total = stats.totalExpenses;
-    if (total <= 0) return [];
-    return expenseSlices.map(s => ({ value: (s.value / total) * 100, color: s.color }));
-  }, [expenseSlices, stats.totalExpenses]);
-
-  // Daily spending trend (for line chart)
-  const dailySpending = useMemo((): DailyPoint[] => {
-    const map = new Map<string, number>();
-    filteredTxs
-      .filter(t => t.type === 'expense')
-      .forEach(t => {
-        const day = t.date.slice(0, 10);
-        map.set(day, (map.get(day) ?? 0) + t.amount);
-      });
-    return Array.from(map.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, amount]) => ({
-        label: new Date(date + 'T12:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }),
-        amount,
-      }));
-  }, [filteredTxs]);
-
-  // AI insights
-  const aiInsights = useMemo(() => {
-    const anomalies = aiService.detectAnomalies(transactions as any);
-    const goalInsight = goal && profile
-      ? aiService.analyzeGoalProgress(transactions as any, goal as any, monthlySalary)
-      : null;
-    return { anomalies: anomalies.slice(0, 2), goalInsight };
-  }, [transactions.length, goal, profile, monthlySalary]);
-
-  // Selected category for the modal
-  const selectedCat = useMemo(
-    () => (selectedCatId ? categories.find(c => c.id === selectedCatId) : null),
-    [selectedCatId, categories]
+  const metricas = useMemo(
+    () => getResumenMetricas(transactions, mes, año, salary),
+    [transactions, mes, año, salary],
   );
 
-  // ── Actions ──────────────────────────────────────────────────────────
-  const handleTogglePaid = useCallback((catId: string) => {
-    setPaidCatIds(prev => {
-      const next = new Set(prev);
-      const wasPaid = next.has(catId);
-      wasPaid ? next.delete(catId) : next.add(catId);
-      storageService.savePaidTxIds([...next]).catch(console.error);
-      if (!wasPaid) {
-        setConfettiKey(k => k + 1);
-        setShowConfetti(true);
-        setTimeout(() => setShowConfetti(false), 700);
-      }
-      return next;
+  const metricasIngreso = useMemo(
+    () => calcularMetricasFinancieras(transactions, categories as any, salary, mes, año),
+    [transactions, categories, salary, mes, año],
+  );
+
+  const barData = useMemo(
+    () => getBarData(transactions, periodoBars),
+    [transactions, periodoBars],
+  );
+
+  const areaData = useMemo(
+    () => getAreaData(transactions, 6, salary),
+    [transactions, salary],
+  );
+
+  const heatData = useMemo(
+    () => getHeatmapData(transactions, mes, año),
+    [transactions, mes, año],
+  );
+
+  const treemapData = useMemo(
+    () => getTreemapData(transactions, mes, año),
+    [transactions, mes, año],
+  );
+
+  const donutData = useMemo(
+    () => getDonutData(transactions, mes, año, salary, colors.primary, colors.income, colors.warning),
+    [transactions, mes, año, salary, colors.primary, colors.income, colors.warning],
+  );
+
+  const maxHeatMonto = useMemo(
+    () => Math.max(...heatData.map(c => c.monto), 1),
+    [heatData],
+  );
+
+  const maxBarMonto = useMemo(
+    () => Math.max(...barData.flatMap(d => [d.gastoActual, d.gastoAnterior]), 1),
+    [barData],
+  );
+
+  const maxAreaMonto = useMemo(
+    () => Math.max(...areaData.map(d => d.ahorro), goal?.targetAmount ?? 1, 1),
+    [areaData, goal],
+  );
+
+  const mesesDisponibles = useMemo(() =>
+    Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+      return {
+        mes: d.getMonth(),
+        año: d.getFullYear(),
+        label: capitalize(getMesLabel(d.getMonth())),
+        labelLargo: getMesLabelLargo(d.getMonth(), d.getFullYear()),
+      };
+    }),
+  [now]);
+
+  // ── Chart constants ────────────────────────────────────────────────────────
+  const BAR_AREA_H = 110;
+  const GROUP_W = CHART_W / Math.max(barData.length, 1);
+  const BAR_W = Math.max(GROUP_W * 0.28, 4);
+  const BAR_GAP = BAR_W * 0.4;
+
+  const barH = (monto: number) =>
+    maxBarMonto > 0 ? Math.max(monto > 0 ? 3 : 0, (monto / maxBarMonto) * BAR_AREA_H) : 0;
+
+  // Area chart
+  const AREA_H = 140;
+  const AREA_PAD_TOP = 16;
+  const AREA_PAD_BOTTOM = 20;
+  const DRAW_H = AREA_H - AREA_PAD_TOP - AREA_PAD_BOTTOM;
+
+  const areaPoints = useMemo(() =>
+    areaData.map((d, i) => ({
+      x: areaData.length > 1 ? (i / (areaData.length - 1)) * CHART_W : CHART_W / 2,
+      y: AREA_PAD_TOP + DRAW_H - (maxAreaMonto > 0 ? (d.ahorro / maxAreaMonto) * DRAW_H : 0),
+      ...d,
+    })),
+  [areaData, maxAreaMonto, CHART_W, DRAW_H]);
+
+  const linePath  = useMemo(() => buildSmoothPath(areaPoints), [areaPoints]);
+  const areaPath  = useMemo(() => {
+    if (areaPoints.length < 2) return '';
+    const last = areaPoints[areaPoints.length - 1];
+    const first = areaPoints[0];
+    return `${linePath} L ${last.x.toFixed(1)},${(AREA_H - AREA_PAD_BOTTOM).toFixed(1)} L ${first.x.toFixed(1)},${(AREA_H - AREA_PAD_BOTTOM).toFixed(1)} Z`;
+  }, [linePath, areaPoints, AREA_H, AREA_PAD_BOTTOM]);
+
+  // ── Animations ─────────────────────────────────────────────────────────────
+
+  // Bar animation via barProgress listener
+  useEffect(() => {
+    const id = barProgress.addListener(({ value }) => {
+      setBarHCurr(barData.map(d => barH(d.gastoActual) * value));
+      setBarHPrev(barData.map(d => barH(d.gastoAnterior) * value));
     });
-  }, []);
+    return () => barProgress.removeListener(id);
+  }, [barData, maxBarMonto]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSaveBudget = useCallback(() => {
-    if (!selectedCatId) return;
-    const amount = parseInt(editAmount.replace(/\./g, ''), 10);
-    if (isNaN(amount) || amount < 0) {
-      Alert.alert('Monto inválido', 'Ingresa un valor numérico válido');
-      return;
-    }
-    updateCategory(selectedCatId, { budget: amount });
-    setSelectedCatId(null);
-  }, [selectedCatId, editAmount, updateCategory]);
+  // Animate all sections on mount / month change
+  useEffect(() => {
+    initDonutAnims();
+    barProgress.setValue(0);
+    Animated.timing(barProgress, { toValue: 1, duration: 700, useNativeDriver: false }).start();
+    areaOpacity.setValue(0);
+    Animated.timing(areaOpacity, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+    heatOpacity.setValue(0);
+    Animated.timing(heatOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    treemapAnim.setValue(0);
+    Animated.spring(treemapAnim, { toValue: 1, tension: 50, friction: 9, useNativeDriver: true }).start();
+  }, [mesSeleccionado]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleDeleteCategory = useCallback(() => {
-    if (!selectedCatId) return;
-    Alert.alert(
-      'Eliminar categoría',
-      '¿Quitar esta categoría del presupuesto?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar', style: 'destructive',
-          onPress: () => {
-            updateCategory(selectedCatId, { budget: 0 });
-            setSelectedCatId(null);
-          },
-        },
-      ]
+  function initDonutAnims() {
+    // Clean up old listeners
+    donutAnimRef.current.forEach(a => a.removeAllListeners());
+    // Create new anims
+    donutAnimRef.current = donutData.map(() => new Animated.Value(0));
+    setDonutDashes(donutData.map(() => 0));
+    // Add listeners
+    donutAnimRef.current.forEach((anim, i) => {
+      anim.addListener(({ value }) => {
+        const dash = (donutData[i]?.dashLength ?? 0) * value;
+        setDonutDashes(prev => {
+          const next = [...prev];
+          next[i] = dash;
+          return next;
+        });
+      });
+    });
+    // Start staggered
+    Animated.stagger(
+      150,
+      donutAnimRef.current.map(a =>
+        Animated.timing(a, { toValue: 1, duration: 800, useNativeDriver: false }),
+      ),
+    ).start();
+  }
+
+  // Initial animation
+  useEffect(() => {
+    initDonutAnims();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Render helpers ─────────────────────────────────────────────────────────
+
+  const card = (children: React.ReactNode, extra?: object) => (
+    <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }, extra]}>
+      {children}
+    </View>
+  );
+
+  // ── TAB: RESUMEN ───────────────────────────────────────────────────────────
+
+  const renderResumen = () => {
+    const pctGastado = donutData.find(d => d.label === 'Gastos')?.percentage ?? 0;
+    return (
+      <>
+        {/* Quick metrics 3-col */}
+        <View style={s.metricGrid}>
+          {[
+            { val: fmtCOP(metricasIngreso.totalGastado),   label: 'Total gastado', color: colors.expense },
+            { val: fmtCOP(metricasIngreso.balanceFinal),   label: 'Balance final', color: colors.income  },
+            { val: `${metricasIngreso.porcentajeGastado}%`, label: 'Gastado',      color: colors.primary },
+          ].map(m => (
+            <View key={m.label} style={[s.metricCell, { backgroundColor: colors.cardSecondary }]}>
+              <Text style={[s.metricVal, { color: m.color }]} numberOfLines={1}>{m.val}</Text>
+              <Text style={[s.metricLabel, { color: colors.textTertiary }]}>{m.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Secondary 2-col */}
+        <View style={[s.metricGrid, { marginTop: 8 }]}>
+          {[
+            { val: fmtCOP(metricasIngreso.gastoPromedioRecomendadoDia), label: 'Presup. diario' },
+            { val: metricas.categoriaMayorGasto,                         label: 'Mayor categoría' },
+          ].map(m => (
+            <View key={m.label} style={[s.metricCell2, { backgroundColor: colors.cardSecondary }]}>
+              <Text style={[s.metricVal2, { color: colors.textPrimary }]} numberOfLines={1}>{m.val}</Text>
+              <Text style={[s.metricLabel, { color: colors.textTertiary }]}>{m.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Donut */}
+        {card(
+          <>
+            <Text style={[s.cardTitle, { color: colors.textPrimary }]}>Distribución del salario</Text>
+            {donutData.length === 0 ? (
+              <View style={s.emptyWrap}>
+                <Icon name="pie-chart" size={28} color={colors.textTertiary} />
+                <Text style={[s.emptyText, { color: colors.textSecondary }]}>Sin transacciones este mes</Text>
+              </View>
+            ) : (
+              <View style={s.donutRow}>
+                {/* SVG */}
+                <Svg width={110} height={110} viewBox="0 0 110 110">
+                  {/* Base track */}
+                  <Circle cx={55} cy={55} r={40} fill="none" stroke={colors.borderSubtle} strokeWidth={16} />
+                  {/* Segments */}
+                  {donutData.map((seg, i) => {
+                    const dash = donutDashes[i] ?? 0;
+                    const gap = Math.max(0, C - dash);
+                    return (
+                      <Circle
+                        key={i}
+                        cx={55} cy={55} r={40}
+                        fill="none"
+                        stroke={seg.color}
+                        strokeWidth={16}
+                        strokeLinecap="butt"
+                        strokeDasharray={`${dash.toFixed(1)} ${gap.toFixed(1)}`}
+                        strokeDashoffset={`${-seg.staticOffset.toFixed(1)}`}
+                        transform="rotate(-90 55 55)"
+                      />
+                    );
+                  })}
+                  {/* Center text */}
+                  <SvgText
+                    x={55} y={51}
+                    textAnchor="middle"
+                    fontSize={14}
+                    fontWeight="500"
+                    fill={colors.textPrimary}
+                  >
+                    {pctGastado}%
+                  </SvgText>
+                  <SvgText
+                    x={55} y={63}
+                    textAnchor="middle"
+                    fontSize={9}
+                    fill={colors.textTertiary}
+                  >
+                    gastado
+                  </SvgText>
+                </Svg>
+
+                {/* Legend */}
+                <View style={s.donutLegend}>
+                  {donutData.map((seg, i) => (
+                    <View key={i} style={s.legendItem}>
+                      <View style={s.legendRow}>
+                        <View style={[s.legendDot, { backgroundColor: seg.color }]} />
+                        <Text style={[s.legendLabel, { color: colors.textPrimary }]}>{seg.label}</Text>
+                        <Text style={[s.legendPct, { color: colors.textPrimary }]}>{seg.percentage}%</Text>
+                      </View>
+                      <View style={[s.legendBarTrack, { backgroundColor: colors.borderSubtle }]}>
+                        <View style={[s.legendBarFill, { backgroundColor: seg.color, width: `${seg.percentage}%` as any }]} />
+                      </View>
+                    </View>
+                  ))}
+                  {metricas.cambioPctVsMesAnterior !== 0 && (
+                    <View style={[s.changeBadge, { backgroundColor: metricas.cambioPctVsMesAnterior < 0 ? colors.incomeLight : colors.expenseLight }]}>
+                      <Icon
+                        name={metricas.cambioPctVsMesAnterior < 0 ? 'trending-down' : 'trending-up'}
+                        size={10}
+                        color={metricas.cambioPctVsMesAnterior < 0 ? colors.income : colors.expense}
+                      />
+                      <Text style={[s.changeText, { color: metricas.cambioPctVsMesAnterior < 0 ? colors.income : colors.expense }]}>
+                        {Math.abs(metricas.cambioPctVsMesAnterior)}% vs mes anterior
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            )}
+          </>,
+          { marginTop: 16 },
+        )}
+      </>
     );
-  }, [selectedCatId, updateCategory]);
+  };
 
-  const STAT_CARDS = [
-    { label: 'GASTOS TOTALES', value: formatCOP(stats.totalExpenses), color: '#EF4444', bg: '#FEF2F2' },
-    { label: 'GASTO PROMEDIO', value: formatCOP(stats.averageExpense), color: '#F59E0B', bg: '#FFFBEB' },
-    { label: 'PRESUPUESTADO',  value: formatCOP(budgetData.totalBudgeted), color: '#8B5CF6', bg: '#F5F3FF' },
-    { label: '% PRESUPUESTO',  value: `${stats.spendingPercentage.toFixed(0)}%`,
-      color: stats.spendingPercentage > 100 ? '#EF4444' : '#10B981',
-      bg:    stats.spendingPercentage > 100 ? '#FEF2F2' : '#ECFDF5' },
-  ];
+  // ── TAB: COMPARATIVO ───────────────────────────────────────────────────────
 
-  const currentMonth = new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
+  const renderComparativo = () => {
+    const hasDatos = barData.some(d => d.gastoActual > 0 || d.gastoAnterior > 0);
+    const conDatos = barData.filter(d => d.gastoActual > 0);
+    const maxG = Math.max(...barData.map(d => d.gastoActual), 0);
+    const minG = conDatos.length > 0 ? Math.min(...conDatos.map(d => d.gastoActual)) : 0;
+    const promedio = conDatos.length > 0
+      ? conDatos.reduce((s, d) => s + d.gastoActual, 0) / conDatos.length
+      : 0;
 
-  return (
-    <ScrollView
-      style={[styles.scroll, { paddingTop: insets.top }]}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerLabel}>ESTADÍSTICAS</Text>
-        <Text style={styles.headerMonth}>{currentMonth}</Text>
-        <View style={styles.periodRow}>
-          {PERIODS.map(p => (
+    return (
+      <>
+        {/* Period selector */}
+        <View style={s.periodoRow}>
+          {([3, 6, 12] as PeriodoBars[]).map(p => (
             <TouchableOpacity
-              key={p.id}
-              style={[styles.periodPill, period === p.id && styles.periodPillActive]}
-              onPress={() => setPeriod(p.id)}
+              key={p}
+              style={[
+                s.periodoPill,
+                periodoBars === p
+                  ? { backgroundColor: colors.primaryLight }
+                  : { backgroundColor: colors.cardSecondary, borderWidth: 0.5, borderColor: colors.border },
+              ]}
+              onPress={() => setPeriodoBars(p)}
             >
-              <Text style={[styles.periodPillText, period === p.id && styles.periodPillTextActive]}>
-                {p.label}
+              <Text style={[s.periodoPillText, { color: periodoBars === p ? colors.primary : colors.textSecondary }]}>
+                {p} meses
               </Text>
             </TouchableOpacity>
           ))}
         </View>
-      </View>
 
-      {/* Stat cards — 2×2 grid */}
-      <View style={styles.statsGrid}>
-        {STAT_CARDS.map((s, i) => (
-          <View key={i} style={[styles.statCard, { backgroundColor: s.bg, borderTopColor: s.color }, webShadow('0 2px 8px rgba(0,0,0,0.05)')]}>
-            <Text style={styles.statLabel}>{s.label}</Text>
-            <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
-          </View>
-        ))}
-      </View>
+        {card(
+          <>
+            {!hasDatos ? (
+              <View style={s.emptyWrap}>
+                <Icon name="bar-chart-2" size={28} color={colors.textTertiary} />
+                <Text style={[s.emptyText, { color: colors.textSecondary }]}>Sin datos en este período</Text>
+              </View>
+            ) : (
+              <>
+                <Svg width={CHART_W} height={BAR_AREA_H + 30}>
+                  {/* Grid lines */}
+                  {[0, 0.5, 1].map((pct, gi) => {
+                    const y = BAR_AREA_H - pct * BAR_AREA_H;
+                    return (
+                      <React.Fragment key={gi}>
+                        <Line
+                          x1={0} y1={y} x2={CHART_W} y2={y}
+                          stroke={colors.borderSubtle}
+                          strokeWidth={0.5}
+                        />
+                        <SvgText
+                          x={0} y={y - 3}
+                          fontSize={8}
+                          fill={colors.textTertiary}
+                        >
+                          {pct === 0 ? '$0' : fmtShort(maxBarMonto * pct)}
+                        </SvgText>
+                      </React.Fragment>
+                    );
+                  })}
 
-      {/* ── Mis Gastos — chart selector ── */}
-      <View style={[styles.card, webShadow('0 2px 8px rgba(0,0,0,0.05)')]}>
-        {/* Card header: title + chart type tabs */}
-        <View style={styles.chartCardHeader}>
-          <View>
-            <Text style={[styles.cardTitle, { marginBottom: 0 }]}>Mis Gastos</Text>
-            <Text style={styles.chartCardSub}>
-              {stats.totalExpenses > 0 ? formatCOP(stats.totalExpenses) + ' gastados' : 'Sin gastos'}
-            </Text>
-          </View>
-          <View style={styles.chartTypeTabs}>
-            {CHART_TYPES.map(ct => (
-              <TouchableOpacity
-                key={ct.id}
-                style={[styles.chartTypeTab, chartType === ct.id && styles.chartTypeTabActive]}
-                onPress={() => setChartType(ct.id)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.chartTypeTabIcon, chartType === ct.id && styles.chartTypeTabIconActive]}>
-                  {ct.icon}
-                </Text>
-                <Text style={[styles.chartTypeTabText, chartType === ct.id && styles.chartTypeTabTextActive]}>
-                  {ct.label}
-                </Text>
-              </TouchableOpacity>
+                  {/* Bars */}
+                  {barData.map((d, i) => {
+                    const cx = i * GROUP_W + GROUP_W / 2;
+                    const hCurr = barHCurr[i] ?? 0;
+                    const hPrev = barHPrev[i] ?? 0;
+                    return (
+                      <React.Fragment key={i}>
+                        {/* Previous year bar */}
+                        {hPrev > 0 && (
+                          <Rect
+                            x={cx - BAR_GAP / 2 - BAR_W}
+                            y={BAR_AREA_H - hPrev}
+                            width={BAR_W}
+                            height={hPrev}
+                            rx={3}
+                            fill={colors.primary}
+                            opacity={0.35}
+                          />
+                        )}
+                        {/* Current year bar */}
+                        {hCurr > 0 && (
+                          <Rect
+                            x={cx + BAR_GAP / 2}
+                            y={BAR_AREA_H - hCurr}
+                            width={BAR_W}
+                            height={hCurr}
+                            rx={3}
+                            fill={colors.primary}
+                          />
+                        )}
+                        {/* X label */}
+                        <SvgText
+                          x={cx}
+                          y={BAR_AREA_H + 18}
+                          textAnchor="middle"
+                          fontSize={9}
+                          fill={colors.textTertiary}
+                        >
+                          {d.label}
+                        </SvgText>
+                      </React.Fragment>
+                    );
+                  })}
+                </Svg>
+
+                {/* Legend */}
+                <View style={s.barLegend}>
+                  <View style={s.legendRow}>
+                    <View style={[s.legendDot, { backgroundColor: colors.primary, opacity: 0.35 }]} />
+                    <Text style={[s.legendLabel, { color: colors.textSecondary }]}>Año anterior</Text>
+                  </View>
+                  <View style={s.legendRow}>
+                    <View style={[s.legendDot, { backgroundColor: colors.primary }]} />
+                    <Text style={[s.legendLabel, { color: colors.textSecondary }]}>Este año</Text>
+                  </View>
+                </View>
+              </>
+            )}
+          </>,
+        )}
+
+        {/* Stats row */}
+        {hasDatos && (
+          <View style={[s.metricGrid, { marginTop: 12 }]}>
+            {[
+              { val: fmtCOP(maxG),     label: 'Mayor gasto' },
+              { val: fmtCOP(minG),     label: 'Menor gasto' },
+              { val: fmtCOP(promedio), label: 'Promedio' },
+            ].map(m => (
+              <View key={m.label} style={[s.metricCell, { backgroundColor: colors.cardSecondary }]}>
+                <Text style={[s.metricVal, { color: colors.textPrimary }]} numberOfLines={1}>{m.val}</Text>
+                <Text style={[s.metricLabel, { color: colors.textTertiary }]}>{m.label}</Text>
+              </View>
             ))}
           </View>
-        </View>
-
-        {/* Chart area */}
-        {stats.totalExpenses <= 0 ? (
-          <View style={{ alignItems: 'center', paddingVertical: 28 }}>
-            <Text style={{ fontSize: 36, marginBottom: 8 }}>💸</Text>
-            <Text style={{ fontSize: 13, color: '#9CA3AF', textAlign: 'center' }}>
-              Aún no hay gastos registrados en este período
-            </Text>
-          </View>
-        ) : chartType === 'dona' ? (
-          <View>
-            <View style={styles.donutContainer}>
-              <DonutChart data={expenseDonutSlices} size={180} strokeWidth={24} />
-              <View style={styles.donutCenter}>
-                <Text style={[styles.donutCenterAmount, { color: '#EF4444' }]}>{formatCOP(stats.totalExpenses)}</Text>
-                <Text style={styles.donutCenterLabel}>gastado</Text>
-              </View>
-            </View>
-            {/* Legend */}
-            <View style={{ gap: 8, marginTop: 8 }}>
-              {expenseSlices.slice(0, 6).map((item, i) => (
-                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: item.color }} />
-                  <Text style={{ flex: 1, fontSize: 13, color: '#374151', fontWeight: '600' }}>
-                    {item.icon ? item.icon + ' ' : ''}{item.name}
-                  </Text>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: item.color }}>
-                    {formatCOP(item.value)}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: '#9CA3AF', minWidth: 32, textAlign: 'right' }}>
-                    {stats.totalExpenses > 0 ? ((item.value / stats.totalExpenses) * 100).toFixed(0) : 0}%
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        ) : chartType === 'barras' ? (
-          <BarChartView data={expenseSlices} />
-        ) : (
-          <LineChartView data={dailySpending} chartWidth={width - 64} />
         )}
-      </View>
+      </>
+    );
+  };
 
-      {/* ── Budget Donut ── */}
-      <View style={[styles.card, webShadow('0 2px 8px rgba(0,0,0,0.05)')]}>
-        <Text style={styles.cardTitle}>Presupuesto Mensual</Text>
+  // ── TAB: AHORRO ────────────────────────────────────────────────────────────
 
-        {monthlySalary <= 0 ? (
-          <View style={{ alignItems: 'center', paddingVertical: 32 }}>
-            <Text style={{ fontSize: 36, marginBottom: 8 }}>💰</Text>
-            <Text style={{ fontSize: 14, color: '#9CA3AF', textAlign: 'center' }}>
-              Configura tu salario mensual en la pestaña Ingresos para ver la distribución de presupuesto
-            </Text>
-          </View>
-        ) : (
+  const renderAhorro = () => {
+    const totalAhorro = areaData[areaData.length - 1]?.ahorro ?? 0;
+    const sinDatos = areaData.every(d => d.ahorro === 0);
+    const goalAmt = goal?.targetAmount ?? 0;
+    const goalY = goalAmt > 0
+      ? AREA_PAD_TOP + DRAW_H - (goalAmt / maxAreaMonto) * DRAW_H
+      : null;
+
+    return (
+      <>
+        {card(
           <>
-            {/* Donut + center label */}
-            <View style={styles.donutContainer}>
-              <DonutChart data={donutSlices} size={200} strokeWidth={26} />
-              <View style={styles.donutCenter}>
-                <Text style={[styles.donutCenterAmount, { color: '#10B981' }]}>{formatCOP(monthlySalary)}</Text>
-                <Text style={styles.donutCenterLabel}>salario mensual</Text>
-                {budgetData.totalBudgeted > 0 && (
-                  <Text style={styles.donutCenterSub}>
-                    {((budgetData.totalBudgeted / monthlySalary) * 100).toFixed(0)}% asignado
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            {/* Budget summary */}
-            <View style={styles.budgetSummaryRow}>
-              <View style={styles.budgetSummaryItem}>
-                <Text style={[styles.budgetSummaryValue, { color: '#6366F1' }]}>{formatCOP(budgetData.totalBudgeted)}</Text>
-                <Text style={styles.budgetSummaryLabel}>📋 Asignado</Text>
-              </View>
-              <View style={styles.budgetSummaryDivider} />
-              <View style={styles.budgetSummaryItem}>
-                <Text style={[styles.budgetSummaryValue, { color: '#10B981' }]}>
-                  {formatCOP(Math.max(0, budgetData.remaining))}
-                </Text>
-                <Text style={styles.budgetSummaryLabel}>💚 Disponible</Text>
-              </View>
-              <View style={styles.budgetSummaryDivider} />
-              <View style={styles.budgetSummaryItem}>
-                <Text style={[styles.budgetSummaryValue, { color: '#EF4444' }]}>{formatCOP(stats.totalExpenses)}</Text>
-                <Text style={styles.budgetSummaryLabel}>🔴 Gastado</Text>
-              </View>
-            </View>
-
-            {/* Category legend — tappable */}
-            {budgetData.budgeted.length === 0 ? (
-              <View style={{ alignItems: 'center', paddingVertical: 16 }}>
-                <Text style={{ fontSize: 13, color: '#9CA3AF', textAlign: 'center' }}>
-                  Aún no tienes categorías con presupuesto.{'\n'}Toca una categoría abajo para asignar.
+            <Text style={[s.cardTitle, { color: colors.textPrimary }]}>Ahorro acumulado</Text>
+            {sinDatos ? (
+              <View style={s.emptyWrap}>
+                <Icon name="trending-up" size={28} color={colors.textTertiary} />
+                <Text style={[s.emptyText, { color: colors.textSecondary }]}>
+                  Registra transacciones para ver tu progreso de ahorro
                 </Text>
               </View>
             ) : (
-              <View style={styles.legendList}>
-                {budgetData.budgeted.map((item) => {
-                  const isPaid = paidCatIds.has(item.id);
-                  const spentPct = item.budget > 0 ? Math.min((item.spent / item.budget) * 100, 100) : 0;
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={styles.legendRow}
-                      onPress={() => setSelectedCatId(item.id)}
-                      activeOpacity={0.7}
+              <Animated.View style={{ opacity: areaOpacity }}>
+                <Svg width={CHART_W} height={AREA_H}>
+                  <Defs>
+                    <LinearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0%"   stopColor={colors.primary} stopOpacity={0.4} />
+                      <Stop offset="100%" stopColor={colors.primary} stopOpacity={0.02} />
+                    </LinearGradient>
+                  </Defs>
+
+                  {/* Grid lines */}
+                  {[0, 0.5, 1].map((pct, gi) => {
+                    const y = AREA_PAD_TOP + DRAW_H - pct * DRAW_H;
+                    return (
+                      <React.Fragment key={gi}>
+                        <Line x1={0} y1={y} x2={CHART_W} y2={y} stroke={colors.borderSubtle} strokeWidth={0.5} />
+                        <SvgText x={0} y={y - 3} fontSize={8} fill={colors.textTertiary}>
+                          {fmtShort(maxAreaMonto * pct)}
+                        </SvgText>
+                      </React.Fragment>
+                    );
+                  })}
+
+                  {/* Goal line */}
+                  {goalY !== null && (
+                    <>
+                      <Line
+                        x1={0} y1={goalY} x2={CHART_W} y2={goalY}
+                        stroke={colors.income}
+                        strokeDasharray="4 3"
+                        strokeWidth={1}
+                        opacity={0.6}
+                      />
+                      <SvgText x={CHART_W - 26} y={goalY - 4} fontSize={8} fill={colors.income}>
+                        Meta
+                      </SvgText>
+                    </>
+                  )}
+
+                  {/* Area fill */}
+                  {areaPath && (
+                    <Path d={areaPath} fill="url(#areaGrad)" />
+                  )}
+                  {/* Line */}
+                  {linePath && (
+                    <Path d={linePath} stroke={colors.primary} strokeWidth={2} fill="none" />
+                  )}
+
+                  {/* Points */}
+                  {areaPoints.map((pt, i) => {
+                    const isLast = i === areaPoints.length - 1;
+                    return (
+                      <React.Fragment key={i}>
+                        {isLast && (
+                          <Circle cx={pt.x} cy={pt.y} r={8} fill={colors.primary} opacity={0.2} />
+                        )}
+                        <Circle cx={pt.x} cy={pt.y} r={isLast ? 5 : 3.5} fill={colors.primary} />
+                      </React.Fragment>
+                    );
+                  })}
+
+                  {/* X labels */}
+                  {areaData.map((d, i) => (
+                    <SvgText
+                      key={i}
+                      x={areaData.length > 1 ? (i / (areaData.length - 1)) * CHART_W : CHART_W / 2}
+                      y={AREA_H - 4}
+                      textAnchor="middle"
+                      fontSize={9}
+                      fill={colors.textTertiary}
                     >
-                      <View style={[styles.legendColorBar, { backgroundColor: item.color }]} />
-                      <View style={{ flex: 1 }}>
-                        <View style={styles.legendRowTop}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Icon name={getCategoryIcon(item.id)} size={14} color={item.color} />
-                            <Text style={styles.legendCatName}>{item.name}</Text>
-                          </View>
-                          <View style={styles.legendRight}>
-                            <Text style={[styles.legendBudget, { color: item.color }]}>
-                              {formatCOP(item.budget)}
-                            </Text>
-                            <View style={[styles.paidBadge, isPaid && styles.paidBadgeActive]}>
-                              <Text style={[styles.paidBadgeText, isPaid && styles.paidBadgeTextActive]}>
-                                {isPaid ? '✓ Pagado' : 'Pendiente'}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-                        {/* Spend bar */}
-                        <View style={styles.spendBarTrack}>
-                          <View style={[styles.spendBarFill, { width: `${spentPct}%` as any, backgroundColor: item.color }]} />
-                        </View>
-                        <Text style={styles.spendBarLabel}>
-                          {formatCOP(item.spent)} gastado · {item.pct.toFixed(0)}% del salario
-                        </Text>
-                      </View>
-                      <Text style={styles.legendArrow}>›</Text>
-                    </TouchableOpacity>
+                      {d.label}
+                    </SvgText>
+                  ))}
+                </Svg>
+              </Animated.View>
+            )}
+
+            {/* Footer */}
+            <View style={s.areaFooter}>
+              <View>
+                <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Acumulado</Text>
+                <Text style={[s.areaFooterVal, { color: colors.primary }]}>{fmtCOP(totalAhorro)}</Text>
+              </View>
+              {goalAmt > 0 && (
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Meta anual</Text>
+                  <Text style={[s.areaFooterVal, { color: colors.income }]}>{fmtCOP(goalAmt)}</Text>
+                </View>
+              )}
+            </View>
+          </>,
+        )}
+      </>
+    );
+  };
+
+  // ── TAB: CALOR ─────────────────────────────────────────────────────────────
+
+  const renderCalor = () => {
+    const CELL = 28;
+    const GAP  = 3;
+    const LABEL_W = 22;
+    const GRID_W = LABEL_W + 7 * (CELL + GAP);
+    const GRID_H = 4 * (CELL + GAP) + 24;
+    const DIA_LABELS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+
+    const diaMaxCell = heatData.reduce((max, c) => c.monto > max.monto ? c : max, heatData[0] ?? { semana: 0, dia: 0, monto: 0, count: 0 });
+    const sinGasto   = heatData.filter(c => c.monto === 0).length;
+
+    return (
+      <>
+        <Text style={[s.heatExplain, { color: colors.textTertiary }]}>
+          Intensidad de gasto por día de la semana
+        </Text>
+
+        {card(
+          <>
+            <Animated.View style={{ opacity: heatOpacity }}>
+              <Svg width={GRID_W} height={GRID_H}>
+                {/* Day labels */}
+                {DIA_LABELS.map((lbl, di) => (
+                  <SvgText
+                    key={di}
+                    x={LABEL_W + di * (CELL + GAP) + CELL / 2}
+                    y={13}
+                    textAnchor="middle"
+                    fontSize={9}
+                    fill={colors.textTertiary}
+                  >
+                    {lbl}
+                  </SvgText>
+                ))}
+
+                {/* Week labels */}
+                {['S1', 'S2', 'S3', 'S4'].map((lbl, wi) => (
+                  <SvgText
+                    key={wi}
+                    x={0}
+                    y={22 + wi * (CELL + GAP) + CELL / 2}
+                    fontSize={8}
+                    fill={colors.textTertiary}
+                  >
+                    {lbl}
+                  </SvgText>
+                ))}
+
+                {/* Cells */}
+                {heatData.map((cell, idx) => {
+                  const intensity = getHeatIntensity(cell.monto, maxHeatMonto);
+                  const fillColor = getHeatColor(intensity, isDark);
+                  const cx = LABEL_W + cell.dia * (CELL + GAP);
+                  const cy = 20 + cell.semana * (CELL + GAP);
+                  return (
+                    <Rect
+                      key={idx}
+                      x={cx} y={cy}
+                      width={CELL} height={CELL}
+                      rx={5}
+                      fill={fillColor}
+                    />
                   );
                 })}
+              </Svg>
+            </Animated.View>
 
-                {/* Remaining / unassigned — verde como el donut */}
-                {budgetData.remaining > 0 && (
-                  <View style={styles.legendRow}>
-                    <View style={[styles.legendColorBar, { backgroundColor: '#10B981' }]} />
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Icon name="check-circle" size={14} color="#10B981" />
-                        <Text style={[styles.legendCatName, { color: '#10B981' }]}>Libre</Text>
-                      </View>
-                      <Text style={styles.spendBarLabel}>{formatCOP(budgetData.remaining)} disponible</Text>
-                    </View>
-                  </View>
+            {/* Tappable overlay for heat cells */}
+            <View style={[StyleSheet.absoluteFill, { top: 0, left: CARD_PADDING, width: GRID_W }]}>
+              {heatData.map((cell, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={[
+                    StyleSheet.absoluteFill,
+                    {
+                      left: LABEL_W + cell.dia * (CELL + GAP),
+                      top: 20 + cell.semana * (CELL + GAP),
+                      width: CELL,
+                      height: CELL,
+                      position: 'absolute',
+                    },
+                  ]}
+                  onPress={() => setSelectedHeatCell(prev =>
+                    prev?.semana === cell.semana && prev.dia === cell.dia ? null : cell
+                  )}
+                />
+              ))}
+            </View>
+
+            {/* Tooltip */}
+            {selectedHeatCell !== null && (
+              <View style={[s.tooltip, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[s.tooltipTitle, { color: colors.textPrimary }]}>
+                  {getDiaLabel(selectedHeatCell.dia)} — Semana {selectedHeatCell.semana + 1}
+                </Text>
+                <Text style={[s.tooltipVal, { color: colors.primary }]}>
+                  {selectedHeatCell.monto > 0 ? fmtCOP(selectedHeatCell.monto) : 'Sin gastos'}
+                </Text>
+                {selectedHeatCell.count > 0 && (
+                  <Text style={[s.tooltipSub, { color: colors.textTertiary }]}>
+                    {selectedHeatCell.count} transacción{selectedHeatCell.count !== 1 ? 'es' : ''}
+                  </Text>
                 )}
               </View>
             )}
 
-            {/* Quick-add: categories without budget */}
-            {categories.filter(c => !c.budget || c.budget === 0).length > 0 && (
-              <View style={{ marginTop: 12 }}>
-                <Text style={styles.quickAddLabel}>AGREGAR AL PRESUPUESTO</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={{ flexDirection: 'row', gap: 8, paddingTop: 8 }}>
-                    {categories
-                      .filter(c => !c.budget || c.budget === 0)
-                      .slice(0, 8)
-                      .map(c => (
-                        <TouchableOpacity
-                          key={c.id}
-                          style={styles.quickAddPill}
-                          onPress={() => setSelectedCatId(c.id)}
-                        >
-                          <Icon name={getCategoryIcon(c.id)} size={13} color="#6B7280" />
-                          <Text style={styles.quickAddText}>{c.name}</Text>
-                        </TouchableOpacity>
-                      ))}
-                  </View>
-                </ScrollView>
-              </View>
-            )}
+            {/* Legend */}
+            <View style={s.heatLegend}>
+              <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Menos</Text>
+              {[0, 0.1, 0.3, 0.6, 1.0].map((v, i) => (
+                <View key={i} style={[s.heatLegendCell, { backgroundColor: getHeatColor(v, isDark) }]} />
+              ))}
+              <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Más</Text>
+            </View>
+          </>,
+        )}
+
+        {/* Insights */}
+        <View style={[s.insightRow, { marginTop: 12 }]}>
+          {diaMaxCell.monto > 0 && (
+            <View style={[s.insightPill, { backgroundColor: colors.cardSecondary }]}>
+              <Icon name="activity" size={12} color={colors.warning} />
+              <Text style={[s.insightPillText, { color: colors.textSecondary }]}>
+                Mayor gasto: {getDiaLabel(diaMaxCell.dia)} · {fmtCOP(diaMaxCell.monto)}
+              </Text>
+            </View>
+          )}
+          <View style={[s.insightPill, { backgroundColor: colors.cardSecondary }]}>
+            <Icon name="check-circle" size={12} color={colors.income} />
+            <Text style={[s.insightPillText, { color: colors.textSecondary }]}>
+              {sinGasto} días sin gastos
+            </Text>
+          </View>
+        </View>
+      </>
+    );
+  };
+
+  // ── TAB: TREEMAP ───────────────────────────────────────────────────────────
+
+  const renderTreemap = () => {
+    const sinDatos = treemapData.length === 0;
+    const mesLabel = capitalize(getMesLabel(mes));
+    const allNodes = treemapData.flatMap(row => row.nodes);
+
+    return (
+      <>
+        {sinDatos ? (
+          <View style={[s.emptyWrap, { paddingVertical: 40 }]}>
+            <Icon name="pie-chart" size={32} color={colors.textTertiary} />
+            <Text style={[s.emptyText, { color: colors.textSecondary }]}>
+              Sin gastos registrados en {mesLabel}
+            </Text>
+            <TouchableOpacity onPress={() => onNavigate?.('gastos')}>
+              <Text style={[s.emptyAction, { color: colors.primary }]}>Agregar gasto</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <Animated.View
+              style={{
+                opacity: treemapAnim,
+                transform: [{ scale: treemapAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) }],
+              }}
+            >
+              {treemapData.map((row, ri) => (
+                <View key={ri} style={[s.treemapRow, { height: row.height }]}>
+                  {row.nodes.map((node, ni) => (
+                    <TouchableOpacity
+                      key={ni}
+                      style={[s.treemapNode, { flex: node.flex, height: row.height, backgroundColor: node.color }]}
+                      onPress={() =>
+                        Alert.alert(node.name, `${fmtCOP(node.amount)} · ${node.percentage}% del total`)
+                      }
+                    >
+                      <Text style={s.treemapName} numberOfLines={1}>
+                        {node.flex < 0.15 ? node.name.slice(0, 3) : node.name}
+                      </Text>
+                      {row.height >= 70 && (
+                        <Text style={s.treemapAmount}>{fmtShort(node.amount)}</Text>
+                      )}
+                      {node.flex >= 0.2 && (
+                        <Text style={s.treemapPct}>{node.percentage}%</Text>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ))}
+            </Animated.View>
+
+            {/* Color legend */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginTop: 12 }}
+              contentContainerStyle={s.treemapLegend}
+            >
+              {allNodes.map((node, i) => (
+                <View key={i} style={s.treemapLegendItem}>
+                  <View style={[s.treemapLegendDot, { backgroundColor: node.color }]} />
+                  <Text style={[s.treemapLegendText, { color: colors.textSecondary }]}>
+                    {node.name}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
           </>
         )}
-      </View>
+      </>
+    );
+  };
 
-      {/* AI Insights */}
-      <View style={[styles.card, webShadow('0 2px 8px rgba(0,0,0,0.05)')]}>
-        <View style={styles.aiCardHeader}>
-          <View style={styles.aiAvatarSmall}>
-            <Text style={styles.aiAvatarIcon}>✦</Text>
-          </View>
-          <Text style={styles.cardTitle}>Análisis IA</Text>
-        </View>
-
-        <View style={styles.insightRow}>
-          <Text style={styles.insightEmoji}>{stats.spendingPercentage > 100 ? '⚠️' : '✅'}</Text>
-          <Text style={styles.insightText}>
-            {stats.spendingPercentage > 100
-              ? `Superaste el presupuesto en ${(stats.spendingPercentage - 100).toFixed(0)}%`
-              : `Quedan ${(100 - stats.spendingPercentage).toFixed(0)}% del presupuesto mensual`}
+  // ── MAIN RENDER ────────────────────────────────────────────────────────────
+  return (
+    <View style={[s.root, { backgroundColor: colors.background }]}>
+      {/* Header */}
+      <View style={[s.header, { backgroundColor: colors.headerBg, paddingTop: insets.top + 12 }]}>
+        <Text style={s.headerTitle}>Estadísticas</Text>
+        <View style={s.monthBadge}>
+          <Text style={s.monthBadgeText}>
+            {capitalize(getMesLabelLargo(mes, año))}
           </Text>
         </View>
-
-        <View style={styles.insightRow}>
-          <Text style={styles.insightEmoji}>📊</Text>
-          <Text style={styles.insightText}>
-            {stats.transactionCount} transacciones registradas este período
-          </Text>
-        </View>
-
-        {aiInsights.goalInsight && (
-          <View style={[styles.insightRow, styles.insightHighlight]}>
-            <Text style={styles.insightEmoji}>🎯</Text>
-            <Text style={styles.insightText}>{aiInsights.goalInsight.message}</Text>
-          </View>
-        )}
-
-        {aiInsights.anomalies.map((a, i) => (
-          <View key={i} style={[styles.insightRow, styles.insightWarning]}>
-            <Text style={styles.insightEmoji}>⚠️</Text>
-            <Text style={styles.insightText}>{a.message}</Text>
-          </View>
-        ))}
       </View>
 
-      <View style={{ height: 16 }} />
-
-      {/* ── Category Budget Modal ── */}
-      <Modal
-        visible={selectedCatId !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedCatId(null)}
+      {/* Month selector */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[s.monthScroll, { backgroundColor: colors.background }]}
+        contentContainerStyle={s.monthScrollContent}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            {selectedCat && (
-              <>
-                {/* Handle bar */}
-                <View style={styles.modalHandle} />
+        {mesesDisponibles.map((m, i) => {
+          const active = m.mes === mes && m.año === año;
+          return (
+            <TouchableOpacity
+              key={i}
+              style={[
+                s.monthPill,
+                active
+                  ? { backgroundColor: colors.primary }
+                  : { backgroundColor: colors.cardSecondary, borderWidth: 0.5, borderColor: colors.border },
+              ]}
+              onPress={() => setMesSeleccionado({ mes: m.mes, año: m.año })}
+            >
+              <Text style={[s.monthPillText, { color: active ? '#FFFFFF' : colors.textSecondary, fontWeight: active ? '500' : '400' }]}>
+                {m.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
 
-                {/* Header */}
-                <View style={styles.modalHeader}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <View style={[styles.modalCatIcon, { backgroundColor: (selectedCat.color ?? '#6366F1') + '20' }]}>
-                      <Icon name={getCategoryIcon(selectedCat.id)} size={26} color={selectedCat.color ?? '#6366F1'} />
-                    </View>
-                    <View>
-                      <Text style={styles.modalCatName}>{selectedCat.name}</Text>
-                      <Text style={styles.modalCatSub}>
-                        {selectedCat.budget ? `Presupuesto actual: ${formatCOP(selectedCat.budget)}` : 'Sin presupuesto asignado'}
-                      </Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity onPress={() => setSelectedCatId(null)} style={styles.modalClose}>
-                    <Icon name="x" size={16} color="#6B7280" />
-                  </TouchableOpacity>
-                </View>
+      {/* Single scrollable content — all sections stacked */}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={[s.tabContent, { paddingBottom: 56 + insets.bottom + 24 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Resumen ── */}
+        <Text style={[s.sectionHeading, { color: colors.textTertiary }]}>RESUMEN</Text>
+        {renderResumen()}
 
-                <ScrollView style={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
-                  {/* Spent this month */}
-                  {stats.expByCategory[selectedCatId!] > 0 && (
-                    <View style={[styles.infoBox, { backgroundColor: '#FEF2F2' }]}>
-                      <Text style={{ fontSize: 12, color: '#9CA3AF', fontWeight: '600' }}>GASTADO ESTE PERÍODO</Text>
-                      <Text style={{ fontSize: 22, fontWeight: '800', color: '#EF4444', marginTop: 2 }}>
-                        {formatCOP(stats.expByCategory[selectedCatId!] ?? 0)}
-                      </Text>
-                      {selectedCat.budget && selectedCat.budget > 0 && (
-                        <>
-                          <View style={styles.spendBarTrack}>
-                            <View style={[styles.spendBarFill, {
-                              width: `${Math.min((stats.expByCategory[selectedCatId!] / selectedCat.budget) * 100, 100)}%` as any,
-                              backgroundColor: '#EF4444',
-                            }]} />
-                          </View>
-                          <Text style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>
-                            {((stats.expByCategory[selectedCatId!] / selectedCat.budget) * 100).toFixed(0)}% del presupuesto usado
-                          </Text>
-                        </>
-                      )}
-                    </View>
-                  )}
+        {/* ── Comparativo ── */}
+        <Text style={[s.sectionHeading, { color: colors.textTertiary, marginTop: 8 }]}>COMPARATIVO</Text>
+        {renderComparativo()}
 
-                  {/* Budget input */}
-                  <Text style={styles.modalFieldLabel}>PRESUPUESTO DEL MES</Text>
-                  <TextInput
-                    style={[styles.modalInput, editFocused && styles.modalInputFocused]}
-                    placeholder="Ej: 500.000"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="numeric"
-                    value={editAmount}
-                    onChangeText={(txt) => { const d = txt.replace(/\./g, '').replace(/[^0-9]/g, ''); const n = parseInt(d, 10); setEditAmount(isNaN(n) ? '' : n.toLocaleString('es-CO').replace(/,/g, '.')); }}
-                    onFocus={() => setEditFocused(true)}
-                    onBlur={() => setEditFocused(false)}
-                  />
+        {/* ── Ahorro ── */}
+        <Text style={[s.sectionHeading, { color: colors.textTertiary, marginTop: 8 }]}>AHORRO</Text>
+        {renderAhorro()}
 
-                  {/* Paid toggle */}
-                  <Text style={[styles.modalFieldLabel, { marginTop: 16 }]}>ESTADO DE PAGO</Text>
-                  <View style={styles.paidToggleRow}>
-                    <TouchableOpacity
-                      style={[styles.paidToggleBtn, paidCatIds.has(selectedCatId!) && styles.paidToggleBtnActive]}
-                      onPress={() => handleTogglePaid(selectedCatId!)}
-                    >
-                      <Text style={[styles.paidToggleText, paidCatIds.has(selectedCatId!) && styles.paidToggleTextActive]}>
-                        {paidCatIds.has(selectedCatId!) ? '✓ Pagado' : 'Marcar como Pagado'}
-                      </Text>
-                    </TouchableOpacity>
-                    {paidCatIds.has(selectedCatId!) && (
-                      <TouchableOpacity
-                        style={styles.unpaidBtn}
-                        onPress={() => handleTogglePaid(selectedCatId!)}
-                      >
-                        <Text style={styles.unpaidBtnText}>A pagar</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
+        {/* ── Mapa de calor ── */}
+        <Text style={[s.sectionHeading, { color: colors.textTertiary, marginTop: 8 }]}>MAPA DE CALOR</Text>
+        {renderCalor()}
 
-                  {/* Save button */}
-                  <TouchableOpacity style={styles.saveBtn} onPress={handleSaveBudget}>
-                    <Text style={styles.saveBtnText}>Guardar Presupuesto</Text>
-                  </TouchableOpacity>
-
-                  {/* Delete / remove from budget */}
-                  {(selectedCat.budget ?? 0) > 0 && (
-                    <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteCategory}>
-                      <Text style={styles.deleteBtnText}>🗑 Quitar del presupuesto</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  <View style={{ height: 32 }} />
-                </ScrollView>
-
-                <ConfettiBurst key={confettiKey} visible={showConfetti} />
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
-    </ScrollView>
+        {/* ── Treemap ── */}
+        <Text style={[s.sectionHeading, { color: colors.textTertiary, marginTop: 8 }]}>DISTRIBUCIÓN</Text>
+        {renderTreemap()}
+      </ScrollView>
+    </View>
   );
-}
+};
 
-// ─── Styles ───────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: 24, gap: 16 },
+// Backward-compat export
+export const Estadisticas = EstadisticasScreen;
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  root:   { flex: 1 },
 
   // Header
-  header: { marginBottom: 4 },
-  headerLabel: { fontSize: 11, color: '#9CA3AF', fontWeight: '700', letterSpacing: 1.2 },
-  headerMonth: { fontSize: 22, fontWeight: '800', color: '#111827', textTransform: 'capitalize' as any },
-
-  // Period selector
-  periodRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  periodPill: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' },
-  periodPillActive: { backgroundColor: '#6366F1', borderColor: '#6366F1' },
-  periodPillText: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
-  periodPillTextActive: { color: '#FFFFFF' },
-
-  // Stat cards
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  statCard: {
-    width: '47%' as any, flexGrow: 1, borderRadius: 14, borderTopWidth: 3, padding: 16,
-    ...(Platform.OS !== 'web' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 } : {}),
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
   },
-  statLabel: { fontSize: 10, color: '#9CA3AF', fontWeight: '700', letterSpacing: 0.8, marginBottom: 6 },
-  statValue: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+  headerTitle: {
+    fontSize: 22, fontWeight: '600', color: '#FFFFFF',
+  },
+  monthBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 4,
+  },
+  monthBadgeText: { fontSize: 12, color: '#FFFFFF' },
+
+  // Month scroll
+  monthScroll:        { maxHeight: 50, flexShrink: 0 },
+  monthScrollContent: { paddingHorizontal: 16, paddingVertical: 8, gap: 6 },
+  monthPill:          { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5 },
+  monthPillText:      { fontSize: 12 },
+
+  // Section heading
+  sectionHeading: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    marginTop: 4,
+  },
+
+  tabContent: { paddingHorizontal: 16, paddingTop: 12, gap: 0 },
 
   // Card
   card: {
-    backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', padding: 20,
-    ...(Platform.OS !== 'web' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 } : {}),
+    borderRadius: 16, borderWidth: 0.5,
+    padding: CARD_PADDING, marginBottom: 12,
   },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 16 },
+  cardTitle: { fontSize: 13, fontWeight: '500', marginBottom: 12 },
 
-  // Chart type selector card
-  chartCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-  chartCardSub: { fontSize: 13, color: '#9CA3AF', fontWeight: '600', marginTop: 2 },
-  chartTypeTabs: { flexDirection: 'row', gap: 6 },
-  chartTypeTab: {
-    alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10,
-    backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB', minWidth: 52,
-  },
-  chartTypeTabActive: { backgroundColor: '#EEF2FF', borderColor: '#6366F1' },
-  chartTypeTabIcon: { fontSize: 14, color: '#9CA3AF', fontWeight: '600' },
-  chartTypeTabIconActive: { color: '#6366F1' },
-  chartTypeTabText: { fontSize: 10, color: '#9CA3AF', fontWeight: '700', marginTop: 2 },
-  chartTypeTabTextActive: { color: '#6366F1' },
+  // Metric grids
+  metricGrid:  { flexDirection: 'row', gap: 8 },
+  metricCell:  { flex: 1, borderRadius: 12, padding: 10, gap: 4 },
+  metricCell2: { flex: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, gap: 4 },
+  metricVal:   { fontSize: 15, fontWeight: '500' },
+  metricVal2:  { fontSize: 13, fontWeight: '500' },
+  metricLabel: { fontSize: 10, fontWeight: '400' },
 
   // Donut
-  donutContainer: { alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: 16 },
-  donutCenter: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  donutCenterAmount: { fontSize: 17, fontWeight: '900', letterSpacing: -0.5 },
-  donutCenterLabel: { fontSize: 10, color: '#9CA3AF', fontWeight: '600', marginTop: 2 },
-  donutCenterSub: { fontSize: 10, color: '#6B7280', fontWeight: '600', marginTop: 1 },
+  donutRow:       { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  donutLegend:    { flex: 1, gap: 10 },
+  legendItem:     { gap: 4 },
+  legendRow:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot:      { width: 8, height: 8, borderRadius: 2 },
+  legendLabel:    { flex: 1, fontSize: 11 },
+  legendPct:      { fontSize: 11, fontWeight: '500' },
+  legendBarTrack: { height: 3, borderRadius: 2, overflow: 'hidden' },
+  legendBarFill:  { height: 3, borderRadius: 2 },
+  changeBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginTop: 4 },
+  changeText:     { fontSize: 10, fontWeight: '500' },
 
-  // Budget summary row
-  budgetSummaryRow: { flexDirection: 'row', backgroundColor: '#F9FAFB', borderRadius: 12, padding: 12, marginBottom: 16 },
-  budgetSummaryItem: { flex: 1, alignItems: 'center' },
-  budgetSummaryDivider: { width: 1, backgroundColor: '#E5E7EB' },
-  budgetSummaryValue: { fontSize: 14, fontWeight: '800', color: '#111827' },
-  budgetSummaryLabel: { fontSize: 10, color: '#9CA3AF', fontWeight: '600', marginTop: 2 },
+  // Comparativo
+  periodoRow:      { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  periodoPill:     { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
+  periodoPillText: { fontSize: 12 },
+  barLegend:       { flexDirection: 'row', gap: 16, marginTop: 8, justifyContent: 'center' },
 
-  // Legend list
-  legendList: { gap: 12 },
-  legendRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  legendColorBar: { width: 4, borderRadius: 2, alignSelf: 'stretch', minHeight: 40 },
-  legendRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  legendCatName: { fontSize: 13, fontWeight: '700', color: '#111827' },
-  legendRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  legendBudget: { fontSize: 13, fontWeight: '800' },
-  legendArrow: { fontSize: 20, color: '#D1D5DB', marginLeft: 4, alignSelf: 'center' },
+  // Ahorro
+  areaFooter:    { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
+  areaFooterVal: { fontSize: 15, fontWeight: '500' },
 
-  // Paid badge (in legend)
-  paidBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' },
-  paidBadgeActive: { backgroundColor: '#ECFDF5', borderColor: '#10B981' },
-  paidBadgeText: { fontSize: 10, fontWeight: '700', color: '#9CA3AF' },
-  paidBadgeTextActive: { color: '#10B981' },
+  // Calor
+  heatExplain:     { fontSize: 11, marginBottom: 8 },
+  heatLegend:      { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 12 },
+  heatLegendCell:  { width: 14, height: 14, borderRadius: 3 },
+  insightRow:      { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  insightPill:     { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  insightPillText: { fontSize: 11 },
 
-  // Spend bar
-  spendBarTrack: { height: 5, backgroundColor: '#F3F4F6', borderRadius: 3, overflow: 'hidden', marginTop: 4 },
-  spendBarFill: { height: '100%', borderRadius: 3 },
-  spendBarLabel: { fontSize: 10, color: '#9CA3AF', fontWeight: '500', marginTop: 3 },
+  // Tooltip
+  tooltip:      { marginTop: 10, borderRadius: 10, borderWidth: 0.5, padding: 10, gap: 2 },
+  tooltipTitle: { fontSize: 11, fontWeight: '500' },
+  tooltipVal:   { fontSize: 14, fontWeight: '500' },
+  tooltipSub:   { fontSize: 10 },
 
-  // Quick add pills
-  quickAddLabel: { fontSize: 10, color: '#9CA3AF', fontWeight: '700', letterSpacing: 0.8 },
-  quickAddPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' },
-  quickAddText: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
+  // Treemap
+  treemapRow:        { flexDirection: 'row', gap: 3, marginBottom: 3 },
+  treemapNode:       { borderRadius: 8, overflow: 'hidden', padding: 8, justifyContent: 'flex-end' },
+  treemapName:       { fontSize: 10, fontWeight: '500', color: 'rgba(255,255,255,0.9)' },
+  treemapAmount:     { fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
+  treemapPct:        { fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 1 },
+  treemapLegend:     { gap: 8, paddingRight: 8 },
+  treemapLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  treemapLegendDot:  { width: 10, height: 10, borderRadius: 2 },
+  treemapLegendText: { fontSize: 10 },
 
-  // AI insights
-  aiCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  aiAvatarSmall: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
-  aiAvatarIcon: { fontSize: 14, color: '#6366F1' },
-  insightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  insightEmoji: { fontSize: 16, marginTop: 1 },
-  insightText: { fontSize: 13, color: '#374151', flex: 1, lineHeight: 18 },
-  insightHighlight: { backgroundColor: '#F0FDF4', borderRadius: 8, paddingHorizontal: 10, borderBottomWidth: 0, marginBottom: 4 },
-  insightWarning: { backgroundColor: '#FFFBEB', borderRadius: 8, paddingHorizontal: 10, borderBottomWidth: 0, marginBottom: 4 },
-
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalSheet: {
-    backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    maxHeight: '85%', overflow: 'hidden',
-    ...(Platform.OS !== 'web' ? { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 20 } : {}),
-  },
-  modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', alignSelf: 'center', marginTop: 10, marginBottom: 4 },
-  modalHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
-  },
-  modalCatIcon: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  modalCatName: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  modalCatSub: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
-  modalClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
-
-  // Modal content
-  infoBox: { borderRadius: 12, padding: 14, marginBottom: 16 },
-  modalFieldLabel: { fontSize: 11, color: '#9CA3AF', fontWeight: '700', letterSpacing: 0.8, marginBottom: 8 },
-  modalInput: {
-    borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#FFFFFF',
-    padding: 14, borderRadius: 10, fontSize: 20, color: '#111827', fontWeight: '700',
-  },
-  modalInputFocused: { borderColor: '#6366F1', borderWidth: 2 },
-
-  // Paid toggle in modal
-  paidToggleRow: { flexDirection: 'row', gap: 10 },
-  paidToggleBtn: {
-    flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1.5,
-    borderColor: '#E5E7EB', alignItems: 'center', backgroundColor: '#F9FAFB',
-  },
-  paidToggleBtnActive: { backgroundColor: '#ECFDF5', borderColor: '#10B981' },
-  paidToggleText: { fontSize: 14, fontWeight: '700', color: '#6B7280' },
-  paidToggleTextActive: { color: '#10B981' },
-  unpaidBtn: {
-    paddingHorizontal: 14, paddingVertical: 12, borderRadius: 10,
-    borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB',
-  },
-  unpaidBtnText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
-
-  // Save / Delete buttons in modal
-  saveBtn: { backgroundColor: '#6366F1', paddingVertical: 15, borderRadius: 12, alignItems: 'center', marginTop: 20 },
-  saveBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
-  deleteBtn: { paddingVertical: 12, alignItems: 'center', marginTop: 10 },
-  deleteBtnText: { fontSize: 14, color: '#EF4444', fontWeight: '600' },
+  // Empty
+  emptyWrap:   { alignItems: 'center', paddingVertical: 24, gap: 8 },
+  emptyText:   { fontSize: 13, textAlign: 'center' },
+  emptyAction: { fontSize: 13, fontWeight: '500' },
 });

@@ -17,7 +17,7 @@ function getPrimerDia(year: number, month: number): number {
   return d === 0 ? 6 : d - 1;
 }
 
-export const CalendarioScreen: React.FC = () => {
+export const CalendarioScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
   const insets = useSafeAreaInsets();
   const { transactions, categories } = useFinance();
   const hoy = new Date();
@@ -55,7 +55,12 @@ export const CalendarioScreen: React.FC = () => {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Calendario</Text>
+        {onBack ? (
+          <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+            <Icon name="arrow-left" size={20} color="#111827" />
+          </TouchableOpacity>
+        ) : null}
+        <Text style={[styles.headerTitle, onBack && { flex: 1, textAlign: 'center' }]}>Calendario</Text>
         <Icon name="calendar" size={20} color="#6366F1" />
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>

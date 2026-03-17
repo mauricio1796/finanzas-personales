@@ -144,11 +144,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '700',
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
   },
   insightText: {
     fontSize: 13,
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
     lineHeight: 18,
     fontWeight: '500',
   },
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   },
   timestampText: {
     fontSize: 11,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     textTransform: 'capitalize',
   },
 });

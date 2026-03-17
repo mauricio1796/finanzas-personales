@@ -1,8 +1,9 @@
-export { OnboardingWelcome } from './OnboardingWelcome';
-export { OnboardingProfile } from './OnboardingProfile';
-export { OnboardingGoal } from './OnboardingGoal';
-export { OnboardingBudget } from './OnboardingBudget';
+export { OnboardingWelcome }    from './OnboardingWelcome';
+export { OnboardingProfile }    from './OnboardingProfile';
+export { OnboardingSalario }    from './OnboardingSalario';
 export { OnboardingCategories } from './OnboardingCategories';
-export { OnboardingConfirm } from './OnboardingConfirm';
+export { OnboardingMontos }     from './OnboardingMontos';
+export { OnboardingConfirm }    from './OnboardingConfirm';
+export { OnboardingGoal }           from './OnboardingGoal';
+export { OnboardingBudget }         from './OnboardingBudget';
 export { OnboardingDashboardOverlay } from './OnboardingDashboardOverlay';
-export { OnboardingMontos } from './OnboardingMontos';

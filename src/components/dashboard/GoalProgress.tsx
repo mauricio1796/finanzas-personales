@@ -110,7 +110,7 @@ export const GoalProgress: React.FC<GoalProgressProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.background_secondary,
+    backgroundColor: COLORS.cardSecondary,
     borderRadius: 12,
     padding: SPACING.lg,
     gap: SPACING.md,
@@ -129,11 +129,11 @@ const styles = StyleSheet.create({
   goalName: {
     fontSize: 14,
     fontWeight: '700',
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
   },
   progress: {
     fontSize: 12,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     marginTop: SPACING.xs,
   },
   progressBarContainer: {
@@ -152,21 +152,21 @@ const styles = StyleSheet.create({
   },
   amountLabel: {
     fontSize: 11,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     fontWeight: '500',
     marginBottom: SPACING.xs,
   },
   amountValue: {
     fontSize: 13,
     fontWeight: '700',
-    color: COLORS.text_primary,
+    color: COLORS.textPrimary,
   },
   timelineContainer: {
     flexDirection: 'row',
     gap: SPACING.md,
     paddingTop: SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: COLORS.gray,
+    borderTopColor: COLORS.border,
   },
   timelineItem: {
     flex: 1,
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   timelineLabel: {
     fontSize: 11,
-    color: COLORS.text_secondary,
+    color: COLORS.textSecondary,
     fontWeight: '500',
   },
   timelineValue: {

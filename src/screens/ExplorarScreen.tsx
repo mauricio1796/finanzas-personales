@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useTheme } from '../state/ThemeContext';
 import { AcademiaScreen } from './AcademiaScreen';
 import { CalendarioScreen } from './CalendarioScreen';
 import { ProyeccionesScreen } from './ProyeccionesScreen';
@@ -15,10 +16,15 @@ const TABS: { id: ExplorarTab; label: string }[] = [
   { id: 'retos', label: 'Retos' },
 ];
 
-export const ExplorarScreen: React.FC = () => {
+interface ExplorarScreenProps {
+  onBack?: () => void;
+}
+
+export const ExplorarScreen: React.FC<ExplorarScreenProps> = ({ onBack }) => {
   const [activeTab, setActiveTab] = useState<ExplorarTab>('academia');
   const [showPremium, setShowPremium] = useState(false);
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   if (showPremium) {
     return <PremiumScreen onBack={() => setShowPremium(false)} />;
@@ -26,6 +32,16 @@ export const ExplorarScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Back / title row */}
+      {onBack && (
+        <View style={[styles.backRow, { borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7} style={styles.backBtn}>
+            <Text style={[styles.backIcon, { color: colors.textPrimary }]}>←</Text>
+          </TouchableOpacity>
+          <Text style={[styles.backTitle, { color: colors.textPrimary }]}>Explorar</Text>
+          <View style={{ width: 32 }} />
+        </View>
+      )}
       {/* Top tab bar */}
       <View style={styles.tabBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBarContent}>
@@ -53,6 +69,10 @@ export const ExplorarScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FAFAFA' },
+  backRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 0.5 },
+  backBtn:   { width: 32, alignItems: 'flex-start' },
+  backIcon:  { fontSize: 20 },
+  backTitle: { fontSize: 17, fontWeight: '500', flex: 1, textAlign: 'center' },
   tabBar: { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   tabBarContent: { paddingHorizontal: 8, paddingTop: 6, paddingBottom: 0, flexDirection: 'row' },
   tab: { paddingHorizontal: 16, paddingVertical: 10 },
