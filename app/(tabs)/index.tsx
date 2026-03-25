@@ -6,6 +6,7 @@ import {
   View,
   Text,
   Animated,
+  Dimensions,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
@@ -13,6 +14,8 @@ import {
   ScrollView,
   BackHandler,
 } from 'react-native';
+
+const SCREEN_W = Dimensions.get('window').width;
 
 import { useFinance } from '../../src/state';
 import { User, Transaction, AuthState } from '../../src/types';
@@ -24,11 +27,20 @@ import { SplashScreen } from '../../src/screens/SplashScreen';
 import { QuickAddSheet } from '../../src/components/ui/QuickAddSheet';
 import { ProductTour, APP_TOUR_STEPS } from '../../src/components/ui/ProductTour';
 import { storageService } from '../../src/services/storage/StorageService';
+import { DashboardSkeleton } from '../../src/components/ui/SkeletonLoader';
+import { Toast, useToast } from '../../src/components/ui/Toast';
 import { ResumenSemanalScreen } from '../../src/screens/ResumenSemanalScreen';
+import { ResumenMensualScreen } from '../../src/screens/ResumenMensualScreen';
+import { SimuladorDecisionesScreen } from '../../src/screens/SimuladorDecisionesScreen';
+import { ExportarReporteScreen } from '../../src/screens/ExportarReporteScreen';
+import { WidgetConfigScreen } from '../../src/screens/WidgetConfigScreen';
+import { deberiasMostrarResumen } from '../../src/utils/resumenMensualUtils';
 import { GamificacionScreen } from '../../src/screens/GamificacionScreen';
 import { ConfiguracionScreen } from '../../src/screens/ConfiguracionScreen';
 import { ResumenSemanalCard } from '../../src/components/finanzas/ResumenSemanalCard';
-import { programarResumenSemanal } from '../../src/services/NotificacionesService';
+import { type NotifData } from '../../src/services/NotificacionesService';
+import { useNotificacionesManager } from '../../src/hooks/useNotificacionesManager';
+import { useWidgetSync } from '../../src/hooks/useWidgetSync';
 import * as Notifications from 'expo-notifications';
 
 // Screens
@@ -72,8 +84,13 @@ export default function HomeScreen() {
   const {
     setUser, user, isOnboarded, setIsOnboarded, onboardingState, updateOnboardingStep, profile,
     transactions, addTransaction: ctxAddTransaction, deleteTransaction: ctxDeleteTransaction,
+    isLoading,
   } = useFinance();
   const { colors } = useTheme();
+
+  // ==================== NOTIFICATIONS ====================
+  useNotificacionesManager();
+  useWidgetSync();
 
   // ==================== SPLASH ====================
   const [showSplash, setShowSplash] = useState(true);
@@ -94,31 +111,61 @@ export default function HomeScreen() {
   const [quickAddMode, setQuickAddMode] = useState<'income' | 'expense' | null>(null);
   const [showTour, setShowTour] = useState(false);
   const [botInitialMessage, setBotInitialMessage] = useState<string | undefined>(undefined);
+  const [resumenMensualMes, setResumenMensualMes] = useState<{ mes: number; año: number } | undefined>(undefined);
+  const { toast, mostrar: mostrarToast, ocultar: ocultarToast } = useToast();
 
   // ==================== NAVIGATION STACK ====================
-  const transitionAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim  = useRef(new Animated.Value(1)).current;
+
+  // Tab scroll-to-top refs
+  const tabScrollRef = useRef<ScrollView | null>(null);
+
+  const ejecutarTransicion = useCallback((callback: () => void, goingBack = false) => {
+    Animated.parallel([
+      Animated.timing(fadeAnim,  { toValue: 0, duration: 100, useNativeDriver: true }),
+      Animated.timing(slideAnim, {
+        toValue: goingBack ? SCREEN_W * 0.3 : -SCREEN_W * 0.08,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      callback();
+      slideAnim.setValue(goingBack ? -SCREEN_W * 0.08 : SCREEN_W * 0.08);
+      Animated.parallel([
+        Animated.timing(fadeAnim,  { toValue: 1, duration: 180, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, tension: 80, friction: 12, useNativeDriver: true }),
+      ]).start();
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const navegarA = useCallback((screen: string) => {
     if (screen === currentScreen) return;
-    setNavHistory(prev => [...prev, currentScreen].slice(-10));
-    Animated.timing(transitionAnim, { toValue: 0, duration: 110, useNativeDriver: true }).start(() => {
+    ejecutarTransicion(() => {
+      setNavHistory(prev => [...prev, currentScreen].slice(-10));
       setCurrentScreen(screen as ScreenName);
-      Animated.timing(transitionAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-    });
-  }, [currentScreen, transitionAnim]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, false);
+  }, [currentScreen, ejecutarTransicion]);
 
   const volver = useCallback(() => {
     const prev = navHistory.length > 0 ? navHistory[navHistory.length - 1] : 'dashboard';
-    setNavHistory(h => h.slice(0, -1));
-    Animated.timing(transitionAnim, { toValue: 0, duration: 90, useNativeDriver: true }).start(() => {
+    ejecutarTransicion(() => {
+      setNavHistory(h => h.slice(0, -1));
       setCurrentScreen(prev as ScreenName);
-      Animated.timing(transitionAnim, { toValue: 1, duration: 180, useNativeDriver: true }).start();
-    });
-  }, [navHistory, transitionAnim]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, true);
+  }, [navHistory, ejecutarTransicion]);
 
   const navegarATab = useCallback((screen: string) => {
     setNavHistory([]);
-    setCurrentScreen(screen as ScreenName);
+    Animated.timing(fadeAnim, { toValue: 0, duration: 80, useNativeDriver: true })
+      .start(() => {
+        setCurrentScreen(screen as ScreenName);
+        Animated.timing(fadeAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleScrollToTop = useCallback(() => {
+    tabScrollRef.current?.scrollTo({ y: 0, animated: true });
   }, []);
 
   // ==================== ONBOARDING STEP MACHINE ====================
@@ -135,28 +182,70 @@ export default function HomeScreen() {
     Animated.spring(authAnim, { toValue: 1, friction: 8, useNativeDriver: true }).start();
   }, [authState, authAnim]);
 
-  // Auto-show tour on first login + schedule weekly summary notification
+  // Auto-show tour on first login
   useEffect(() => {
     if (!user) return;
     storageService.getTourDone().then(done => {
       if (!done) {
-        // Small delay so the app finishes rendering before tour starts
         const t = setTimeout(() => setShowTour(true), 600);
         return () => clearTimeout(t);
       }
     });
-    programarResumenSemanal().catch(() => {});
+
+    // Auto-show monthly close screen if applicable
+    const t = setTimeout(() => {
+      deberiasMostrarResumen().then(({ mostrar, mes, año }) => {
+        if (mostrar) {
+          setResumenMensualMes({ mes, año });
+          setCurrentScreen('resumenMensual');
+        }
+      }).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(t);
   }, [user?.id]);
 
-  // Notification tap listener → open weekly summary
+  // Notification listeners — tap opens the target screen
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener(response => {
-      if (response.notification.request.content.data?.type === 'weekly_summary') {
-        setCurrentScreen('resumenSemanal');
+    const SCREEN_MAP: Record<string, string> = {
+      'dashboard':      'dashboard',
+      'categorias':     'categorias',
+      'estadisticas':   'estadisticas',
+      'historial':      'historial',
+      'resumenSemanal': 'resumenSemanal',
+      'resumenMensual': 'resumenMensual',
+      'gamificacion':   'gamificacion',
+      'bot':            'bot',
+    };
+
+    const tapSub = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data as NotifData | undefined;
+
+      // New format: data.screen
+      if (data?.screen) {
+        const target = SCREEN_MAP[data.screen] ?? data.screen;
+        navegarA(target);
+        return;
+      }
+
+      // Legacy format: data.type
+      const legacyType = (data as any)?.type;
+      if (legacyType === 'weekly_summary') setCurrentScreen('resumenSemanal');
+      if (legacyType === 'cierre_mes') { setResumenMensualMes(undefined); setCurrentScreen('resumenMensual'); }
+    });
+
+    const foregroundSub = Notifications.addNotificationReceivedListener(notification => {
+      const data = notification.request.content.data as NotifData | undefined;
+      if (data?.tipo === 'presupuesto_limite' || data?.tipo === 'gasto_inusual') {
+        // Handled passively — the notification banner is shown by the OS
+        // and the app will react when the user taps it
       }
     });
-    return () => sub.remove();
-  }, []);
+
+    return () => {
+      tapSub.remove();
+      foregroundSub.remove();
+    };
+  }, [navegarA]);
 
   // ==================== AUTH HANDLERS ====================
   const handleLogin = () => {
@@ -272,6 +361,11 @@ export default function HomeScreen() {
   // ==================== 0. SPLASH ====================
   if (showSplash) {
     return <MobileShell><SplashScreen onDone={() => setShowSplash(false)} /></MobileShell>;
+  }
+
+  // ==================== 0b. LOADING (hydrating AsyncStorage) ====================
+  if (isLoading) {
+    return <MobileShell><DashboardSkeleton /></MobileShell>;
   }
 
   // ==================== 1. ONBOARDING AI (PRIMERO) ====================
@@ -497,7 +591,13 @@ export default function HomeScreen() {
   return (
     <MobileShell>
       <View style={styles.appContainer}>
-        <Animated.View style={[styles.screenContent, { opacity: transitionAnim }]}>
+        <Toast
+          visible={toast.visible}
+          mensaje={toast.mensaje}
+          tipo={toast.tipo}
+          onHide={ocultarToast}
+        />
+        <Animated.View style={[styles.screenContent, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
           {currentScreen === 'dashboard' && (
             <FinancialFeed
               onNavigate={handleNavigateToSection}
@@ -538,7 +638,7 @@ export default function HomeScreen() {
             <ExplorarScreen onBack={volver} />
           )}
           {currentScreen === 'historial' && (
-            <HistorialScreen onBack={volver} />
+            <HistorialScreen onBack={volver} onNavigate={navegarA} />
           )}
           {currentScreen === 'resumenSemanal' && (
             <ResumenSemanalScreen
@@ -567,12 +667,29 @@ export default function HomeScreen() {
           {currentScreen === 'proyecciones' && (
             <ProyeccionesScreen onBack={volver} />
           )}
+          {currentScreen === 'resumenMensual' && (
+            <ResumenMensualScreen
+              onBack={volver}
+              onNavigate={navegarA}
+              mesOverride={resumenMensualMes}
+            />
+          )}
+          {currentScreen === 'simulador' && (
+            <SimuladorDecisionesScreen onBack={volver} onNavigate={navegarA} />
+          )}
+          {currentScreen === 'exportar' && (
+            <ExportarReporteScreen onBack={volver} />
+          )}
+          {currentScreen === 'widget' && (
+            <WidgetConfigScreen onBack={volver} />
+          )}
         </Animated.View>
         {mostrarBottomNav(currentScreen) && (
           <BottomNavBar
             currentScreen={getTabActivo(currentScreen)}
             onNavigate={navegarATab}
             onQuickAdd={() => setQuickAddMode('expense')}
+            onScrollToTop={handleScrollToTop}
           />
         )}
       </View>

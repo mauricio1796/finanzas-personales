@@ -842,10 +842,18 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
       {/* Header */}
       <View style={[s.header, { backgroundColor: colors.headerBg, paddingTop: insets.top + 12 }]}>
         <Text style={s.headerTitle}>Estadísticas</Text>
-        <View style={s.monthBadge}>
-          <Text style={s.monthBadgeText}>
-            {capitalize(getMesLabelLargo(mes, año))}
-          </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={s.monthBadge}>
+            <Text style={s.monthBadgeText}>
+              {capitalize(getMesLabelLargo(mes, año))}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => onNavigate?.('exportar')}
+            style={[s.downloadBtn, { backgroundColor: colors.primaryLight }]}
+          >
+            <Icon name="download" size={16} color={colors.primary} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -931,6 +939,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 4,
   },
   monthBadgeText: { fontSize: 12, color: '#FFFFFF' },
+  downloadBtn: {
+    width: 32, height: 32, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   // Month scroll
   monthScroll:        { maxHeight: 50, flexShrink: 0 },

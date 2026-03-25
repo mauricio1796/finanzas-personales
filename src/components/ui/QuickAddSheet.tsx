@@ -16,6 +16,8 @@ import {
 import { useFinance } from '../../state';
 import { Icon, getCategoryIcon } from './Icon';
 import { useTheme } from '../../state/ThemeContext';
+import { verificarGastoInusual } from '../../services/NotificacionesService';
+import { type Transaction } from '../../types';
 
 // ─── Quick categories ──────────────────────────────────────────────────
 const INCOME_CATS = [
@@ -46,7 +48,7 @@ interface QuickAddSheetProps {
 
 export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onClose, onAdd }) => {
   const { colors } = useTheme();
-  const { categories, updateUserSalary } = useFinance();
+  const { categories, transactions, updateUserSalary } = useFinance();
   const slideAnim  = useRef(new Animated.Value(400)).current;
   const backdropOp = useRef(new Animated.Value(0)).current;
 
@@ -87,10 +89,26 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
   const handleConfirm = () => {
     const parsed = parseInt(amount.replace(/\./g, ''), 10);
     if (!parsed || parsed <= 0 || !selectedCat) return;
-    onAdd(parsed, selectedCat, mode, new Date());
+
+    const fecha = new Date();
+    onAdd(parsed, selectedCat, mode, fecha);
+
     if (isIncome && selectedCat === 'salario') {
       updateUserSalary(parsed);
     }
+
+    // Verificar gasto inusual de forma asíncrona (no bloquea la UI)
+    if (mode === 'expense') {
+      const tempTx: Transaction = {
+        id:       fecha.getTime().toString(),
+        amount:   parsed,
+        category: selectedCat,
+        type:     'expense',
+        date:     fecha.toISOString(),
+      };
+      verificarGastoInusual(tempTx, transactions).catch(() => {});
+    }
+
     handleClose();
   };
 

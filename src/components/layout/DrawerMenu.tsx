@@ -38,7 +38,9 @@ const SECTIONS: DrawerSection[] = [
       { key: 'bot',            label: 'Finn IA',         icon: 'message-circle' },
       { key: 'explorar',       label: 'Explorar',        icon: 'compass'        },
       { key: 'historial',      label: 'Historial',       icon: 'clock'          },
-      { key: 'resumenSemanal', label: 'Resumen semanal', icon: 'bar-chart-2'    },
+      { key: 'resumenSemanal',  label: 'Resumen semanal', icon: 'bar-chart-2' },
+      { key: 'resumenMensual', label: 'Cierre de mes',  icon: 'calendar'     },
+      { key: 'simulador',     label: 'Simulador',       icon: 'cpu'          },
     ],
   },
   {
@@ -53,8 +55,10 @@ const SECTIONS: DrawerSection[] = [
   {
     title: 'CUENTA',
     items: [
-      { key: 'configuracion', label: 'Apariencia', icon: 'moon' },
-      { key: 'perfil',        label: 'Mi perfil',  icon: 'user' },
+      { key: 'exportar',      label: 'Exportar PDF',     icon: 'file-text' },
+      { key: 'widget',        label: 'Widget de inicio', icon: 'layout'    },
+      { key: 'configuracion', label: 'Apariencia',       icon: 'moon'      },
+      { key: 'perfil',        label: 'Mi perfil',        icon: 'user'      },
     ],
   },
 ];

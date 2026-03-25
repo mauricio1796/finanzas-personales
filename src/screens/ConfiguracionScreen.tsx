@@ -4,8 +4,15 @@ import {
   Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { useTheme, ThemePreference } from '../state/ThemeContext';
+import { useFinance } from '../state';
 import { Icon } from '../components/ui/Icon';
+import { useHaptics } from '../hooks/useHaptics';
+import { Toast, useToast } from '../components/ui/Toast';
+import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
+import { verificarConexionWorker } from '../services/RealAIService';
 
 interface ConfiguracionScreenProps {
   onBack: () => void;
@@ -147,14 +154,84 @@ const ThemeOption = ({
   );
 };
 
+// ── Notif toggle switch (animated) ────────────────────────────────────────────
+const NotifToggle = ({
+  active,
+  disabled,
+  onPress,
+  colors,
+}: {
+  active: boolean;
+  disabled: boolean;
+  onPress: () => void;
+  colors: any;
+}) => {
+  const thumbAnim  = useRef(new Animated.Value(active ? 1 : 0)).current;
+  const trackColor = useRef(new Animated.Value(active ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(thumbAnim,  { toValue: active ? 1 : 0, useNativeDriver: true }),
+      Animated.timing(trackColor, { toValue: active ? 1 : 0, duration: 150, useNativeDriver: false }),
+    ]).start();
+  }, [active]);
+
+  const translateX = thumbAnim.interpolate({ inputRange: [0, 1], outputRange: [3, 23] });
+  const bg = trackColor.interpolate({ inputRange: [0, 1], outputRange: [colors.border, colors.primary] });
+
+  return (
+    <TouchableOpacity onPress={onPress} disabled={disabled} activeOpacity={0.85}>
+      <Animated.View style={[styles.notifTrack, { backgroundColor: bg, opacity: disabled ? 0.4 : 1 }]}>
+        <Animated.View style={[styles.notifThumb, { transform: [{ translateX }] }]} />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export function ConfiguracionScreen({ onBack }: ConfiguracionScreenProps) {
   const insets = useSafeAreaInsets();
   const { isDark, colors, preference, setPreference, toggle } = useTheme();
+  const { categories, transactions, profile } = useFinance();
+  const haptics = useHaptics();
+  const { toast, mostrar: mostrarToast, ocultar: ocultarToast } = useToast();
 
   const previewFade = useRef(new Animated.Value(1)).current;
   const thumbAnim   = useRef(new Animated.Value(isDark ? 1 : 0)).current;
   const [trackColor] = useState(new Animated.Value(isDark ? 1 : 0));
+
+  // ── IA state ─────────────────────────────────────────────────────────────
+  const [estadoIA, setEstadoIA] = useState<'verificando' | 'conectado' | 'error'>('verificando');
+
+  useEffect(() => {
+    verificarConexionWorker().then(ok => setEstadoIA(ok ? 'conectado' : 'error'));
+  }, []);
+
+  // ── Notification state ───────────────────────────────────────────────────
+  const [permisosNotif, setPermisosNotif] = useState(false);
+  const [notifConfig, setNotifConfig] = useState({
+    pagos:       true,
+    presupuesto: true,
+    racha:       true,
+    semanal:     true,
+    inusual:     true,
+  });
+
+  useEffect(() => {
+    Notifications.getPermissionsAsync().then(({ status }) => {
+      setPermisosNotif(status === 'granted');
+    });
+    AsyncStorage.getItem('@financy_notif_config').then(raw => {
+      if (raw) setNotifConfig(JSON.parse(raw));
+    });
+  }, []);
+
+  const toggleNotif = async (key: keyof typeof notifConfig) => {
+    const nueva = { ...notifConfig, [key]: !notifConfig[key] };
+    setNotifConfig(nueva);
+    await AsyncStorage.setItem('@financy_notif_config', JSON.stringify(nueva));
+    haptistyles.selection();
+  };
 
   // Animate preview when theme changes
   useEffect(() => {
@@ -251,7 +328,156 @@ export function ConfiguracionScreen({ onBack }: ConfiguracionScreenProps) {
           </TouchableOpacity>
         </View>
 
+        {/* ── Notificaciones ── */}
+        <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 24 }]}>
+          NOTIFICACIONES
+        </Text>
+
+        <View style={[styles.notifCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          {/* Estado de permisos */}
+          <View style={styles.notifStatusRow}>
+            <View style={[
+              styles.notifStatusIcon,
+              { backgroundColor: permisosNotif ? colors.incomeLight : colors.expenseLight },
+            ]}>
+              <Icon
+                name={permisosNotif ? 'bell' : 'bell-off'}
+                size={18}
+                color={permisosNotif ? colors.income : colors.expense}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.notifStatusTitle, { color: colors.textPrimary }]}>
+                {permisosNotif ? 'Notificaciones activas' : 'Notificaciones desactivadas'}
+              </Text>
+              <Text style={[styles.notifStatusSub, { color: colors.textSecondary }]}>
+                {permisosNotif
+                  ? 'Recibes alertas financieras inteligentes'
+                  : 'Activaelas para no perder pagos importantes'}
+              </Text>
+            </View>
+            {!permisosNotif && (
+              <TouchableOpacity
+                onPress={() => {
+                  haptistyles.medium();
+                  Notifications.requestPermissionsAsync().then(({ status }) => {
+                    setPermisosNotif(status === 'granted');
+                  });
+                }}
+                style={[styles.notifActivateBtn, { backgroundColor: colors.primary }]}
+              >
+                <Text style={styles.notifActivateBtnTxt}>Activar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Toggles por tipo */}
+          {(
+            [
+              { key: 'pagos',       label: 'Pagos proximos y vencidos', icon: 'calendar',    desc: 'Alertas 3 dias antes y el dia del vencimiento' },
+              { key: 'presupuesto', label: 'Limites de presupuesto',    icon: 'alert-circle', desc: 'Cuando llegas al 80% y 100% de una categoria'  },
+              { key: 'racha',       label: 'Racha en riesgo',           icon: 'zap',          desc: 'Si no registras actividad en el dia'           },
+              { key: 'semanal',     label: 'Resumen semanal',           icon: 'bar-chart-2',  desc: 'Cada lunes a las 9am'                          },
+              { key: 'inusual',     label: 'Gastos inusuales',          icon: 'trending-up',  desc: 'Cuando un gasto supera 2.5x tu promedio'       },
+            ] as const
+          ).map(item => (
+            <View
+              key={item.key}
+              style={[styles.notifItem, { borderTopColor: colors.borderSubtle }]}
+            >
+              <Icon name={item.icon as any} size={16} color={colors.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.notifItemLabel, { color: colors.textPrimary }]}>
+                  {item.label}
+                </Text>
+                <Text style={[styles.notifItemDesc, { color: colors.textTertiary }]}>
+                  {item.desc}
+                </Text>
+              </View>
+              <NotifToggle
+                active={notifConfig[item.key] && permisosNotif}
+                disabled={!permisosNotif}
+                onPress={() => toggleNotif(item.key)}
+                colors={colors}
+              />
+            </View>
+          ))}
+        </View>
+
+        {/* Reprogramar manualmente */}
+        {/* ── Sección Finn IA ────────────────────────────────────────── */}
+        <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 24 }]}>
+          FINN IA
+        </Text>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          {/* Estado de conexión */}
+          <View style={styles.iaRow}>
+            <View style={[styles.iaIcon, {
+              backgroundColor: estadoIA === 'conectado' ? colors.incomeLight
+                : estadoIA === 'error' ? colors.expenseLight
+                : colors.inputBg,
+            }]}>
+              <Icon
+                name={estadoIA === 'conectado' ? 'cpu' : estadoIA === 'error' ? 'wifi-off' : 'loader'}
+                size={18}
+                color={estadoIA === 'conectado' ? colors.income : estadoIA === 'error' ? colors.expense : colors.textTertiary}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.iaTitle, { color: colors.textPrimary }]}>
+                {estadoIA === 'conectado' ? 'Finn IA conectado'
+                  : estadoIA === 'error' ? 'Sin conexión a Finn IA'
+                  : 'Verificando conexión…'}
+              </Text>
+              <Text style={[styles.iaSub, { color: colors.textSecondary }]}>
+                {estadoIA === 'conectado'
+                  ? 'Usando claude-haiku-4-5 via Cloudflare Worker'
+                  : 'Modo básico con respuestas locales'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                setEstadoIA('verificando');
+                verificarConexionWorker().then(ok => setEstadoIA(ok ? 'conectado' : 'error'));
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Icon name="refresh-cw" size={16} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Nota informativa */}
+          <View style={[styles.iaNota, { borderTopColor: colors.border }]}>
+            <Text style={[styles.iaNotaText, { color: colors.textSecondary }]}>
+              Finn analiza tus finanzas en tiempo real. Tus datos se envían de forma segura al asistente y nunca se almacenan en servidores externos.
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          onPress={async () => {
+            haptistyles.medium();
+            await reprogramarTodasLasNotificaciones(
+              categories, transactions, profile?.monthlySalary ?? 0,
+            );
+            mostrarToast('Notificaciones actualizadas', 'success');
+          }}
+          style={[styles.notifReprogramBtn, { borderColor: colors.border }]}
+        >
+          <Icon name="refresh-cw" size={14} color={colors.textSecondary} />
+          <Text style={[styles.notifReprogramTxt, { color: colors.textSecondary }]}>
+            Reprogramar notificaciones
+          </Text>
+        </TouchableOpacity>
+
       </ScrollView>
+
+      <Toast
+        visible={toast.visible}
+        mensaje={toast.mensaje}
+        tipo={toast.tipo}
+        onHide={ocultarToast}
+      />
     </View>
   );
 }
@@ -425,6 +651,102 @@ const styles = StyleSheet.create({
   previewTxAmount: {
     fontSize: 12,
     fontWeight: '500',
+  },
+
+  // Notif toggle switch (module-level)
+  notifCard: {
+    borderRadius: 14,
+    borderWidth: 0.5,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  notifStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+  },
+  notifStatusIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifStatusTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  notifStatusSub: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  notifActivateBtn: {
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  notifActivateBtnTxt: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#fff',
+  },
+  notifItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderTopWidth: 0.5,
+  },
+  notifItemLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  notifItemDesc: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  notifTrack: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+  },
+  notifThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#fff',
+  },
+  // IA section
+  card: {
+    borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 8,
+  },
+  iaRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14,
+  },
+  iaIcon: {
+    width: 38, height: 38, borderRadius: 11,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  iaTitle: { fontSize: 14, fontWeight: '600' },
+  iaSub:   { fontSize: 12, marginTop: 1 },
+  iaNota:  { borderTopWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
+  iaNotaText: { fontSize: 12, lineHeight: 18 },
+
+  notifReprogramBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    padding: 12,
+    marginBottom: 8,
+  },
+  notifReprogramTxt: {
+    fontSize: 13,
   },
 
   // Toggle

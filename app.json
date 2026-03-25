@@ -9,9 +9,14 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.financyai.finanzaspersonales",
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.financyai.finanzaspersonales"]
+      }
     },
     "android": {
+      "package": "com.financyai.finanzaspersonales",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

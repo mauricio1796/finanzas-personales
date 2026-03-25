@@ -6,8 +6,8 @@ import {
   Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../state/ThemeContext';
+import { useHaptics } from '../../hooks/useHaptics';
 import { Icon } from '../ui/Icon';
 import type { FeatherName } from '../ui/Icon';
 
@@ -37,19 +37,29 @@ interface TabItemProps {
   label: string;
   active: boolean;
   onPress: () => void;
+  onScrollToTop?: () => void;
   colors: any;
 }
 
-const TabItem: React.FC<TabItemProps> = ({ icon, label, active, onPress, colors }) => {
+const TabItem: React.FC<TabItemProps> = ({
+  icon, label, active, onPress, onScrollToTop, colors,
+}) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const { selection, light } = useHaptics();
 
   const handlePress = () => {
     Animated.sequence([
       Animated.timing(scaleAnim, { toValue: 0.88, duration: 80, useNativeDriver: true }),
       Animated.spring(scaleAnim, { toValue: 1, tension: 200, friction: 10, useNativeDriver: true }),
     ]).start();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    onPress();
+
+    if (active) {
+      selection();
+      onScrollToTop?.();
+    } else {
+      selection();
+      onPress();
+    }
   };
 
   return (
@@ -57,6 +67,7 @@ const TabItem: React.FC<TabItemProps> = ({ icon, label, active, onPress, colors 
       onPress={handlePress}
       style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 8 }}
       activeOpacity={1}
+      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
     >
       <Animated.View style={{ transform: [{ scale: scaleAnim }], alignItems: 'center', gap: 3 }}>
         {active ? (
@@ -92,6 +103,7 @@ const TabItem: React.FC<TabItemProps> = ({ icon, label, active, onPress, colors 
 const FABCenter: React.FC<{ onPress: () => void; colors: any }> = ({ onPress, colors }) => {
   const scaleAnim  = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  const { medium } = useHaptics();
 
   const handlePress = () => {
     Animated.parallel([
@@ -104,7 +116,7 @@ const FABCenter: React.FC<{ onPress: () => void; colors: any }> = ({ onPress, co
         Animated.timing(rotateAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
       ]),
     ]).start();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    medium();
     onPress();
   };
 
@@ -112,7 +124,11 @@ const FABCenter: React.FC<{ onPress: () => void; colors: any }> = ({ onPress, co
 
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 0 }}>
-      <TouchableOpacity onPress={handlePress} activeOpacity={1}>
+      <TouchableOpacity
+        onPress={handlePress}
+        activeOpacity={1}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
         <Animated.View style={{
           width: 52,
           height: 52,
@@ -143,12 +159,14 @@ interface BottomNavBarProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
   onQuickAdd: () => void;
+  onScrollToTop?: () => void;
 }
 
 export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   currentScreen,
   onNavigate,
   onQuickAdd,
+  onScrollToTop,
 }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -175,6 +193,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           label={tab.label}
           active={currentScreen === tab.key}
           onPress={() => onNavigate(tab.key)}
+          onScrollToTop={currentScreen === tab.key ? onScrollToTop : undefined}
           colors={colors}
         />
       ))}
@@ -189,6 +208,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           label={tab.label}
           active={currentScreen === tab.key}
           onPress={() => onNavigate(tab.key)}
+          onScrollToTop={currentScreen === tab.key ? onScrollToTop : undefined}
           colors={colors}
         />
       ))}

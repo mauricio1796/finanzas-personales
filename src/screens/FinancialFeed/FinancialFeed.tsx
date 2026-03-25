@@ -14,7 +14,7 @@ import { useFinance } from '../../state';
 import { useTheme } from '../../state/ThemeContext';
 import { Icon, getCategoryIcon } from '../../components/ui/Icon';
 import { getPaletaItem } from '../../constants/catalogoCategorias';
-import { aiService, AIRecommendation } from '../../services/ai/AIService';
+import { generarInsightDiario } from '../../services/RealAIService';
 import { calcularMetricasFinancieras } from '../../utils/ingresoUtils';
 import { QuickAddSheet } from '../../components/ui/QuickAddSheet';
 import { SwipeableRow } from '../../components/ui/SwipeableRow';
@@ -153,7 +153,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [quickAddVisible, setQuickAddVisible] = useState(false);
   const [quickAddType, setQuickAddType] = useState<'income' | 'expense'>('expense');
-  const [aiInsight, setAiInsight] = useState<AIRecommendation | null>(null);
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
 
   // ── Animated values ────────────────────────────────────────────────────────
   const heroAnim    = useRef(new Animated.Value(0)).current;
@@ -198,17 +198,11 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
       Animated.timing(a, { toValue: 1, duration: 600, useNativeDriver: false })
     )).start();
 
-    // AI insight
-    try {
-      const result = aiService.generateDailyInsight(
-        transactions as any,
-        profile as any,
-        profile?.monthlySalary ?? 0,
-        categories as any,
-      );
-      setAiInsight(result);
+    // AI insight — usar IA real con fallback local
+    generarInsightDiario(transactions as any, categories as any, profile).then(texto => {
+      setAiInsight(texto);
       Animated.timing(insightAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
-    } catch {}
+    }).catch(() => {});
 
     return () => { balanceAnim.removeAllListeners(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -351,11 +345,11 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
       onPress: () => abrirQuickAdd('expense'),
     },
     {
-      label: 'Retos',
-      icon: 'zap',
+      label: 'Simular',
+      icon: 'cpu',
       bg: colors.warningLight,
       color: colors.warning,
-      onPress: () => onNavigate('retos'),
+      onPress: () => onNavigate('simulador'),
     },
     {
       label: 'Finn IA',
@@ -529,7 +523,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
                   FINN · INSIGHT DEL DÍA
                 </Text>
                 <Text style={[s.insightText, { color: colors.primaryText }]}>
-                  {aiInsight.message}
+                  {aiInsight}
                 </Text>
               </View>
             </View>
