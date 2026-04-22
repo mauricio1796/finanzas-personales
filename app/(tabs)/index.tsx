@@ -27,6 +27,8 @@ import { SplashScreen } from '../../src/screens/SplashScreen';
 import { QuickAddSheet } from '../../src/components/ui/QuickAddSheet';
 import { ProductTour, APP_TOUR_STEPS } from '../../src/components/ui/ProductTour';
 import { storageService } from '../../src/services/storage/StorageService';
+import { authService } from '../../src/services/supabase/AuthService';
+import { supabaseService } from '../../src/services/supabase/SupabaseService';
 import { DashboardSkeleton } from '../../src/components/ui/SkeletonLoader';
 import { Toast, useToast } from '../../src/components/ui/Toast';
 import { ResumenSemanalScreen } from '../../src/screens/ResumenSemanalScreen';
@@ -83,8 +85,9 @@ function mostrarBottomNav(screen: string): boolean {
 export default function HomeScreen() {
   const {
     setUser, user, isOnboarded, setIsOnboarded, onboardingState, updateOnboardingStep, profile,
-    transactions, addTransaction: ctxAddTransaction, deleteTransaction: ctxDeleteTransaction,
-    isLoading,
+    transactions, categories, goal, userLevel, leccionesCompletadas, retosCompletados, retoActivo, premium,
+    addTransaction: ctxAddTransaction, deleteTransaction: ctxDeleteTransaction,
+    isLoading, importServerData,
   } = useFinance();
   const { colors } = useTheme();
 
@@ -104,6 +107,7 @@ export default function HomeScreen() {
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
 
   // ==================== APP STATE ====================
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('dashboard');
@@ -248,23 +252,47 @@ export default function HomeScreen() {
   }, [navegarA]);
 
   // ==================== AUTH HANDLERS ====================
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setAuthError('');
     if (!loginEmail || !loginPassword) {
       setAuthError('Por favor completa todos los campos');
       return;
     }
-    const newUser: User = {
-      id: Date.now().toString(),
-      email: loginEmail,
-      name: loginEmail.split('@')[0],
-    };
-    setUser(newUser);
-    setLoginEmail('');
-    setLoginPassword('');
+    setAuthLoading(true);
+    try {
+      if (authService.isReady) {
+        // ── Auth real con Supabase ──────────────────────────────────────────
+        const { user: sbUser, error } = await authService.signIn(loginEmail, loginPassword);
+        if (error || !sbUser) { setAuthError(error ?? 'Error al iniciar sesión'); return; }
+
+        setUser(sbUser);
+
+        // Traer datos del servidor y cargarlos en el contexto
+        const serverData = await supabaseService.pullFromServer(sbUser.id);
+        if (serverData) {
+          await importServerData(serverData);
+          // Sincronizar el nombre en el contexto del usuario si el servidor lo tiene
+          if (serverData.name && serverData.name !== sbUser.name) {
+            setUser({ ...sbUser, name: serverData.name, monthlySalary: serverData.monthlySalary || sbUser.monthlySalary });
+          }
+        }
+      } else {
+        // ── Fallback local (sin Supabase configurado) ─────────────────────
+        const newUser: User = {
+          id: Date.now().toString(),
+          email: loginEmail,
+          name: loginEmail.split('@')[0],
+        };
+        setUser(newUser);
+      }
+      setLoginEmail('');
+      setLoginPassword('');
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     setAuthError('');
     if (!registerName || !registerEmail || !registerPassword || !registerConfirmPassword) {
       setAuthError('Por favor completa todos los campos');
@@ -278,27 +306,60 @@ export default function HomeScreen() {
       setAuthError('La contraseña debe tener al menos 6 caracteres');
       return;
     }
-    const newUser: User = {
-      id: Date.now().toString(),
-      email: registerEmail,
-      name: registerName,
-      createdAt: new Date().toISOString(),
-    };
-    setUser(newUser);
-    setRegisterName('');
-    setRegisterEmail('');
-    setRegisterPassword('');
-    setRegisterConfirmPassword('');
+    setAuthLoading(true);
+    try {
+      if (authService.isReady) {
+        // ── Auth real con Supabase ──────────────────────────────────────────
+        const { user: sbUser, error } = await authService.signUp(registerEmail, registerPassword, registerName);
+        if (error || !sbUser) { setAuthError(error ?? 'Error al crear cuenta'); return; }
+
+        setUser(sbUser);
+
+        // Subir todos los datos locales del onboarding al servidor
+        await supabaseService.pushAllToServer(sbUser.id, {
+          transactions,
+          categories,
+          profile: profile ?? null,
+          goal: goal ?? null,
+          userLevel: userLevel ?? null,
+          leccionesCompletadas,
+          retosCompletados,
+          retoActivo: retoActivo ?? null,
+          premium,
+          isOnboarded,
+          name: registerName,
+          monthlySalary: profile?.monthlySalary ?? sbUser.monthlySalary ?? 0,
+        });
+      } else {
+        // ── Fallback local (sin Supabase configurado) ─────────────────────
+        const newUser: User = {
+          id: Date.now().toString(),
+          email: registerEmail,
+          name: registerName,
+          createdAt: new Date().toISOString(),
+        };
+        setUser(newUser);
+      }
+      setRegisterName('');
+      setRegisterEmail('');
+      setRegisterPassword('');
+      setRegisterConfirmPassword('');
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const handleLogout = async () => {
+    if (authService.isReady) {
+      await authService.signOut();
+    }
     setUser(null);
     setAuthState('login');
     await setIsOnboarded(false);
     setCurrentScreen('dashboard');
     setLoginEmail('');
     setLoginPassword('');
-    setShowSplash(false); // don't re-show splash on logout
+    setShowSplash(false);
   };
 
   const handleReset = () => {
@@ -467,8 +528,14 @@ export default function HomeScreen() {
 
                   {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
 
-                  <Pressable style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={handleLogin}>
-                    <Text style={[styles.primaryButtonText, { color: colors.background }]}>Iniciar Sesión</Text>
+                  <Pressable
+                    style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: authLoading ? 0.7 : 1 }]}
+                    onPress={handleLogin}
+                    disabled={authLoading}
+                  >
+                    <Text style={[styles.primaryButtonText, { color: colors.background }]}>
+                      {authLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+                    </Text>
                   </Pressable>
 
                   <Pressable onPress={() => setAuthState('register')}>
@@ -567,8 +634,14 @@ export default function HomeScreen() {
 
                     {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
 
-                    <Pressable style={[styles.primaryButton, { backgroundColor: colors.primary }]} onPress={handleRegister}>
-                      <Text style={[styles.primaryButtonText, { color: colors.background }]}>Crear Cuenta y Comenzar</Text>
+                    <Pressable
+                      style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: authLoading ? 0.7 : 1 }]}
+                      onPress={handleRegister}
+                      disabled={authLoading}
+                    >
+                      <Text style={[styles.primaryButtonText, { color: colors.background }]}>
+                        {authLoading ? 'Creando cuenta...' : 'Crear Cuenta y Comenzar'}
+                      </Text>
                     </Pressable>
 
                     <Pressable onPress={() => setAuthState('login')}>

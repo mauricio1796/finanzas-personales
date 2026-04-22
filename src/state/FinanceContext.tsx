@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { storageService } from '../services/storage/StorageService';
+import { supabaseService } from '../services/supabase/SupabaseService';
+import type { ServerData } from '../services/supabase/SupabaseService';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
 import {
   User,
@@ -13,7 +15,7 @@ import {
   OnboardingState,
 } from '../types';
 
-// ─── New types for Phase 3 ───────────────────────────────────────────────────
+// ─── Phase 3 types ───────────────────────────────────────────────────────────
 export interface PremiumState {
   isPremium: boolean;
   plan: 'mensual' | 'anual' | null;
@@ -58,9 +60,11 @@ interface FinanceContextType {
   deleteTransaction: (id: string) => void;
   addIncome: (amount: number, category: string, date: Date, description?: string) => void;
   addExpense: (amount: number, category: string, date: Date, description?: string) => void;
-
   updateUserSalary: (salary: number) => void;
   resetAll: () => Promise<void>;
+
+  // Sync: importa datos del servidor al contexto local (usado en login/registro)
+  importServerData: (data: Partial<ServerData>) => Promise<void>;
 
   // Phase 3 methods
   completarLeccion: (leccionId: string, xp: number) => void;
@@ -76,7 +80,6 @@ interface FinanceContextType {
   markCategoryPaid: (id: string) => void;
   unmarkCategoryPaid: (id: string) => void;
 }
-
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
 const DEFAULT_PREMIUM: PremiumState = {
@@ -117,14 +120,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [onboardingState, setOnboardingState] = useState<OnboardingState | null>(DEFAULT_ONBOARDING);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Phase 3 state
+  // Phase 3
   const [leccionesCompletadas, setLeccionesCompletadas] = useState<string[]>([]);
   const [retoActivo, setRetoActivo] = useState<RetoActivo | null>(null);
   const [retosCompletados, setRetosCompletados] = useState<string[]>([]);
   const [premium, setPremiumState] = useState<PremiumState>(DEFAULT_PREMIUM);
 
-
-  // ─── Hydration ─────────────────────────────────────────────────────────────
+  // ─── Hydration (AsyncStorage → estado local) ──────────────────────────────
   const hydrate = useCallback(async () => {
     try {
       const [
@@ -159,22 +161,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (storedUser) setUserState(storedUser);
       if (storedTxs) setTransactions(storedTxs);
       if (storedCats) {
-        // Migration 1: rename legacy presupuesto → budget, drop gastado
-        // Migration 2: ensure isSelected=true for categories without the flag
-        //              (fix for onboarding bug where isSelected was not set)
         const migrated = storedCats.map((c: any) => {
           const { presupuesto, gastado, ...rest } = c;
-          if (presupuesto !== undefined && rest.budget === undefined) {
-            rest.budget = presupuesto;
-          }
-          // Fix missing isSelected — any saved category was intentionally added
-          if (rest.isSelected === undefined || rest.isSelected === null) {
-            rest.isSelected = true;
-          }
-          // Fix tipo: 'variable' → 'gasto' (legacy onboarding set wrong tipo)
-          if (rest.tipo === 'variable' || rest.tipo === 'fijo') {
-            rest.tipo = 'gasto';
-          }
+          if (presupuesto !== undefined && rest.budget === undefined) rest.budget = presupuesto;
+          if (rest.isSelected === undefined || rest.isSelected === null) rest.isSelected = true;
+          if (rest.tipo === 'variable' || rest.tipo === 'fijo') rest.tipo = 'gasto';
           return rest as Category;
         });
         setCategoriesState(migrated);
@@ -186,6 +177,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (storedRetoActivo) setRetoActivo(storedRetoActivo);
       if (storedRetosComp) setRetosCompletados(storedRetosComp);
       if (storedPremium) setPremiumState(storedPremium);
+
+      // storedPaidIds se usa en Estadisticas directamente via storageService (no en este contexto)
+      void storedPaidIds;
     } catch (e) {
       console.warn('Hydration error:', e);
     } finally {
@@ -195,18 +189,40 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => { hydrate(); }, [hydrate]);
 
-  // ─── Auto-persist ──────────────────────────────────────────────────────────
+  // ─── Auto-persist (AsyncStorage) ──────────────────────────────────────────
+  // Nota: el sync a Supabase se hace en cada método de acción (fire-and-forget),
+  // NO en estos effects, para evitar syncs completos en cada cambio.
   useEffect(() => { storageService.saveTransactions(transactions); }, [transactions]);
   useEffect(() => { if (profile) storageService.saveProfile(profile); }, [profile]);
   useEffect(() => { if (goal) storageService.saveGoal(goal); }, [goal]);
   useEffect(() => { if (userLevel) storageService.saveUserLevel(userLevel); }, [userLevel]);
-  useEffect(() => { if (categories.length) storageService.saveCategories(categories); reprogramarTodasLasNotificaciones(categories); }, [categories]);
+  useEffect(() => {
+    if (categories.length) {
+      storageService.saveCategories(categories);
+      reprogramarTodasLasNotificaciones(categories);
+    }
+  }, [categories]);
   useEffect(() => { if (user) storageService.saveUser(user); }, [user]);
   useEffect(() => { storageService.saveLeccionesCompletadas(leccionesCompletadas); }, [leccionesCompletadas]);
   useEffect(() => { storageService.saveRetosCompletados(retosCompletados); }, [retosCompletados]);
   useEffect(() => { storageService.saveRetoActivo(retoActivo); }, [retoActivo]);
   useEffect(() => { storageService.savePremium(premium); }, [premium]);
 
+  // ─── importServerData: carga datos del servidor en el contexto local ───────
+  // Llamado desde index.tsx después de un login o registro exitoso.
+  const importServerData = async (data: Partial<ServerData>): Promise<void> => {
+    if (data.transactions !== undefined) setTransactions(data.transactions);
+    if (data.categories !== undefined) setCategoriesState(data.categories);
+    if (data.profile !== undefined) setProfileState(data.profile);
+    if (data.goal !== undefined) setGoalState(data.goal);
+    if (data.userLevel !== undefined) setUserLevelState(data.userLevel);
+    if (data.leccionesCompletadas !== undefined) setLeccionesCompletadas(data.leccionesCompletadas);
+    if (data.retosCompletados !== undefined) setRetosCompletados(data.retosCompletados);
+    if (data.retoActivo !== undefined) setRetoActivo(data.retoActivo);
+    if (data.premium !== undefined) setPremiumState(data.premium);
+    if (data.isOnboarded !== undefined) setIsOnboardedState(data.isOnboarded);
+    if (data.paidTxIds !== undefined) await storageService.savePaidTxIds(data.paidTxIds);
+  };
 
   // ─── Core methods ─────────────────────────────────────────────────────────
   const setUser = (u: User | null) => setUserState(u);
@@ -216,6 +232,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await storageService.setOnboarded(value);
     if (!value) {
       setOnboardingState(DEFAULT_ONBOARDING);
+    } else if (user) {
+      // Marcar onboarded en servidor
+      supabaseService.upsertUserData(user.id, { isOnboarded: value }).catch(() => {});
     }
   };
 
@@ -228,16 +247,40 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const setCategories = (cats: Category[]) => setCategoriesState(cats);
-  const setProfile = (p: FinancialProfile) => setProfileState(p);
-  const setGoal = (g: FinancialGoal) => setGoalState(g);
-  const setUserLevel = (l: UserLevel) => setUserLevelState(l);
+
+  const setProfile = (p: FinancialProfile) => {
+    setProfileState(p);
+    if (user) {
+      supabaseService.upsertFinancialProfile(user.id, p).catch(() => {});
+    }
+  };
+
+  const setGoal = (g: FinancialGoal) => {
+    setGoalState(g);
+    if (user) {
+      supabaseService.upsertGoal(user.id, g).catch(() => {});
+    }
+  };
+
+  const setUserLevel = (l: UserLevel) => {
+    setUserLevelState(l);
+    if (user) {
+      supabaseService.upsertUserLevel(user.id, l).catch(() => {});
+    }
+  };
 
   const addTransaction = (tx: Transaction) => {
     setTransactions(prev => [tx, ...prev]);
+    if (user) {
+      supabaseService.upsertTransaction(user.id, tx).catch(() => {});
+    }
   };
 
   const deleteTransaction = (id: string) => {
     setTransactions(prev => prev.filter(tx => tx.id !== id));
+    if (user) {
+      supabaseService.deleteTransaction(id).catch(() => {});
+    }
   };
 
   const addIncome = (amount: number, category: string, date: Date, description?: string) => {
@@ -262,52 +305,92 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
+  const updateUserSalary = (salary: number) => {
+    setUserState(prev => prev ? { ...prev, monthlySalary: salary } : prev);
+    setProfileState(prev => prev ? { ...prev, monthlySalary: salary } : prev);
+    if (user) {
+      supabaseService.upsertUserData(user.id, { monthlySalary: salary }).catch(() => {});
+      if (profile) {
+        supabaseService.upsertFinancialProfile(user.id, { ...profile, monthlySalary: salary }).catch(() => {});
+      }
+    }
+  };
+
   // ─── Phase 3 methods ──────────────────────────────────────────────────────
   const completarLeccion = (leccionId: string, xp: number) => {
-    setLeccionesCompletadas(prev => prev.includes(leccionId) ? prev : [...prev, leccionId]);
+    setLeccionesCompletadas(prev => {
+      if (prev.includes(leccionId)) return prev;
+      const next = [...prev, leccionId];
+      if (user) supabaseService.upsertUserData(user.id, { leccionesCompletadas: next }).catch(() => {});
+      return next;
+    });
     if (xp > 0 && userLevel) {
-      setUserLevelState(prev => prev ? { ...prev, experience: prev.experience + xp } : prev);
+      const next = { ...userLevel, experience: userLevel.experience + xp };
+      setUserLevelState(next);
+      if (user) supabaseService.upsertUserLevel(user.id, next).catch(() => {});
     }
   };
 
   const iniciarReto = (retoId: string) => {
-    setRetoActivo({ retoId, fechaInicio: new Date().toISOString() });
+    const nuevo: RetoActivo = { retoId, fechaInicio: new Date().toISOString() };
+    setRetoActivo(nuevo);
+    if (user) supabaseService.upsertUserData(user.id, { retoActivo: nuevo }).catch(() => {});
   };
 
   const completarReto = (retoId: string, xp?: number) => {
-    setRetosCompletados(prev => prev.includes(retoId) ? prev : [...prev, retoId]);
+    setRetosCompletados(prev => {
+      if (prev.includes(retoId)) return prev;
+      const next = [...prev, retoId];
+      if (user) supabaseService.upsertUserData(user.id, { retosCompletados: next }).catch(() => {});
+      return next;
+    });
     setRetoActivo(null);
-    if (xp && xp > 0) {
-      setUserLevelState(prev => prev ? { ...prev, experience: prev.experience + xp } : prev);
+    if (user) supabaseService.upsertUserData(user.id, { retoActivo: null }).catch(() => {});
+    if (xp && xp > 0 && userLevel) {
+      const next = { ...userLevel, experience: userLevel.experience + xp };
+      setUserLevelState(next);
+      if (user) supabaseService.upsertUserLevel(user.id, next).catch(() => {});
     }
   };
 
   const abandonarReto = () => {
     setRetoActivo(null);
+    if (user) supabaseService.upsertUserData(user.id, { retoActivo: null }).catch(() => {});
   };
 
   const setPremium = (state: PremiumState) => {
     setPremiumState(state);
+    if (user) supabaseService.upsertUserData(user.id, { premium: state }).catch(() => {});
   };
 
-
-  const updateUserSalary = (salary: number) => {
-    setUserState(prev => prev ? { ...prev, monthlySalary: salary } : prev);
-    setProfileState(prev => prev ? { ...prev, monthlySalary: salary } : prev);
-  };
-
+  // ─── Category management ──────────────────────────────────────────────────
   const addCategory = (cat: Category) => {
     setCategoriesState(prev => [...prev, cat]);
-    if (userLevel) setUserLevelState(prev => prev ? { ...prev, experience: prev.experience + 20 } : prev);
+    if (userLevel) {
+      const next = { ...userLevel, experience: userLevel.experience + 20 };
+      setUserLevelState(next);
+      if (user) supabaseService.upsertUserLevel(user.id, next).catch(() => {});
+    }
+    if (user) supabaseService.upsertCategory(user.id, cat).catch(() => {});
   };
 
   const updateCategory = (id: string, update: CategoryUpdate) => {
-    setCategoriesState(prev => prev.map(c => c.id === id ? { ...c, ...update } : c));
-    if (userLevel) setUserLevelState(prev => prev ? { ...prev, experience: prev.experience + 10 } : prev);
+    setCategoriesState(prev => prev.map(c => {
+      if (c.id !== id) return c;
+      const updated = { ...c, ...update };
+      if (user) supabaseService.upsertCategory(user.id, updated).catch(() => {});
+      return updated;
+    }));
+    if (userLevel) {
+      const next = { ...userLevel, experience: userLevel.experience + 10 };
+      setUserLevelState(next);
+      if (user) supabaseService.upsertUserLevel(user.id, next).catch(() => {});
+    }
   };
 
   const deleteCategory = (id: string) => {
     setCategoriesState(prev => prev.filter(c => c.id !== id));
+    if (user) supabaseService.deleteCategory(id).catch(() => {});
   };
 
   const markCategoryPaid = (id: string) => {
@@ -325,21 +408,40 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             type: 'expense',
             description: cat.tipo === 'fijo' ? 'Gasto fijo pagado' : 'Presupuesto pagado',
           };
+          if (user) supabaseService.upsertTransaction(user.id, newTx).catch(() => {});
           return [newTx, ...prev2];
         });
       }
-      return prev.map(c => c.id === id ? { ...c, pagado: true } : c);
+      return prev.map(c => {
+        if (c.id !== id) return c;
+        const updated = { ...c, pagado: true };
+        if (user) supabaseService.upsertCategory(user.id, updated).catch(() => {});
+        return updated;
+      });
     });
-    if (userLevel) setUserLevelState(prev => prev ? { ...prev, experience: prev.experience + 50 } : prev);
+    if (userLevel) {
+      const next = { ...userLevel, experience: userLevel.experience + 50 };
+      setUserLevelState(next);
+      if (user) supabaseService.upsertUserLevel(user.id, next).catch(() => {});
+    }
   };
 
   const unmarkCategoryPaid = (id: string) => {
     const txId = 'budget_payment_' + id;
     setTransactions(prev => prev.filter(t => t.id !== txId));
-    setCategoriesState(prev => prev.map(c => c.id === id ? { ...c, pagado: false } : c));
+    if (user) supabaseService.deleteTransaction(txId).catch(() => {});
+    setCategoriesState(prev => prev.map(c => {
+      if (c.id !== id) return c;
+      const updated = { ...c, pagado: false };
+      if (user) supabaseService.upsertCategory(user.id, updated).catch(() => {});
+      return updated;
+    }));
   };
 
   const resetAll = async () => {
+    if (user) {
+      await supabaseService.deleteAllUserData(user.id).catch(() => {});
+    }
     await storageService.clearAll();
     setUserState(null);
     setTransactions([]);
@@ -381,6 +483,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     deleteTransaction,
     addIncome,
     addExpense,
+    importServerData,
     completarLeccion,
     iniciarReto,
     completarReto,
