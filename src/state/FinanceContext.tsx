@@ -13,6 +13,10 @@ import {
   UserLevel,
   Achievement,
   OnboardingState,
+  Meta,
+  Deuda,
+  PagoDeuda,
+  GastoRecurrente,
 } from '../types';
 
 // ─── Phase 3 types ───────────────────────────────────────────────────────────
@@ -58,6 +62,7 @@ interface FinanceContextType {
   setUserLevel: (level: UserLevel) => void;
   addTransaction: (tx: Transaction) => void;
   deleteTransaction: (id: string) => void;
+  updateTransaction: (id: string, update: Partial<Transaction>) => void;
   addIncome: (amount: number, category: string, date: Date, description?: string) => void;
   addExpense: (amount: number, category: string, date: Date, description?: string) => void;
   updateUserSalary: (salary: number) => void;
@@ -79,6 +84,27 @@ interface FinanceContextType {
   deleteCategory: (id: string) => void;
   markCategoryPaid: (id: string) => void;
   unmarkCategoryPaid: (id: string) => void;
+
+  // Metas
+  metas: Meta[];
+  addMeta: (meta: Meta) => void;
+  updateMeta: (id: string, update: Partial<Meta>) => void;
+  deleteMeta: (id: string) => void;
+  abonarMeta: (id: string, monto: number) => void;
+
+  // Deudas
+  deudas: Deuda[];
+  addDeuda: (deuda: Deuda) => void;
+  updateDeuda: (id: string, update: Partial<Deuda>) => void;
+  deleteDeuda: (id: string) => void;
+  pagarDeuda: (id: string, pago: PagoDeuda) => void;
+
+  // Gastos Recurrentes
+  recurrentes: GastoRecurrente[];
+  addRecurrente: (r: GastoRecurrente) => void;
+  updateRecurrente: (id: string, update: Partial<GastoRecurrente>) => void;
+  deleteRecurrente: (id: string) => void;
+  toggleRecurrente: (id: string) => void;
 }
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
@@ -120,6 +146,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [onboardingState, setOnboardingState] = useState<OnboardingState | null>(DEFAULT_ONBOARDING);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Metas / Deudas / Recurrentes
+  const [metas, setMetas] = useState<Meta[]>([]);
+  const [deudas, setDeudas] = useState<Deuda[]>([]);
+  const [recurrentes, setRecurrentes] = useState<GastoRecurrente[]>([]);
+
   // Phase 3
   const [leccionesCompletadas, setLeccionesCompletadas] = useState<string[]>([]);
   const [retoActivo, setRetoActivo] = useState<RetoActivo | null>(null);
@@ -142,6 +173,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         storedRetoActivo,
         storedRetosComp,
         storedPremium,
+        storedMetas,
+        storedDeudas,
+        storedRecurrentes,
       ] = await Promise.all([
         storageService.getOnboarded(),
         storageService.getUser(),
@@ -155,6 +189,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         storageService.getRetoActivo(),
         storageService.getRetosCompletados(),
         storageService.getPremium(),
+        storageService.getMetas(),
+        storageService.getDeudas(),
+        storageService.getRecurrentes(),
       ]);
 
       if (storedOnboarded) setIsOnboardedState(true);
@@ -177,6 +214,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (storedRetoActivo) setRetoActivo(storedRetoActivo);
       if (storedRetosComp) setRetosCompletados(storedRetosComp);
       if (storedPremium) setPremiumState(storedPremium);
+      if (storedMetas) setMetas(storedMetas);
+      if (storedDeudas) setDeudas(storedDeudas);
+      if (storedRecurrentes) setRecurrentes(storedRecurrentes);
 
       // storedPaidIds se usa en Estadisticas directamente via storageService (no en este contexto)
       void storedPaidIds;
@@ -207,6 +247,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => { storageService.saveRetosCompletados(retosCompletados); }, [retosCompletados]);
   useEffect(() => { storageService.saveRetoActivo(retoActivo); }, [retoActivo]);
   useEffect(() => { storageService.savePremium(premium); }, [premium]);
+  useEffect(() => { storageService.saveMetas(metas); }, [metas]);
+  useEffect(() => { storageService.saveDeudas(deudas); }, [deudas]);
+  useEffect(() => { storageService.saveRecurrentes(recurrentes); }, [recurrentes]);
 
   // ─── importServerData: carga datos del servidor en el contexto local ───────
   // Llamado desde index.tsx después de un login o registro exitoso.
@@ -281,6 +324,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (user) {
       supabaseService.deleteTransaction(id).catch(() => {});
     }
+  };
+
+  const updateTransaction = (id: string, update: Partial<Transaction>) => {
+    setTransactions(prev => prev.map(tx => {
+      if (tx.id !== id) return tx;
+      const updated = { ...tx, ...update };
+      if (user) supabaseService.upsertTransaction(user.id, updated).catch(() => {});
+      return updated;
+    }));
   };
 
   const addIncome = (amount: number, category: string, date: Date, description?: string) => {
@@ -438,6 +490,43 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }));
   };
 
+  // ─── Metas ────────────────────────────────────────────────────────────────
+  const addMeta = (meta: Meta) => setMetas(prev => [meta, ...prev]);
+  const updateMeta = (id: string, update: Partial<Meta>) =>
+    setMetas(prev => prev.map(m => m.id === id ? { ...m, ...update } : m));
+  const deleteMeta = (id: string) => setMetas(prev => prev.filter(m => m.id !== id));
+  const abonarMeta = (id: string, monto: number) =>
+    setMetas(prev => prev.map(m => {
+      if (m.id !== id) return m;
+      const nuevo = Math.min(m.montoActual + monto, m.montoObjetivo);
+      return { ...m, montoActual: nuevo, completada: nuevo >= m.montoObjetivo };
+    }));
+
+  // ─── Deudas ───────────────────────────────────────────────────────────────
+  const addDeuda = (deuda: Deuda) => setDeudas(prev => [deuda, ...prev]);
+  const updateDeuda = (id: string, update: Partial<Deuda>) =>
+    setDeudas(prev => prev.map(d => d.id === id ? { ...d, ...update } : d));
+  const deleteDeuda = (id: string) => setDeudas(prev => prev.filter(d => d.id !== id));
+  const pagarDeuda = (id: string, pago: PagoDeuda) =>
+    setDeudas(prev => prev.map(d => {
+      if (d.id !== id) return d;
+      const nuevoSaldo = Math.max(0, d.saldo - pago.monto);
+      return {
+        ...d,
+        saldo: nuevoSaldo,
+        saldada: nuevoSaldo <= 0,
+        pagos: [pago, ...d.pagos],
+      };
+    }));
+
+  // ─── Gastos Recurrentes ───────────────────────────────────────────────────
+  const addRecurrente = (r: GastoRecurrente) => setRecurrentes(prev => [r, ...prev]);
+  const updateRecurrente = (id: string, update: Partial<GastoRecurrente>) =>
+    setRecurrentes(prev => prev.map(r => r.id === id ? { ...r, ...update } : r));
+  const deleteRecurrente = (id: string) => setRecurrentes(prev => prev.filter(r => r.id !== id));
+  const toggleRecurrente = (id: string) =>
+    setRecurrentes(prev => prev.map(r => r.id === id ? { ...r, activo: !r.activo } : r));
+
   const resetAll = async () => {
     if (user) {
       await supabaseService.deleteAllUserData(user.id).catch(() => {});
@@ -455,12 +544,30 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setRetoActivo(null);
     setRetosCompletados([]);
     setPremiumState(DEFAULT_PREMIUM);
+    setMetas([]);
+    setDeudas([]);
+    setRecurrentes([]);
   };
 
   const value: FinanceContextType = {
     user,
     transactions,
     categories,
+    metas,
+    deudas,
+    recurrentes,
+    addMeta,
+    updateMeta,
+    deleteMeta,
+    abonarMeta,
+    addDeuda,
+    updateDeuda,
+    deleteDeuda,
+    pagarDeuda,
+    addRecurrente,
+    updateRecurrente,
+    deleteRecurrente,
+    toggleRecurrente,
     profile,
     goal,
     userLevel,
@@ -481,6 +588,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setUserLevel,
     addTransaction,
     deleteTransaction,
+    updateTransaction,
     addIncome,
     addExpense,
     importServerData,

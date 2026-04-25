@@ -4,6 +4,7 @@ import {
   TextInput,
   Pressable,
   TouchableOpacity,
+  Modal,
   View,
   Text,
   FlatList,
@@ -24,21 +25,36 @@ import {
 } from '../services/ai/AIService';
 import {
   enviarMensajeAFinn,
+  enviarMensajeAgenteAFinn,
   verificarConexionWorker,
   type MensajeChat,
 } from '../services/RealAIService';
+import { ejecutarHerramienta, previewEliminar, type FinnToolCall, type FinnToolResult } from '../services/AgentService';
+import { VoiceButton } from '../components/ui/VoiceButton';
 import { catalogoItemToCategory, CATALOGO_CATEGORIAS, getPaletaItem } from '../constants/catalogoCategorias';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
+interface FinnAction {
+  tool:        string;
+  descripcion: string;
+  exito:       boolean;
+}
+
 interface Message {
-  id:        string;
-  text:      string;
-  sender:    'user' | 'bot';
-  timestamp: Date;
-  accion?:   BotAccion;
-  esError?:  boolean;
+  id:          string;
+  text:        string;
+  sender:      'user' | 'bot';
+  timestamp:   Date;
+  accion?:     BotAccion;
+  esError?:    boolean;
+  accionFinn?: FinnAction;
+}
+
+interface PendingAction {
+  toolCall:   FinnToolCall;
+  preview:    string;
 }
 
 interface BotIAProps {
@@ -176,7 +192,7 @@ const ConfirmacionCategorias: React.FC<ConfirmacionCategoriasProps> = ({
 
 export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
   const { colors } = useTheme();
-  const { profile, goal, categories, addCategory, updateCategory } = useFinance();
+  const { profile, goal, categories, addCategory, updateCategory, addTransaction, deleteTransaction, updateTransaction, setGoal } = useFinance();
   const insets = useSafeAreaInsets();
 
   const [messages, setMessages]   = useState<Message[]>([]);
@@ -192,6 +208,9 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
   const [catsPendientes,    setCatsPendientes]    = useState<CategoriaSugerida[]>([]);
   const [catsSeleccionadas, setCatsSeleccionadas] = useState<Set<string>>(new Set());
   const [confirmacionId,    setConfirmacionId]    = useState<string | null>(null);
+
+  // ── Agentic action state ──────────────────────────────────────────────────
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
   // ── Ping Worker + saludo inicial ──────────────────────────────────────────
   useEffect(() => {
@@ -246,6 +265,35 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   }, [catsPendientes, catsSeleccionadas, categories, addCategory, updateCategory]);
 
+  // ── Ejecutar acción confirmada ────────────────────────────────────────────
+  const ejecutarAccionConfirmada = useCallback((action: PendingAction) => {
+    const agentCtx = {
+      transactions:      transactions as any,
+      categories:        categories as any,
+      goal:              goal as any,
+      addTransaction,
+      deleteTransaction,
+      updateTransaction,
+      updateCategory,
+      addCategory,
+      setGoal,
+    };
+    const result: FinnToolResult = ejecutarHerramienta(action.toolCall, agentCtx);
+
+    const accionMsg: Message = {
+      id:          Date.now().toString(),
+      text:        result.descripcion,
+      sender:      'bot',
+      timestamp:   new Date(),
+      accionFinn:  { tool: action.toolCall.tool, descripcion: result.descripcion, exito: result.exito },
+    };
+    setMessages(prev => [...prev, accionMsg]);
+    setPendingAction(null);
+    Haptics.notificationAsync(
+      result.exito ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error,
+    ).catch(() => {});
+  }, [transactions, categories, goal, addTransaction, deleteTransaction, updateTransaction, updateCategory, addCategory, setGoal]);
+
   // ── Enviar mensaje ────────────────────────────────────────────────────────
   const handleSend = useCallback(async (texto?: string) => {
     const txt = (texto ?? inputText).trim();
@@ -256,13 +304,42 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
     setInputText('');
     setIsTyping(true);
 
-    const resp = await enviarMensajeAFinn(
+    const resp = await enviarMensajeAgenteAFinn(
       txt, historialRef.current,
       transactions as any, categories as any, profile, goal,
     );
 
     setIsTyping(false);
 
+    // ── Tool call: Finn quiere ejecutar una acción ─────────────────────────
+    if (resp.tipo === 'tool_call') {
+      const toolCall: FinnToolCall = {
+        tool:             resp.tool,
+        input:            resp.input,
+        toolUseId:        resp.toolUseId,
+        assistantMessage: resp.assistantMessage,
+      };
+
+      if (resp.tool === 'eliminar_transaccion') {
+        // Requiere confirmación del usuario
+        const preview = previewEliminar(resp.input.id, transactions as any);
+        setPendingAction({ toolCall, preview: `¿Eliminar ${preview}?` });
+      } else {
+        // Ejecutar inmediatamente
+        ejecutarAccionConfirmada({ toolCall, preview: '' });
+      }
+
+      // Actualizar historial con resumen de la acción
+      historialRef.current = [
+        ...historialRef.current,
+        { role: 'user' as const, content: txt },
+        { role: 'assistant' as const, content: `[Acción ejecutada: ${resp.tool}]` },
+      ].slice(-20);
+
+      return;
+    }
+
+    // ── Respuesta de texto normal ─────────────────────────────────────────
     const botMsg: Message = {
       id:        (Date.now() + 1).toString(),
       text:      resp.texto,
@@ -272,10 +349,9 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
     };
     setMessages(prev => [...prev, botMsg]);
 
-    // Actualizar historial
     historialRef.current = [
       ...historialRef.current,
-      { role: 'user'      as const, content: txt        },
+      { role: 'user'      as const, content: txt       },
       { role: 'assistant' as const, content: resp.texto },
     ].slice(-20);
 
@@ -286,7 +362,6 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
         setCatsPendientes(localResp.accion.categorias);
         setCatsSeleccionadas(new Set());
         setConfirmacionId(botMsg.id);
-        // Update the bot message with the local action text instead
         setMessages(prev => prev.map(m => m.id === botMsg.id
           ? { ...m, text: localResp.text, accion: localResp.accion }
           : m,
@@ -297,12 +372,35 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
     resp.exito
       ? Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
       : Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-  }, [inputText, isTyping, transactions, categories, profile, goal]);
+  }, [inputText, isTyping, transactions, categories, profile, goal, ejecutarAccionConfirmada]);
 
   // ── Render mensaje ────────────────────────────────────────────────────────
   const renderMessage = useCallback(({ item }: { item: Message }) => {
-    const isUser          = item.sender === 'user';
+    const isUser           = item.sender === 'user';
     const showConfirmacion = !isUser && item.id === confirmacionId && catsPendientes.length > 0;
+
+    if (item.accionFinn) {
+      return (
+        <View style={[st.msgRow, st.msgBot]}>
+          <View style={[st.botAvatar, { backgroundColor: '#8B5CF620' }]}>
+            <Text style={[st.botAvatarText, { color: '#8B5CF6' }]}>✦</Text>
+          </View>
+          <View style={[st.accionBubble, { borderColor: '#8B5CF6' }]}>
+            <View style={st.accionHeader}>
+              <View style={st.accionBadge}>
+                <Text style={st.accionBadgeText}>Finn actuó</Text>
+              </View>
+              <Text style={[st.bubbleTime, { color: '#8B5CF680' }]}>
+                {new Date(item.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            </View>
+            <Text style={[st.accionText, { color: item.accionFinn.exito ? '#8B5CF6' : colors.expense }]}>
+              {item.accionFinn.exito ? '✓ ' : '✗ '}{item.accionFinn.descripcion}
+            </Text>
+          </View>
+        </View>
+      );
+    }
 
     return (
       <View style={[st.msgRow, isUser ? st.msgUser : st.msgBot]}>
@@ -421,6 +519,38 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
         ))}
       </ScrollView>
 
+      {/* Delete confirmation modal */}
+      <Modal
+        transparent
+        animationType="fade"
+        visible={!!pendingAction}
+        onRequestClose={() => setPendingAction(null)}
+      >
+        <View style={st.modalOverlay}>
+          <View style={[st.modalCard, { backgroundColor: colors.card }]}>
+            <View style={[st.modalIconWrap, { backgroundColor: '#8B5CF620' }]}>
+              <Text style={{ fontSize: 24 }}>🗑️</Text>
+            </View>
+            <Text style={[st.modalTitle, { color: colors.textPrimary }]}>Confirmar eliminación</Text>
+            <Text style={[st.modalBody, { color: colors.textSecondary }]}>{pendingAction?.preview}</Text>
+            <View style={st.modalBtns}>
+              <TouchableOpacity
+                style={[st.modalBtn, { borderColor: colors.border, borderWidth: 1 }]}
+                onPress={() => setPendingAction(null)}
+              >
+                <Text style={[st.modalBtnText, { color: colors.textSecondary }]}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[st.modalBtn, { backgroundColor: colors.expense }]}
+                onPress={() => pendingAction && ejecutarAccionConfirmada(pendingAction)}
+              >
+                <Text style={[st.modalBtnText, { color: '#FFFFFF' }]}>Eliminar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Input */}
       <View style={[st.inputWrap, {
         paddingHorizontal: 16,
@@ -428,6 +558,15 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
         backgroundColor: colors.card,
         borderTopColor: colors.border,
       }]}>
+        <VoiceButton
+          size="small"
+          onParsed={(tx) => {
+            const txt = tx.descripcion
+              ? `${tx.descripcion} — ${tx.tipo === 'expense' ? 'gasto' : 'ingreso'} de $${tx.monto.toLocaleString('es-CO').replace(/,/g, '.')} en ${tx.categoria}`
+              : `Registra un ${tx.tipo === 'expense' ? 'gasto' : 'ingreso'} de $${tx.monto.toLocaleString('es-CO').replace(/,/g, '.')} en ${tx.categoria}`;
+            setInputText(txt);
+          }}
+        />
         <TextInput
           style={[
             st.input,
@@ -506,4 +645,25 @@ const st = StyleSheet.create({
   inputWrap: { borderTopWidth: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 10, paddingTop: 10 },
   input:     { flex: 1, borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 100 },
   sendBtn:   { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+
+  // Action bubble
+  accionBubble: {
+    flex: 1, borderWidth: 1.5, borderRadius: 16, borderBottomLeftRadius: 4,
+    paddingHorizontal: 14, paddingVertical: 10, gap: 6,
+    backgroundColor: '#8B5CF608',
+  },
+  accionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  accionBadge:  { backgroundColor: '#8B5CF6', borderRadius: 100, paddingHorizontal: 8, paddingVertical: 3 },
+  accionBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+  accionText: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modalCard:    { width: '100%', borderRadius: 20, padding: 24, alignItems: 'center', gap: 12 },
+  modalIconWrap: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  modalTitle:   { fontSize: 17, fontWeight: '700' },
+  modalBody:    { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  modalBtns:    { flexDirection: 'row', gap: 12, marginTop: 8, width: '100%' },
+  modalBtn:     { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  modalBtnText: { fontSize: 15, fontWeight: '700' },
 });

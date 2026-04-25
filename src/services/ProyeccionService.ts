@@ -54,6 +54,81 @@ export function calcularCredito(monto: number, tasaMensual: number, plazoMeses: 
   };
 }
 
+export interface CuotaAmortizacion {
+  mes: number;
+  cuota: number;
+  capital: number;
+  interes: number;
+  saldo: number;
+}
+
+export function calcularAmortizacion(saldo: number, tasaMensual: number, cuota: number, maxMeses = 12): CuotaAmortizacion[] {
+  const rows: CuotaAmortizacion[] = [];
+  let s = saldo;
+  for (let i = 1; i <= maxMeses && s > 0; i++) {
+    const interes  = s * (tasaMensual / 100);
+    const capital  = Math.min(cuota - interes, s);
+    s = Math.max(0, s - capital);
+    rows.push({ mes: i, cuota: Math.round(cuota), capital: Math.round(capital), interes: Math.round(interes), saldo: Math.round(s) });
+  }
+  return rows;
+}
+
+export function calcularPromedioCategoria(transactions: { amount: number; category: string; type: string; date: string }[], categoria: string, meses = 3): number {
+  const ahora = new Date();
+  const corte = new Date(ahora.getFullYear(), ahora.getMonth() - meses, 1);
+  const filtradas = transactions.filter(t => t.type === 'expense' && t.category === categoria && new Date(t.date) >= corte);
+  if (!filtradas.length) return 0;
+  const total = filtradas.reduce((a, t) => a + t.amount, 0);
+  return total / meses;
+}
+
+export function detectarTendencia(transactions: { amount: number; category: string; type: string; date: string }[]): { categoria: string; promedio: number; tendencia: 'sube' | 'baja' | 'estable' }[] {
+  const gastos = transactions.filter(t => t.type === 'expense');
+  const cats = [...new Set(gastos.map(t => t.category))];
+  const ahora = new Date();
+  return cats.map(cat => {
+    const txMes1 = gastos.filter(t => {
+      const d = new Date(t.date);
+      return t.category === cat && d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear();
+    }).reduce((a, t) => a + t.amount, 0);
+    const mesAnterior = ahora.getMonth() === 0 ? 11 : ahora.getMonth() - 1;
+    const anioAnterior = ahora.getMonth() === 0 ? ahora.getFullYear() - 1 : ahora.getFullYear();
+    const txMes0 = gastos.filter(t => {
+      const d = new Date(t.date);
+      return t.category === cat && d.getMonth() === mesAnterior && d.getFullYear() === anioAnterior;
+    }).reduce((a, t) => a + t.amount, 0);
+    const diff = txMes0 > 0 ? (txMes1 - txMes0) / txMes0 : 0;
+    return {
+      categoria: cat,
+      promedio: calcularPromedioCategoria(transactions, cat, 3),
+      tendencia: diff > 0.1 ? 'sube' : diff < -0.1 ? 'baja' : 'estable',
+    };
+  }).filter(r => r.promedio > 0).sort((a, b) => b.promedio - a.promedio).slice(0, 5);
+}
+
+export function proyectarMesProximo(transactions: { amount: number; category: string; type: string; date: string }[], ingreso: number): ResultadoProyeccion {
+  const tendencias = detectarTendencia(transactions);
+  const gastoProyectado = tendencias.reduce((a, t) => a + t.promedio, 0);
+  const ahorro = ingreso - gastoProyectado;
+  const meses = 6;
+  return {
+    titulo: 'Proyección próximo mes',
+    valorPrincipal: '$' + Math.round(gastoProyectado).toLocaleString('es-CO').replace(/,/g, '.'),
+    lineasTiempo: Array.from({ length: meses }, (_, i) => ({
+      mes: i + 1,
+      valor: Math.round(gastoProyectado * (1 + i * 0.02)),
+    })),
+    insights: [
+      'Gasto proyectado: $' + Math.round(gastoProyectado).toLocaleString('es-CO').replace(/,/g, '.'),
+      ahorro > 0
+        ? 'Podrías ahorrar $' + Math.round(ahorro).toLocaleString('es-CO').replace(/,/g, '.') + ' este mes'
+        : 'Gastos superan ingresos en $' + Math.round(-ahorro).toLocaleString('es-CO').replace(/,/g, '.'),
+      ...tendencias.filter(t => t.tendencia === 'sube').map(t => t.categoria + ' va en aumento — revisa tu presupuesto'),
+    ].slice(0, 3),
+  };
+}
+
 export function simularReduccion(gastoActual: number, reduccionPct: number, meses: number, ingreso: number): ResultadoProyeccion {
   const ahorroPorMes = gastoActual * (reduccionPct / 100);
   const totalAhorrado = ahorroPorMes * meses;

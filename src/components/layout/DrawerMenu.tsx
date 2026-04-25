@@ -50,6 +50,9 @@ const SECTIONS: DrawerSection[] = [
       { key: 'retos',        label: 'Retos',        icon: 'zap'         },
       { key: 'academia',     label: 'Academia',     icon: 'book-open'   },
       { key: 'proyecciones', label: 'Proyecciones', icon: 'trending-up' },
+      { key: 'metas',        label: 'Mis Metas',    icon: 'target'      },
+      { key: 'deudas',       label: 'Deudas',       icon: 'credit-card' },
+      { key: 'recurrentes',  label: 'Recurrentes',  icon: 'repeat'      },
     ],
   },
   {

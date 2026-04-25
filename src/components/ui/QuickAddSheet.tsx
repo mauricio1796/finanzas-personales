@@ -39,21 +39,30 @@ const EXPENSE_CATS = [
   { id: 'otros',           label: 'Otros'        },
 ];
 
-interface QuickAddSheetProps {
-  visible: boolean;
-  mode: 'income' | 'expense';
-  onClose: () => void;
-  onAdd: (amount: number, category: string, type: 'income' | 'expense', date: Date) => void;
+export interface QuickAddInitialData {
+  amount?:      number;
+  category?:    string;
+  description?: string;
+  type?:        'income' | 'expense';
 }
 
-export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onClose, onAdd }) => {
+interface QuickAddSheetProps {
+  visible:      boolean;
+  mode:         'income' | 'expense';
+  onClose:      () => void;
+  onAdd:        (amount: number, category: string, type: 'income' | 'expense', date: Date, description?: string) => void;
+  initialData?: QuickAddInitialData;
+}
+
+export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onClose, onAdd, initialData }) => {
   const { colors } = useTheme();
   const { categories, transactions, updateUserSalary } = useFinance();
   const slideAnim  = useRef(new Animated.Value(400)).current;
   const backdropOp = useRef(new Animated.Value(0)).current;
 
-  const [amount, setAmount] = useState('');
+  const [amount,      setAmount]      = useState('');
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
+  const [description, setDescription] = useState('');
   const [amountFocused, setAmountFocused] = useState(false);
 
   const isIncome = mode === 'income';
@@ -67,8 +76,22 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
 
   useEffect(() => {
     if (visible) {
-      setAmount('');
-      setSelectedCat(cats[0]?.id ?? null);
+      // Pre-fill from initialData (voice input) or reset to defaults
+      if (initialData?.amount && initialData.amount > 0) {
+        setAmount(initialData.amount.toLocaleString('es-CO').replace(/,/g, '.'));
+      } else {
+        setAmount('');
+      }
+      if (initialData?.description) {
+        setDescription(initialData.description);
+      } else {
+        setDescription('');
+      }
+      // Find category by name (from voice parse) or default to first
+      const matchedCat = initialData?.category
+        ? cats.find(c => c.label.toLowerCase() === initialData.category!.toLowerCase())?.id
+        : null;
+      setSelectedCat(matchedCat ?? cats[0]?.id ?? null);
       Animated.parallel([
         Animated.spring(slideAnim, { toValue: 0, friction: 8, tension: 65, useNativeDriver: true }),
         Animated.timing(backdropOp, { toValue: 1, duration: 200, useNativeDriver: true }),
@@ -91,7 +114,7 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
     if (!parsed || parsed <= 0 || !selectedCat) return;
 
     const fecha = new Date();
-    onAdd(parsed, selectedCat, mode, fecha);
+    onAdd(parsed, selectedCat, mode, fecha, description.trim() || undefined);
 
     if (isIncome && selectedCat === 'salario') {
       updateUserSalary(parsed);
@@ -189,6 +212,20 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
               );
             })}
           </ScrollView>
+
+          {/* Description input (opcional) */}
+          <TextInput
+            style={[styles.descInput, {
+              backgroundColor: colors.inputBg,
+              borderColor:     colors.border,
+              color:           colors.textPrimary,
+            }]}
+            placeholder="Descripción (opcional)"
+            placeholderTextColor={colors.textTertiary ?? colors.border}
+            value={description}
+            onChangeText={setDescription}
+            maxLength={80}
+          />
 
           {/* Confirm button */}
           <TouchableOpacity
@@ -309,6 +346,16 @@ const styles = StyleSheet.create({
   },
   catChipLabelActive: {
     color: '#FFFFFF',
+  },
+
+  // Description
+  descInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    marginBottom: 16,
   },
 
   // Confirm

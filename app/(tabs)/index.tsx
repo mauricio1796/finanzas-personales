@@ -58,6 +58,9 @@ import { RetosScreen } from '../../src/screens/RetosScreen';
 import { CalendarioScreen } from '../../src/screens/CalendarioScreen';
 import { AcademiaScreen } from '../../src/screens/AcademiaScreen';
 import { ProyeccionesScreen } from '../../src/screens/ProyeccionesScreen';
+import { MetasScreen } from '../../src/screens/MetasScreen';
+import { DeudasScreen } from '../../src/screens/DeudasScreen';
+import { RecurrentesScreen } from '../../src/screens/RecurrentesScreen';
 import { Usuario } from '../../src/screens/Usuario';
 import { type ScreenName } from '../../src/screens/Navigation';
 import {
@@ -222,7 +225,7 @@ export default function HomeScreen() {
     };
 
     const tapSub = Notifications.addNotificationResponseReceivedListener(response => {
-      const data = response.notification.request.content.data as NotifData | undefined;
+      const data = response.notification.request.content.data as unknown as NotifData | undefined;
 
       // New format: data.screen
       if (data?.screen) {
@@ -238,7 +241,7 @@ export default function HomeScreen() {
     });
 
     const foregroundSub = Notifications.addNotificationReceivedListener(notification => {
-      const data = notification.request.content.data as NotifData | undefined;
+      const data = notification.request.content.data as unknown as NotifData | undefined;
       if (data?.tipo === 'presupuesto_limite' || data?.tipo === 'gasto_inusual') {
         // Handled passively — the notification banner is shown by the OS
         // and the app will react when the user taps it
@@ -755,6 +758,15 @@ export default function HomeScreen() {
           )}
           {currentScreen === 'widget' && (
             <WidgetConfigScreen onBack={volver} />
+          )}
+          {currentScreen === 'metas' && (
+            <MetasScreen onBack={volver} />
+          )}
+          {currentScreen === 'deudas' && (
+            <DeudasScreen onBack={volver} />
+          )}
+          {currentScreen === 'recurrentes' && (
+            <RecurrentesScreen onBack={volver} />
           )}
         </Animated.View>
         {mostrarBottomNav(currentScreen) && (

@@ -37,14 +37,65 @@ export interface Transaction {
 export type AuthState = 'login' | 'register' | 'authenticated';
 
 // Screen Names
-export type ScreenName = 
-  | 'dashboard' 
-  | 'ingresos' 
-  | 'gastos' 
-  | 'categorias' 
-  | 'estadisticas' 
-  | 'botia' 
-  | 'usuario';
+export type ScreenName =
+  | 'dashboard'
+  | 'ingresos'
+  | 'gastos'
+  | 'categorias'
+  | 'estadisticas'
+  | 'botia'
+  | 'usuario'
+  | 'metas'
+  | 'deudas'
+  | 'recurrentes';
+
+// ─── Meta (savings goal) ─────────────────────────────────────────────────────
+export interface Meta {
+  id: string;
+  nombre: string;
+  montoObjetivo: number;
+  montoActual: number;
+  emoji: string;
+  color: string;
+  fechaLimite?: string;
+  completada: boolean;
+  creadaEn: string;
+}
+
+// ─── Deuda ────────────────────────────────────────────────────────────────────
+export interface PagoDeuda {
+  id: string;
+  monto: number;
+  fecha: string;
+  nota?: string;
+}
+
+export interface Deuda {
+  id: string;
+  nombre: string;
+  montoOriginal: number;
+  saldo: number;
+  tasaMensual: number; // porcentaje, ej: 2.5 para 2.5%
+  cuotaMensual: number;
+  diaPago?: number;
+  pagos: PagoDeuda[];
+  creadaEn: string;
+  saldada: boolean;
+}
+
+// ─── Gasto Recurrente ─────────────────────────────────────────────────────────
+export interface GastoRecurrente {
+  id: string;
+  nombre: string;
+  monto: number;
+  categoria: string;
+  frecuencia: 'diario' | 'semanal' | 'quincenal' | 'mensual' | 'anual';
+  diaPago?: number; // día del mes para frecuencia mensual
+  activo: boolean;
+  proximoPago?: string;
+  creadoEn: string;
+  descripcion?: string;
+}
 
 // ========== NUEVOS TIPOS PARA ONBOARDING Y FEATURES AVANZADAS ==========
 

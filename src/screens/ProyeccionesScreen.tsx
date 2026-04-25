@@ -4,9 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Polyline, Circle } from 'react-native-svg';
 import { Icon } from '../components/ui/Icon';
 import { useFinance } from '../state/FinanceContext';
-import { calcularMeta, calcularCredito, simularReduccion } from '../services/ProyeccionService';
+import { calcularMeta, calcularCredito, simularReduccion, proyectarMesProximo, detectarTendencia } from '../services/ProyeccionService';
 
-type Escenario = 'meta' | 'credito' | 'reduccion';
+type Escenario = 'proyeccion' | 'meta' | 'credito' | 'reduccion';
 const fmtCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
 
 const CHART_W = 300;
@@ -67,8 +67,8 @@ function StepRow({ label, value, min, max, step, formato, onChange }: StepRowPro
 
 export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
   const insets = useSafeAreaInsets();
-  const { profile, premium } = useFinance();
-  const [escenario, setEscenario] = useState<Escenario>('meta');
+  const { profile, premium, transactions } = useFinance();
+  const [escenario, setEscenario] = useState<Escenario>('proyeccion');
   const salario = profile?.monthlySalary ?? 2500000;
 
   const [ahorroMensual, setAhorroMensual] = useState(500000);
@@ -81,11 +81,15 @@ export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }
   const [gastoActual, setGastoActual] = useState(Math.round(salario * 0.7));
   const [mesesReduccion, setMesesReduccion] = useState(12);
 
+  const proyeccionReal = useMemo(() => proyectarMesProximo(transactions, salario), [transactions, salario]);
+  const tendencias     = useMemo(() => detectarTendencia(transactions), [transactions]);
+
   const resultado = useMemo(() => {
+    if (escenario === 'proyeccion') return proyeccionReal;
     if (escenario === 'meta') return calcularMeta(ahorroMensual, metaTotal, rendimiento / 100);
     if (escenario === 'credito') return calcularCredito(montoCredito, tasaMensual / 100, plazo);
     return simularReduccion(gastoActual, reduccionPct, mesesReduccion, salario);
-  }, [escenario, ahorroMensual, metaTotal, rendimiento, montoCredito, tasaMensual, plazo, reduccionPct, gastoActual, mesesReduccion, salario]);
+  }, [escenario, proyeccionReal, ahorroMensual, metaTotal, rendimiento, montoCredito, tasaMensual, plazo, reduccionPct, gastoActual, mesesReduccion, salario]);
 
   if (!premium.isPremium) {
     return (
@@ -117,6 +121,7 @@ export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.escenarioRow}>
           {([
+            ['proyeccion', 'Proyección', 'activity'],
             ['meta', 'Meta ahorro', 'target'],
             ['credito', 'Credito', 'credit-card'],
             ['reduccion', 'Reduccion', 'scissors'],
@@ -131,6 +136,36 @@ export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }
             </TouchableOpacity>
           ))}
         </View>
+
+        {escenario === 'proyeccion' && tendencias.length > 0 && (
+          <View style={styles.slidersCard}>
+            <Text style={[styles.resultTitulo, { marginBottom: 8 }]}>TENDENCIAS POR CATEGORÍA</Text>
+            {tendencias.map(t => (
+              <View key={t.categoria} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#374151', textTransform: 'capitalize' }}>{t.categoria}</Text>
+                  <Text style={{ fontSize: 12, color: '#9CA3AF' }}>{fmtCOP(t.promedio)}/mes promedio</Text>
+                </View>
+                <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+                  backgroundColor: t.tendencia === 'sube' ? '#FEE2E2' : t.tendencia === 'baja' ? '#D1FAE5' : '#F3F4F6' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700',
+                    color: t.tendencia === 'sube' ? '#EF4444' : t.tendencia === 'baja' ? '#10B981' : '#9CA3AF' }}>
+                    {t.tendencia === 'sube' ? '↑ sube' : t.tendencia === 'baja' ? '↓ baja' : '— estable'}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {escenario === 'proyeccion' && transactions.length === 0 && (
+          <View style={[styles.slidersCard, { alignItems: 'center', paddingVertical: 24 }]}>
+            <Icon name="activity" size={32} color="#D1D5DB" />
+            <Text style={{ fontSize: 14, color: '#9CA3AF', marginTop: 12, textAlign: 'center' }}>
+              Registra transacciones para ver proyecciones reales basadas en tus patrones de gasto.
+            </Text>
+          </View>
+        )}
 
         {escenario === 'meta' && (
           <View style={styles.slidersCard}>

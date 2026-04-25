@@ -8,13 +8,13 @@ import {
   SafeAreaView,
   Animated,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { useFinance } from '../../state';
 import { COLORS, SPACING } from '../../constants';
 import { ProgressIndicator } from '../../components/onboarding';
 
 import { ChatBubble } from '../../components/onboarding';
-  const navigation = useNavigation();
+
+export function OnboardingWelcome({ onNext }: { onNext: () => void }) {
   const { updateOnboardingStep } = useFinance();
   const [showBubble, setShowBubble] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -38,7 +38,7 @@ import { ChatBubble } from '../../components/onboarding';
 
   const handleStart = () => {
     updateOnboardingStep(1);
-    navigation.navigate('OnboardingProfile' as never);
+    onNext();
   };
 
   return (

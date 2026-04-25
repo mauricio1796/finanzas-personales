@@ -16,7 +16,9 @@ import { Icon, getCategoryIcon } from '../../components/ui/Icon';
 import { getPaletaItem } from '../../constants/catalogoCategorias';
 import { generarInsightDiario } from '../../services/RealAIService';
 import { calcularMetricasFinancieras } from '../../utils/ingresoUtils';
-import { QuickAddSheet } from '../../components/ui/QuickAddSheet';
+import { QuickAddSheet, type QuickAddInitialData } from '../../components/ui/QuickAddSheet';
+import { VoiceButton } from '../../components/ui/VoiceButton';
+import { type ParsedTransaction } from '../../services/VoiceService';
 import { SwipeableRow } from '../../components/ui/SwipeableRow';
 import { DrawerMenu } from '../../components/layout/DrawerMenu';
 import { Transaction } from '../../types';
@@ -53,6 +55,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   const {
     user, transactions, categories, profile, goal, userLevel,
     addTransaction: ctxAdd, deleteTransaction: ctxDelete,
+    metas,
   } = useFinance();
 
   // ── Date constants ──────────────────────────────────────────────────────────
@@ -150,10 +153,11 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   }, [categories, diaHoy]);
 
   // ── States ─────────────────────────────────────────────────────────────────
-  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [drawerVisible,   setDrawerVisible]   = useState(false);
   const [quickAddVisible, setQuickAddVisible] = useState(false);
-  const [quickAddType, setQuickAddType] = useState<'income' | 'expense'>('expense');
-  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [quickAddType,    setQuickAddType]    = useState<'income' | 'expense'>('expense');
+  const [quickAddInitial, setQuickAddInitial] = useState<QuickAddInitialData | undefined>(undefined);
+  const [aiInsight,       setAiInsight]       = useState<string | null>(null);
 
   // ── Animated values ────────────────────────────────────────────────────────
   const heroAnim    = useRef(new Animated.Value(0)).current;
@@ -216,10 +220,20 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   }, [mesSeleccionado]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Handlers ───────────────────────────────────────────────────────────────
-  const abrirQuickAdd = (tipo: 'income' | 'expense') => {
+  const abrirQuickAdd = (tipo: 'income' | 'expense', initial?: QuickAddInitialData) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setQuickAddType(tipo);
+    setQuickAddInitial(initial);
     setQuickAddVisible(true);
+  };
+
+  const handleVoiceParsed = (tx: ParsedTransaction) => {
+    abrirQuickAdd(tx.tipo, {
+      amount:      tx.monto,
+      category:    tx.categoria,
+      description: tx.descripcion,
+      type:        tx.tipo,
+    });
   };
 
   // ── ICON_MAP (uses colors, so inside component) ────────────────────────────
@@ -336,6 +350,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
       bg: colors.incomeLight,
       color: colors.income,
       onPress: () => abrirQuickAdd('income'),
+      isVoice: false,
     },
     {
       label: 'Gasto',
@@ -343,6 +358,15 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
       bg: colors.expenseLight,
       color: colors.expense,
       onPress: () => abrirQuickAdd('expense'),
+      isVoice: false,
+    },
+    {
+      label: 'Voz',
+      icon: 'mic',
+      bg: '#F3E8FF',
+      color: '#8B5CF6',
+      onPress: () => {},
+      isVoice: true,
     },
     {
       label: 'Simular',
@@ -350,6 +374,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
       bg: colors.warningLight,
       color: colors.warning,
       onPress: () => onNavigate('simulador'),
+      isVoice: false,
     },
     {
       label: 'Finn IA',
@@ -357,6 +382,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
       bg: colors.aiLight,
       color: colors.ai,
       onPress: () => { if (onOpenBot) onOpenBot(); else onNavigate('bot'); },
+      isVoice: false,
     },
   ];
 
@@ -485,21 +511,59 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
         {/* ── Quick actions ──────────────────────────────────────────── */}
         <View style={s.quickActionsRow}>
           {QUICK_ACTIONS.map((item) => (
-            <TouchableOpacity
-              key={item.label}
-              style={s.quickActionItem}
-              onPress={item.onPress}
-              activeOpacity={0.7}
-            >
-              <View style={[s.quickActionCircle, { backgroundColor: item.bg }]}>
-                <Icon name={item.icon as any} size={20} color={item.color} />
-              </View>
-              <Text style={[s.quickActionLabel, { color: colors.textSecondary }]}>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
+            <View key={item.label} style={s.quickActionItem}>
+              {item.isVoice ? (
+                <>
+                  <VoiceButton onParsed={handleVoiceParsed} size="normal" />
+                  <Text style={[s.quickActionLabel, { color: colors.textSecondary }]}>
+                    {item.label}
+                  </Text>
+                </>
+              ) : (
+                <TouchableOpacity
+                  onPress={item.onPress}
+                  activeOpacity={0.7}
+                  style={{ alignItems: 'center', gap: 6 }}
+                >
+                  <View style={[s.quickActionCircle, { backgroundColor: item.bg }]}>
+                    <Icon name={item.icon as any} size={20} color={item.color} />
+                  </View>
+                  <Text style={[s.quickActionLabel, { color: colors.textSecondary }]}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
           ))}
         </View>
+
+        {/* ── Metas carousel ─────────────────────────────────────────── */}
+        {metas.filter(m => !m.completada).length > 0 && (
+          <View style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text style={[s.sectionTitle ?? { fontSize: 15, fontWeight: '700' }, { color: colors.textPrimary }]}>Mis Metas</Text>
+              <TouchableOpacity onPress={() => onNavigate?.('metas')}>
+                <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '600' }}>Ver todas</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -4 }}>
+              {metas.filter(m => !m.completada).slice(0, 5).map(meta => {
+                const pct = Math.min(meta.montoActual / meta.montoObjetivo, 1);
+                return (
+                  <TouchableOpacity key={meta.id} onPress={() => onNavigate?.('metas')}
+                    style={{ backgroundColor: colors.card, marginHorizontal: 4, borderRadius: 14, padding: 14, width: 160 }}>
+                    <Text style={{ fontSize: 26, marginBottom: 6 }}>{meta.emoji}</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 }} numberOfLines={1}>{meta.nombre}</Text>
+                    <View style={{ height: 4, borderRadius: 2, backgroundColor: colors.border, overflow: 'hidden', marginBottom: 4 }}>
+                      <View style={{ height: '100%', borderRadius: 2, backgroundColor: meta.color, width: `${pct * 100}%` as any }} />
+                    </View>
+                    <Text style={{ fontSize: 11, color: colors.textTertiary }}>{Math.round(pct * 100)}% alcanzado</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
         {/* ── Finn insight ───────────────────────────────────────────── */}
         {aiInsight && (
@@ -739,18 +803,21 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
       {/* ── QuickAddSheet ─────────────────────────────────────────────── */}
       <QuickAddSheet
         visible={quickAddVisible}
-        mode={quickAddType}
-        onClose={() => setQuickAddVisible(false)}
-        onAdd={(amount, category, type, date) => {
+        mode={quickAddInitial?.type ?? quickAddType}
+        onClose={() => { setQuickAddVisible(false); setQuickAddInitial(undefined); }}
+        onAdd={(amount, category, type, date, description) => {
           ctxAdd({
             id: Date.now().toString(),
             amount,
             category,
             type,
             date: date.toISOString(),
+            ...(description ? { description } : {}),
           });
           setQuickAddVisible(false);
+          setQuickAddInitial(undefined);
         }}
+        initialData={quickAddInitial}
       />
     </View>
   );

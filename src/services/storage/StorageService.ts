@@ -23,6 +23,9 @@ class StorageService {
     RETOS_COMPLETADOS: '@financy_retos_completados',
     PREMIUM: '@financy_premium',
     TOUR_DONE: '@financy_tour_done',
+    METAS: '@financy_metas',
+    DEUDAS: '@financy_deudas',
+    RECURRENTES: '@financy_recurrentes',
   };
 
   async saveData(key: string, data: any): Promise<void> {
@@ -88,6 +91,12 @@ class StorageService {
   async getPremium(): Promise<any | null> { return this.getData(this.KEYS.PREMIUM); }
   async setTourDone(value: boolean): Promise<void> { return this.saveData(this.KEYS.TOUR_DONE, value); }
   async getTourDone(): Promise<boolean> { const v = await this.getData<boolean>(this.KEYS.TOUR_DONE); return v === true; }
+  async saveMetas(metas: any[]): Promise<void> { return this.saveData(this.KEYS.METAS, metas); }
+  async getMetas(): Promise<any[] | null> { return this.getData(this.KEYS.METAS); }
+  async saveDeudas(deudas: any[]): Promise<void> { return this.saveData(this.KEYS.DEUDAS, deudas); }
+  async getDeudas(): Promise<any[] | null> { return this.getData(this.KEYS.DEUDAS); }
+  async saveRecurrentes(recurrentes: any[]): Promise<void> { return this.saveData(this.KEYS.RECURRENTES, recurrentes); }
+  async getRecurrentes(): Promise<any[] | null> { return this.getData(this.KEYS.RECURRENTES); }
 }
 
 export const storageService = new StorageService();

@@ -138,6 +138,132 @@ export async function enviarMensajeAFinn(
   }
 }
 
+// ── Agentic flow ─────────────────────────────────────────────────────────────
+
+export type RespuestaAgente =
+  | { tipo: 'texto';     texto: string; exito: boolean; error?: string }
+  | { tipo: 'tool_call'; tool: string; input: Record<string, any>; toolUseId: string; assistantMessage: any[] };
+
+function buildSystemPromptAgente(
+  contexto: string,
+  nombreUsuario: string,
+  transactions: Transaction[],
+  categories: Category[],
+): string {
+  const recientes = transactions.slice(0, 20).map(t => {
+    const fecha = new Date(t.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    const tipo  = t.type === 'income' ? 'INGRESO' : 'GASTO';
+    const monto = '$' + Math.round(t.amount).toLocaleString('es-CO').replace(/,/g, '.');
+    return `[ID:${t.id}] ${tipo} ${monto} en ${t.category} (${fecha})`;
+  }).join('\n') || 'Sin transacciones';
+
+  const catsList = categories.map(c =>
+    `[ID:${c.id}] ${c.name} presupuesto:$${c.budget ?? 0}`,
+  ).join('\n') || 'Sin categorías';
+
+  return `${buildSystemPrompt(contexto, nombreUsuario)}
+
+CAPACIDADES DE ACCIÓN:
+Puedes ejecutar acciones directas usando las herramientas disponibles. Úsalas solo cuando el usuario pida explícitamente:
+- Registrar ingreso/gasto → registrar_transaccion
+- Eliminar una transacción → eliminar_transaccion (usa el ID exacto de la lista)
+- Actualizar datos de una transacción → actualizar_transaccion
+- Cambiar presupuesto de categoría → actualizar_presupuesto
+- Crear categoría nueva → crear_categoria
+- Actualizar meta financiera → actualizar_meta
+
+TRANSACCIONES RECIENTES:
+${recientes}
+
+CATEGORÍAS:
+${catsList}
+
+Para preguntas o análisis, responde con texto normal. Solo usa herramientas cuando la intención del usuario sea claramente ejecutar una acción.`;
+}
+
+async function llamarWorkerAgente(
+  mensajes:  MensajeChat[],
+  system:    string,
+  maxTokens: number,
+): Promise<RespuestaAgente> {
+  const controller = new AbortController();
+  const timeoutId  = setTimeout(() => controller.abort(), CONFIG.AI_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(CONFIG.WORKER_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Version': CONFIG.APP_VERSION },
+      body:    JSON.stringify({ system, messages: mensajes, max_tokens: maxTokens, use_tools: true }),
+      signal:  controller.signal,
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({})) as any;
+      throw new Error(err.error ?? `HTTP ${response.status}`);
+    }
+
+    const data = await response.json() as any;
+
+    if (data?.type === 'tool_call') {
+      return {
+        tipo:             'tool_call',
+        tool:             data.tool,
+        input:            data.input,
+        toolUseId:        data.toolUseId,
+        assistantMessage: data.assistantMessage,
+      };
+    }
+
+    const texto = data?.content?.[0]?.text ?? '';
+    if (!texto) throw new Error('Respuesta vacía');
+    return { tipo: 'texto', texto, exito: true };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function enviarMensajeAgenteAFinn(
+  mensajeUsuario: string,
+  historial:      MensajeChat[],
+  transactions:   Transaction[],
+  categories:     Category[],
+  profile:        any,
+  goal:           any,
+): Promise<RespuestaAgente> {
+  try {
+    const now      = new Date();
+    const metricas = calcularMetricasFinancieras(
+      transactions, categories as any,
+      profile?.monthlySalary ?? 0,
+      now.getMonth(), now.getFullYear(),
+    );
+    const contexto = buildContextoIA(
+      metricas, categories as any, transactions, profile,
+      now.getMonth(), now.getFullYear(),
+    );
+    const system  = buildSystemPromptAgente(contexto, profile?.name ?? 'Usuario', transactions, categories);
+    const mensajes: MensajeChat[] = [
+      ...historial.slice(-(CONFIG.MAX_HISTORIAL_MENSAJES - 1)),
+      { role: 'user', content: mensajeUsuario },
+    ];
+
+    return await llamarWorkerAgente(mensajes, system, CONFIG.MAX_TOKENS_RESPUESTA);
+  } catch (e: any) {
+    console.warn('[RealAIService] agente error:', e?.message);
+    try {
+      const local = procesarMensajeUsuario(mensajeUsuario, transactions as any, categories as any, profile as any, goal as any);
+      return { tipo: 'texto', texto: local.text, exito: true, error: 'fallback' };
+    } catch {
+      // ignore
+    }
+    let msg = 'No pude conectarme en este momento. Intenta de nuevo.';
+    if (e?.name === 'AbortError')             msg = 'La respuesta tardó demasiado. Verifica tu conexión.';
+    if (e?.message?.includes('429'))          msg = 'Estoy recibiendo muchas preguntas. Espera un momento.';
+    if (e?.message?.includes('NetworkError')) msg = 'Sin conexión a internet. Conéctate e intenta de nuevo.';
+    return { tipo: 'texto', texto: msg, exito: false, error: e?.message };
+  }
+}
+
 // ── Insight diario ────────────────────────────────────────────────────────────
 
 export async function generarInsightDiario(
