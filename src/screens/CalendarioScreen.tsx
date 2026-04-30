@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, getCategoryIcon } from '../components/ui/Icon';
 import { useFinance } from '../state/FinanceContext';
+import { THEME } from '../constants/theme';
 
 const DIAS_SEMANA = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -61,7 +62,7 @@ export const CalendarioScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) 
           </TouchableOpacity>
         ) : null}
         <Text style={[styles.headerTitle, onBack && { flex: 1, textAlign: 'center' }]}>Calendario</Text>
-        <Icon name="calendar" size={20} color="#6366F1" />
+        <Icon name="calendar" size={20} color={THEME.colors.primary} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Nav mes */}
@@ -73,11 +74,11 @@ export const CalendarioScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) 
 
         {/* Resumen */}
         <View style={styles.resumenCard}>
-          <View style={styles.resumenItem}><Icon name="trending-up" size={14} color="#10B981" /><Text style={styles.resumenLabel}>Ingresos</Text><Text style={[styles.resumenVal, { color: '#10B981' }]}>{fmtCOP(totalIngresos)}</Text></View>
+          <View style={styles.resumenItem}><Icon name="trending-up" size={14} color={THEME.colors.income} /><Text style={styles.resumenLabel}>Ingresos</Text><Text style={[styles.resumenVal, { color: THEME.colors.income }]}>{fmtCOP(totalIngresos)}</Text></View>
           <View style={styles.resumenDivider} />
-          <View style={styles.resumenItem}><Icon name="trending-down" size={14} color="#EF4444" /><Text style={styles.resumenLabel}>Gastos</Text><Text style={[styles.resumenVal, { color: '#EF4444' }]}>{fmtCOP(totalGastos)}</Text></View>
+          <View style={styles.resumenItem}><Icon name="trending-down" size={14} color={THEME.colors.expense} /><Text style={styles.resumenLabel}>Gastos</Text><Text style={[styles.resumenVal, { color: THEME.colors.expense }]}>{fmtCOP(totalGastos)}</Text></View>
           <View style={styles.resumenDivider} />
-          <View style={styles.resumenItem}><Icon name="dollar-sign" size={14} color="#6366F1" /><Text style={styles.resumenLabel}>Balance</Text><Text style={[styles.resumenVal, { color: totalIngresos - totalGastos >= 0 ? '#10B981' : '#EF4444' }]}>{fmtCOP(totalIngresos - totalGastos)}</Text></View>
+          <View style={styles.resumenItem}><Icon name="dollar-sign" size={14} color={THEME.colors.primary} /><Text style={styles.resumenLabel}>Balance</Text><Text style={[styles.resumenVal, { color: totalIngresos - totalGastos >= 0 ? THEME.colors.income : THEME.colors.expense }]}>{fmtCOP(totalIngresos - totalGastos)}</Text></View>
         </View>
 
         {/* Dias semana */}
@@ -97,8 +98,8 @@ export const CalendarioScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) 
               <TouchableOpacity key={dia} style={[styles.celda, esHoy && styles.celdaHoy, diaSeleccionado === dia && styles.celdaSeleccionada]} onPress={() => setDiaSeleccionado(dia === diaSeleccionado ? null : dia)} activeOpacity={0.7}>
                 <Text style={[styles.celdaNum, esHoy && styles.celdaNumHoy]}>{dia}</Text>
                 <View style={styles.celdaDots}>
-                  {tieneIngreso && <View style={[styles.dot, { backgroundColor: '#10B981' }]} />}
-                  {tieneGasto && <View style={[styles.dot, { backgroundColor: '#EF4444' }]} />}
+                  {tieneIngreso && <View style={[styles.dot, { backgroundColor: THEME.colors.income }]} />}
+                  {tieneGasto && <View style={[styles.dot, { backgroundColor: THEME.colors.expense }]} />}
                 </View>
               </TouchableOpacity>
             );
@@ -113,12 +114,12 @@ export const CalendarioScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) 
               <Text style={styles.sinTx}>Sin movimientos</Text>
             ) : (
               txDiaSeleccionado.map((tx, i) => (
-                <View key={tx.id} style={[styles.txRow, i < txDiaSeleccionado.length - 1 && { borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }]}>
-                  <View style={[styles.txIcon, { backgroundColor: tx.type === 'income' ? '#DCFCE7' : '#FEE2E2' }]}>
-                    <Icon name={getCategoryIcon(tx.category)} size={14} color={tx.type === 'income' ? '#10B981' : '#EF4444'} />
+                <View key={tx.id} style={[styles.txRow, i < txDiaSeleccionado.length - 1 && { borderBottomWidth: 1, borderBottomColor: THEME.colors.surfaceSecondary }]}>
+                  <View style={[styles.txIcon, { backgroundColor: tx.type === 'income' ? THEME.colors.incomeLight : THEME.colors.expenseLight }]}>
+                    <Icon name={getCategoryIcon(tx.category)} size={14} color={tx.type === 'income' ? THEME.colors.income : THEME.colors.expense} />
                   </View>
                   <Text style={styles.txCat}>{tx.category}</Text>
-                  <Text style={[styles.txAmt, { color: tx.type === 'income' ? '#10B981' : '#EF4444' }]}>{tx.type === 'income' ? '+' : '-'}{fmtCOP(tx.amount)}</Text>
+                  <Text style={[styles.txAmt, { color: tx.type === 'income' ? THEME.colors.income : THEME.colors.expense }]}>{tx.type === 'income' ? '+' : '-'}{fmtCOP(tx.amount)}</Text>
                 </View>
               ))
             )}
@@ -130,34 +131,34 @@ export const CalendarioScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) 
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FAFAFA' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', backgroundColor: '#FFFFFF' },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  container: { flex: 1, backgroundColor: THEME.colors.background },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: THEME.colors.surfaceSecondary, backgroundColor: THEME.colors.surface },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: THEME.colors.textPrimary },
   scroll: { padding: 16, paddingBottom: 32, gap: 14 },
   mesNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  navBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
-  mesLabel: { fontSize: 17, fontWeight: '800', color: '#111827' },
-  resumenCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', padding: 16, flexDirection: 'row', alignItems: 'center' },
+  navBtn: { width: 36, height: 36, borderRadius: THEME.radius.sm, backgroundColor: THEME.colors.surfaceSecondary, alignItems: 'center', justifyContent: 'center' },
+  mesLabel: { fontSize: 17, fontWeight: '800', color: THEME.colors.textPrimary },
+  resumenCard: { backgroundColor: THEME.colors.surface, borderRadius: THEME.radius.lg, borderWidth: 1, borderColor: THEME.colors.border, padding: 16, flexDirection: 'row', alignItems: 'center' },
   resumenItem: { flex: 1, alignItems: 'center', gap: 4 },
-  resumenDivider: { width: 1, height: 40, backgroundColor: '#F3F4F6' },
-  resumenLabel: { fontSize: 11, color: '#9CA3AF', fontWeight: '600' },
+  resumenDivider: { width: 1, height: 40, backgroundColor: THEME.colors.surfaceSecondary },
+  resumenLabel: { fontSize: 11, color: THEME.colors.textTertiary, fontWeight: '600' },
   resumenVal: { fontSize: 13, fontWeight: '800' },
   weekRow: { flexDirection: 'row' },
-  weekLabel: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: '#9CA3AF' },
+  weekLabel: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: THEME.colors.textTertiary },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   celdaVacia: { width: '14.28%', aspectRatio: 1 },
-  celda: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
-  celdaHoy: { backgroundColor: '#EEF2FF' },
-  celdaSeleccionada: { backgroundColor: '#6366F1' },
-  celdaNum: { fontSize: 13, fontWeight: '500', color: '#374151' },
-  celdaNumHoy: { fontWeight: '800', color: '#6366F1' },
+  celda: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: THEME.radius.sm },
+  celdaHoy: { backgroundColor: THEME.colors.primaryLight },
+  celdaSeleccionada: { backgroundColor: THEME.colors.primary },
+  celdaNum: { fontSize: 13, fontWeight: '500', color: THEME.colors.textSecondary },
+  celdaNumHoy: { fontWeight: '800', color: THEME.colors.primary },
   celdaDots: { flexDirection: 'row', gap: 2, marginTop: 2 },
   dot: { width: 4, height: 4, borderRadius: 2 },
-  diaDetalleCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', padding: 16, gap: 8 },
-  diaDetalleTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 4 },
-  sinTx: { fontSize: 13, color: '#9CA3AF', textAlign: 'center', paddingVertical: 8 },
+  diaDetalleCard: { backgroundColor: THEME.colors.surface, borderRadius: THEME.radius.lg, borderWidth: 1, borderColor: THEME.colors.border, padding: 16, gap: 8 },
+  diaDetalleTitle: { fontSize: 15, fontWeight: '700', color: THEME.colors.textPrimary, marginBottom: 4 },
+  sinTx: { fontSize: 13, color: THEME.colors.textTertiary, textAlign: 'center', paddingVertical: 8 },
   txRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-  txIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  txCat: { flex: 1, fontSize: 13, color: '#374151', fontWeight: '600' },
+  txIcon: { width: 32, height: 32, borderRadius: THEME.radius.pill, alignItems: 'center', justifyContent: 'center' },
+  txCat: { flex: 1, fontSize: 13, color: THEME.colors.textSecondary, fontWeight: '600' },
   txAmt: { fontSize: 13, fontWeight: '700' },
 });

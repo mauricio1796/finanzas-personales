@@ -10,6 +10,7 @@ import {
 import { Colors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
 import { StorageService } from '@/services/StorageService';
+import { THEME } from '../../constants/theme';
 
 interface DailyTipProps {
   tips?: string[];
@@ -134,7 +135,7 @@ export const DailyTip: React.FC<DailyTipProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: Colors.border,
@@ -193,7 +194,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     paddingVertical: Spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',

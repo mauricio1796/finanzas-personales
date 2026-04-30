@@ -8,6 +8,7 @@ import Svg, { Rect, Line, Text as SvgText } from 'react-native-svg';
 import { useFinance } from '../state';
 import { Icon } from '../components/ui/Icon';
 import { computeWeeklyMetrics, WeeklyMetrics } from '../services/WeeklyReportService';
+import { THEME } from '../constants/theme';
 
 const fmtCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
 
@@ -58,12 +59,12 @@ const DailyBarChart: React.FC<{
       {/* Legend */}
       <View style={{ flexDirection: 'row', gap: 16, marginBottom: 8 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: '#6366F1' }} />
-          <Text style={{ fontSize: 11, color: '#6B7280' }}>Esta semana</Text>
+          <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: THEME.colors.primary }} />
+          <Text style={{ fontSize: 11, color: THEME.colors.textSecondary }}>Esta semana</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: '#E0E7FF' }} />
-          <Text style={{ fontSize: 11, color: '#6B7280' }}>Semana anterior</Text>
+          <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: THEME.colors.primaryLight }} />
+          <Text style={{ fontSize: 11, color: THEME.colors.textSecondary }}>Semana anterior</Text>
         </View>
       </View>
 
@@ -73,11 +74,11 @@ const DailyBarChart: React.FC<{
           <React.Fragment key={i}>
             <Line
               x1={yAxisW} y1={g.y} x2={chartWidth} y2={g.y}
-              stroke="#F3F4F6" strokeWidth={1}
+              stroke={THEME.colors.surfaceSecondary} strokeWidth={1}
             />
             <SvgText
               x={yAxisW - 4} y={g.y + 4}
-              textAnchor="end" fontSize={9} fill="#9CA3AF"
+              textAnchor="end" fontSize={9} fill={THEME.colors.textTertiary}
             >
               {g.label}
             </SvgText>
@@ -94,14 +95,14 @@ const DailyBarChart: React.FC<{
           const labelY = barAreaBottom + 14;
           return (
             <React.Fragment key={i}>
-              <Rect x={groupX}         y={currY} width={barW} height={currH} rx={4} fill="#6366F1" />
-              <Rect x={groupX + barW}  y={prevY} width={barW} height={prevH} rx={4} fill="#E0E7FF" />
+              <Rect x={groupX}         y={currY} width={barW} height={currH} rx={4} fill={THEME.colors.primary} />
+              <Rect x={groupX + barW}  y={prevY} width={barW} height={prevH} rx={4} fill={THEME.colors.primaryLight} />
               <SvgText
                 x={groupX + barW}
                 y={labelY}
                 textAnchor="middle"
                 fontSize={10}
-                fill="#9CA3AF"
+                fill={THEME.colors.textTertiary}
               >
                 {d.label}
               </SvgText>
@@ -126,9 +127,9 @@ interface MetricCardProps {
 
 const MetricCard: React.FC<MetricCardProps> = ({ label, value, deltaLabel, deltaType, animVal }) => {
   const deltaStyle = {
-    up:      { bg: '#DCFCE7', text: '#166534' },
-    down:    { bg: '#FEE2E2', text: '#991B1B' },
-    neutral: { bg: '#EEF2FF', text: '#4338CA' },
+    up:      { bg: THEME.colors.incomeLight, text: '#166534' },
+    down:    { bg: THEME.colors.expenseLight, text: THEME.colors.expense },
+    neutral: { bg: THEME.colors.primaryLight, text: THEME.colors.primary },
   }[deltaType];
 
   return (
@@ -268,7 +269,7 @@ export function ResumenSemanalScreen({ onBack, onOpenBot }: ResumenSemanalScreen
       {
         label: 'Diferencia vs ant.',
         value: gastosDiffLabel,
-        color: metrics.gastos.diff > 0 ? '#EF4444' : '#10B981',
+        color: metrics.gastos.diff > 0 ? THEME.colors.expense : THEME.colors.income,
       },
     ],
     ingresos: [
@@ -280,11 +281,11 @@ export function ResumenSemanalScreen({ onBack, onOpenBot }: ResumenSemanalScreen
         value: metrics.ingresos.diff >= 0
           ? `+${fmtCOP(metrics.ingresos.diff)}`
           : `-${fmtCOP(Math.abs(metrics.ingresos.diff))}`,
-        color: metrics.ingresos.diff >= 0 ? '#10B981' : '#EF4444',
+        color: metrics.ingresos.diff >= 0 ? THEME.colors.income : THEME.colors.expense,
       },
     ],
     ahorro: [
-      { label: 'Esta semana',     value: fmtCOP(metrics.ahorro.thisWeek),  color: '#10B981' },
+      { label: 'Esta semana',     value: fmtCOP(metrics.ahorro.thisWeek),  color: THEME.colors.income },
       { label: 'Semana anterior', value: fmtCOP(metrics.ahorro.lastWeek) },
       { label: 'Promedio',        value: fmtCOP(metrics.ahorro.average) },
       {
@@ -292,7 +293,7 @@ export function ResumenSemanalScreen({ onBack, onOpenBot }: ResumenSemanalScreen
         value: metrics.totalIncome > 0
           ? `${Math.round((metrics.totalSaved / metrics.totalIncome) * 100)}%`
           : '—',
-        color: '#6366F1',
+        color: THEME.colors.primary,
       },
     ],
   };
@@ -300,13 +301,13 @@ export function ResumenSemanalScreen({ onBack, onOpenBot }: ResumenSemanalScreen
   const botMsg = `Finn, analiza mi semana del ${metrics.weekStart.toLocaleDateString('es-CO')} al ${metrics.weekEnd.toLocaleDateString('es-CO')} y dame recomendaciones concretas para mejorar`;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#FAFAFA' }}>
+    <View style={{ flex: 1, backgroundColor: THEME.colors.background }}>
       {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         {/* Top row */}
         <View style={styles.headerTopRow}>
           <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.8}>
-            <Icon name="chevron-left" size={20} color="#FFFFFF" />
+            <Icon name="chevron-left" size={20} color={THEME.colors.surface} />
           </TouchableOpacity>
           <View style={styles.dateBadge}>
             <Text style={styles.dateBadgeText}>
@@ -341,7 +342,7 @@ export function ResumenSemanalScreen({ onBack, onOpenBot }: ResumenSemanalScreen
               style={styles.weekArrow}
               activeOpacity={0.7}
             >
-              <Icon name="chevron-left" size={18} color="#111827" />
+              <Icon name="chevron-left" size={18} color={THEME.colors.textPrimary} />
             </TouchableOpacity>
             <Text style={styles.weekLabel}>{metrics.weekLabel}</Text>
             <TouchableOpacity
@@ -350,7 +351,7 @@ export function ResumenSemanalScreen({ onBack, onOpenBot }: ResumenSemanalScreen
               activeOpacity={0.7}
               disabled={offsetWeeks === 0}
             >
-              <Icon name="chevron-right" size={18} color="#111827" />
+              <Icon name="chevron-right" size={18} color={THEME.colors.textPrimary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -454,9 +455,9 @@ export function ResumenSemanalScreen({ onBack, onOpenBot }: ResumenSemanalScreen
           onPress={() => onOpenBot?.(botMsg)}
           activeOpacity={0.85}
         >
-          <Icon name="message-circle" size={18} color="#FFFFFF" />
+          <Icon name="message-circle" size={18} color={THEME.colors.surface} />
           <Text style={styles.ctaBtnText}>Pedir análisis profundo a Finn</Text>
-          <Icon name="arrow-up-right" size={16} color="#FFFFFF" />
+          <Icon name="arrow-up-right" size={16} color={THEME.colors.surface} />
         </TouchableOpacity>
 
         <View style={{ height: insets.bottom + 24 }} />
@@ -468,7 +469,7 @@ export function ResumenSemanalScreen({ onBack, onOpenBot }: ResumenSemanalScreen
 const styles = StyleSheet.create({
   // ── Header
   header: {
-    backgroundColor: '#6366F1',
+    backgroundColor: THEME.colors.primary,
     paddingHorizontal: 16,
     paddingBottom: 18,
   },
@@ -488,19 +489,19 @@ const styles = StyleSheet.create({
   },
   dateBadge: {
     backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 20,
+    borderRadius: THEME.radius.pill,
     paddingHorizontal: 12,
     paddingVertical: 4,
   },
   dateBadgeText: {
     fontSize: 12,
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
     fontWeight: '500',
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: '500',
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
     marginBottom: 12,
   },
   xpRow: {
@@ -516,13 +517,13 @@ const styles = StyleSheet.create({
   xpTrack: {
     height: 6,
     backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     overflow: 'hidden',
   },
   xpFill: {
     height: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    backgroundColor: THEME.colors.surface,
+    borderRadius: THEME.radius.sm,
   },
 
   // ── Layout
@@ -531,10 +532,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: THEME.colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: THEME.colors.border,
     padding: 14,
   },
   chartCard: {
@@ -543,7 +544,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
     marginBottom: 12,
   },
 
@@ -556,16 +557,16 @@ const styles = StyleSheet.create({
   weekArrow: {
     width: 32,
     height: 32,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: THEME.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   weekLabel: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
     flex: 1,
     textAlign: 'center',
   },
@@ -579,22 +580,22 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: THEME.colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: THEME.colors.border,
     padding: 12,
   },
   metricLabel: {
     fontSize: 11,
-    color: '#6B7280',
+    color: THEME.colors.textSecondary,
     fontWeight: '400',
     marginBottom: 4,
   },
   metricValue: {
     fontSize: 18,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
     marginBottom: 6,
   },
   deltaBadge: {
@@ -614,14 +615,14 @@ const styles = StyleSheet.create({
   // ── Category bars
   catBarName: {
     fontSize: 12,
-    color: '#6B7280',
+    color: THEME.colors.textSecondary,
     fontWeight: '400',
     width: 90,
   },
   catBarTrack: {
     flex: 1,
     height: 8,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: THEME.colors.surfaceSecondary,
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -631,7 +632,7 @@ const styles = StyleSheet.create({
   },
   catBarAmount: {
     fontSize: 12,
-    color: '#111827',
+    color: THEME.colors.textPrimary,
     fontWeight: '500',
     width: 70,
     textAlign: 'right',
@@ -646,22 +647,22 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 20,
+    borderColor: THEME.colors.border,
+    borderRadius: THEME.radius.pill,
     paddingVertical: 6,
     alignItems: 'center',
   },
   tabActive: {
-    backgroundColor: '#6366F1',
-    borderColor: '#6366F1',
+    backgroundColor: THEME.colors.primary,
+    borderColor: THEME.colors.primary,
   },
   tabText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: THEME.colors.textSecondary,
     fontWeight: '400',
   },
   tabTextActive: {
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
     fontWeight: '500',
   },
 
@@ -674,24 +675,24 @@ const styles = StyleSheet.create({
   },
   compRowBorder: {
     borderBottomWidth: 0.5,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: THEME.colors.border,
   },
   compLabel: {
     fontSize: 12,
-    color: '#6B7280',
+    color: THEME.colors.textSecondary,
     fontWeight: '400',
   },
   compValue: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
   },
 
   // ── Finn card
   finnCard: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: THEME.colors.primaryLight,
     borderWidth: 1,
-    borderColor: '#C7D2FE',
+    borderColor: THEME.colors.border,
     borderRadius: 14,
     padding: 14,
   },
@@ -703,18 +704,18 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#6366F1',
+    backgroundColor: THEME.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   finnAvatarText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
   },
   finnLabel: {
     fontSize: 10,
-    color: '#6366F1',
+    color: THEME.colors.primary,
     fontWeight: '500',
     letterSpacing: 0.04 * 10,
     textTransform: 'uppercase',
@@ -722,7 +723,7 @@ const styles = StyleSheet.create({
   },
   finnInsight: {
     fontSize: 13,
-    color: '#3730A3',
+    color: THEME.colors.textPrimary,
     fontWeight: '400',
     lineHeight: 20,
   },
@@ -734,10 +735,10 @@ const styles = StyleSheet.create({
   },
   badgeCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: THEME.colors.surface,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
+    borderColor: THEME.colors.border,
+    borderRadius: THEME.radius.md,
     padding: 8,
     alignItems: 'center',
     gap: 6,
@@ -757,7 +758,7 @@ const styles = StyleSheet.create({
 
   // ── CTA
   ctaBtn: {
-    backgroundColor: '#6366F1',
+    backgroundColor: THEME.colors.primary,
     borderRadius: 14,
     padding: 14,
     flexDirection: 'row',
@@ -768,7 +769,7 @@ const styles = StyleSheet.create({
   ctaBtnText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
     flex: 1,
     textAlign: 'center',
   },

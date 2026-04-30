@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { THEME } from '../constants/theme';
 
 export type ScreenName = 'dashboard' | 'ingresos' | 'gastos' | 'categorias' | 'estadisticas' | 'bot' | 'perfil' | 'explorar' | 'historial' | 'resumenSemanal' | 'gamificacion' | 'configuracion' | 'retos' | 'calendario' | 'academia' | 'proyecciones' | 'resumenMensual' | 'simulador' | 'exportar' | 'widget' | 'metas' | 'deudas' | 'recurrentes';
 
@@ -166,8 +167,8 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     paddingHorizontal: 16,
     borderRightWidth: 1,
-    borderRightColor: '#e5e7eb',
-    backgroundColor: '#fafafa',
+    borderRightColor: THEME.colors.border,
+    backgroundColor: THEME.colors.background,
     display: 'flex',
     flexDirection: 'column',
   },
@@ -183,23 +184,23 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
     marginBottom: 8,
   },
   userName: {
     fontSize: 13,
-    color: '#6b7280',
+    color: THEME.colors.textSecondary,
     fontWeight: '500',
   },
   divider: {
     height: 1,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: THEME.colors.border,
     marginBottom: 16,
   },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#9ca3af',
+    color: THEME.colors.textTertiary,
     letterSpacing: 0.5,
     marginBottom: 12,
     paddingHorizontal: 12,
@@ -215,16 +216,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     gap: 12,
     marginBottom: 6,
     backgroundColor: 'transparent',
     position: 'relative',
   },
   navItemActive: {
-    backgroundColor: '#dbeafe',
+    backgroundColor: THEME.colors.primaryLight,
     borderLeftWidth: 3,
-    borderLeftColor: '#0ea5e9',
+    borderLeftColor: THEME.colors.primary,
   },
   navIcon: {
     fontSize: 20,
@@ -238,46 +239,46 @@ const styles = StyleSheet.create({
   navLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: THEME.colors.textSecondary,
   },
   navDescription: {
     fontSize: 11,
-    color: '#9ca3af',
+    color: THEME.colors.textTertiary,
     marginTop: 2,
   },
   navLabelActive: {
     fontWeight: '700',
-    color: '#0ea5e9',
+    color: THEME.colors.primary,
   },
   activeIndicator: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#0ea5e9',
+    backgroundColor: THEME.colors.primary,
   },
   sidebarFooter: {
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: THEME.colors.border,
     alignItems: 'center',
   },
   footerVersion: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#374151',
+    color: THEME.colors.textSecondary,
     marginBottom: 4,
   },
   footerText: {
     fontSize: 11,
-    color: '#9ca3af',
+    color: THEME.colors.textTertiary,
     textAlign: 'center',
     fontWeight: '500',
   },
   mobileContainer: {
     paddingBottom: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    backgroundColor: '#fafafa',
+    borderTopColor: THEME.colors.border,
+    backgroundColor: THEME.colors.background,
   },
   mobileNav: {
     flexDirection: 'row',
@@ -289,12 +290,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
   },
   mobileNavItemActive: {
-    backgroundColor: '#dbeafe',
+    backgroundColor: THEME.colors.primaryLight,
     borderBottomWidth: 3,
-    borderBottomColor: '#0ea5e9',
+    borderBottomColor: THEME.colors.primary,
   },
   mobileNavIcon: {
     fontSize: 24,
@@ -303,6 +304,6 @@ const styles = StyleSheet.create({
   mobileNavLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#0ea5e9',
+    color: THEME.colors.primary,
   },
 });

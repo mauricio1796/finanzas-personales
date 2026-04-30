@@ -11,6 +11,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useFinance, Category } from '@/src/core/context/FinanceContext';
+import { THEME } from '@/src/constants/theme';
 
 interface CategoriasProps {
   onCategoryUpdate?: () => void;
@@ -186,7 +187,7 @@ export function Categorias({ onCategoryUpdate }: CategoriasProps) {
           <TextInput
             style={styles.input}
             placeholder="ej: Cine, Deportes, etc."
-            placeholderTextColor="#999"
+            placeholderTextColor={THEME.colors.textTertiary}
             value={newCategoryName}
             onChangeText={setNewCategoryName}
           />
@@ -197,7 +198,7 @@ export function Categorias({ onCategoryUpdate }: CategoriasProps) {
           <TextInput
             style={styles.input}
             placeholder="Monto máximo a gastar"
-            placeholderTextColor="#999"
+            placeholderTextColor={THEME.colors.textTertiary}
             keyboardType="decimal-pad"
             value={newCategoryBudget}
             onChangeText={setNewCategoryBudget}
@@ -209,7 +210,7 @@ export function Categorias({ onCategoryUpdate }: CategoriasProps) {
           <TextInput
             style={styles.input}
             placeholder="Pega un emoji"
-            placeholderTextColor="#999"
+            placeholderTextColor={THEME.colors.textTertiary}
             value={newCategoryIcon}
             onChangeText={setNewCategoryIcon}
             maxLength={2}
@@ -294,12 +295,12 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '800',
     marginBottom: 24,
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
     letterSpacing: 0.3,
   },
   selectedInfo: {
     padding: 14,
-    borderRadius: 10,
+    borderRadius: THEME.radius.md,
     backgroundColor: '#fef3c7',
     borderWidth: 1,
     borderColor: '#fcd34d',
@@ -312,11 +313,11 @@ const styles = StyleSheet.create({
   },
   form: {
     padding: 20,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     gap: 20,
-    backgroundColor: '#f9fafb',
+    backgroundColor: THEME.colors.surfaceSecondary,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: THEME.colors.border,
     shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowRadius: 4,
@@ -326,16 +327,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     marginBottom: 10,
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: THEME.colors.border,
     padding: 14,
-    borderRadius: 10,
+    borderRadius: THEME.radius.sm,
     fontSize: 16,
-    color: '#1f2937',
-    backgroundColor: '#ffffff',
+    color: THEME.colors.textPrimary,
+    backgroundColor: THEME.colors.surface,
     fontWeight: '500',
   },
   emojiScroll: {
@@ -346,10 +347,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     marginRight: 10,
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
+    backgroundColor: THEME.colors.surface,
+    borderRadius: THEME.radius.sm,
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: THEME.colors.border,
   },
   emoji: {
     fontSize: 28,
@@ -361,9 +362,9 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    backgroundColor: '#0ea5e9',
+    backgroundColor: THEME.colors.primary,
     padding: 16,
-    borderRadius: 10,
+    borderRadius: THEME.radius.sm,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOpacity: 0.1,
@@ -371,7 +372,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cancelButton: {
-    backgroundColor: '#9ca3af',
+    backgroundColor: THEME.colors.textTertiary,
   },
   buttonText: {
     color: 'white',
@@ -379,29 +380,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   errorContainer: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: THEME.colors.expenseLight,
     padding: 14,
-    borderRadius: 10,
+    borderRadius: THEME.radius.sm,
     borderLeftWidth: 4,
-    borderLeftColor: '#dc2626',
+    borderLeftColor: THEME.colors.expense,
   },
   errorText: {
-    color: '#991b1b',
+    color: THEME.colors.expense,
     fontSize: 14,
     fontWeight: '600',
   },
   categoriesList: {
     padding: 20,
-    borderRadius: 12,
-    backgroundColor: '#f9fafb',
+    borderRadius: THEME.radius.md,
+    backgroundColor: THEME.colors.surfaceSecondary,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: THEME.colors.border,
   },
   listTitle: {
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 16,
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
   },
   listContent: {
     gap: 8,
@@ -410,11 +411,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderRadius: 10,
+    borderRadius: THEME.radius.sm,
     marginBottom: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: THEME.colors.surface,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: THEME.colors.border,
     shadowColor: '#000',
     shadowOpacity: 0.02,
     shadowRadius: 2,
@@ -426,15 +427,15 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#d1d5db',
+    borderColor: THEME.colors.border,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: THEME.colors.surfaceSecondary,
   },
   checkbox: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#22c55e',
+    color: THEME.colors.income,
   },
   categoryInfo: {
     flexDirection: 'row',
@@ -451,12 +452,12 @@ const styles = StyleSheet.create({
   categoryName: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
   },
   budgetDisplay: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6b7280',
+    color: THEME.colors.textSecondary,
     marginTop: 4,
   },
   categoryActions: {
@@ -473,18 +474,18 @@ const styles = StyleSheet.create({
   },
   editButton: {
     fontSize: 12,
-    color: '#0ea5e9',
+    color: THEME.colors.primary,
     fontWeight: '700',
-    backgroundColor: '#dbeafe',
+    backgroundColor: THEME.colors.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
   },
   deleteButton: {
     fontSize: 12,
-    color: '#dc2626',
+    color: THEME.colors.expense,
     fontWeight: '700',
-    backgroundColor: '#fee2e2',
+    backgroundColor: THEME.colors.expenseLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
@@ -493,16 +494,16 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: THEME.colors.border,
     gap: 10,
   },
   budgetInput: {
     borderWidth: 1,
     borderColor: '#fcd34d',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     fontSize: 14,
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
     backgroundColor: '#fffbeb',
     fontWeight: '500',
   },
@@ -520,11 +521,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fbbf24',
   },
   budgetCancelBtn: {
-    backgroundColor: '#d1d5db',
+    backgroundColor: THEME.colors.border,
   },
   budgetActionText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#ffffff',
+    color: THEME.colors.surface,
   },
 });

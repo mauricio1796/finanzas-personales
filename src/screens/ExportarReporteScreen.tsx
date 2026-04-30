@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useFinance } from '../state';
 import { useTheme } from '../state/ThemeContext';
+import { THEME } from '../constants/theme';
 import { Icon } from '../components/ui/Icon';
 import {
   generarYCompartirPDF,
@@ -266,7 +267,7 @@ export const ExportarReporteScreen: React.FC<Props> = ({ onBack, mesInicial }) =
                 ]}
                 onPress={() => setMesSelec(m)}
               >
-                <Text style={[s.monthPillText, { color: active ? '#FFFFFF' : colors.textSecondary }]}>
+                <Text style={[s.monthPillText, { color: active ? THEME.colors.surface : colors.textSecondary }]}>
                   {mesLabel(m.mes, m.año)}
                 </Text>
               </TouchableOpacity>
@@ -341,7 +342,7 @@ export const ExportarReporteScreen: React.FC<Props> = ({ onBack, mesInicial }) =
               ]}
               onPress={() => setFiltroTipo(f)}
             >
-              <Text style={[s.filterPillText, { color: filtroTipo === f ? '#FFFFFF' : colors.textSecondary }]}>
+              <Text style={[s.filterPillText, { color: filtroTipo === f ? THEME.colors.surface : colors.textSecondary }]}>
                 {f.charAt(0).toUpperCase() + f.slice(1)}
               </Text>
             </TouchableOpacity>
@@ -356,8 +357,8 @@ export const ExportarReporteScreen: React.FC<Props> = ({ onBack, mesInicial }) =
           disabled={isLoading}
           activeOpacity={0.8}
         >
-          <Icon name="share-2" size={18} color={isLoading ? colors.textTertiary : '#FFFFFF'} />
-          <Text style={[s.actionBtnText, { color: isLoading ? colors.textTertiary : '#FFFFFF' }]}>
+          <Icon name="share-2" size={18} color={isLoading ? colors.textTertiary : THEME.colors.surface} />
+          <Text style={[s.actionBtnText, { color: isLoading ? colors.textTertiary : THEME.colors.surface }]}>
             Generar y compartir
           </Text>
         </TouchableOpacity>
@@ -457,7 +458,7 @@ const s = StyleSheet.create({
 
   // Progress
   progressWrap: {
-    borderRadius: 14, padding: 16, marginBottom: 4,
+    borderRadius: THEME.radius.lg, padding: 16, marginBottom: 4,
     borderWidth: 1,
   },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
@@ -470,13 +471,13 @@ const s = StyleSheet.create({
   monthScrollContent: { gap: 8, paddingRight: 8 },
   monthPill: {
     paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: 100,
+    borderRadius: THEME.radius.pill,
   },
   monthPillText: { fontSize: 13, fontWeight: '600' },
 
   // Stats card
   statsCard: {
-    borderRadius: 16, borderWidth: 1,
+    borderRadius: THEME.radius.lg, borderWidth: 1,
     padding: 16, marginBottom: 4,
   },
   statsTitle: { fontSize: 15, fontWeight: '700', marginBottom: 12 },
@@ -489,7 +490,7 @@ const s = StyleSheet.create({
 
   // Toggles
   togglesCard: {
-    borderRadius: 16, borderWidth: 1, overflow: 'hidden',
+    borderRadius: THEME.radius.lg, borderWidth: 1, overflow: 'hidden',
   },
   toggleRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -503,31 +504,31 @@ const s = StyleSheet.create({
 
   // Filter pills
   pillRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
-  filterPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 100 },
+  filterPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: THEME.radius.pill },
   filterPillText: { fontSize: 13, fontWeight: '600' },
 
   // Action buttons
   actionBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 10, paddingVertical: 15, borderRadius: 14,
+    gap: 10, paddingVertical: 15, borderRadius: THEME.radius.lg,
     marginTop: 4,
   },
   actionBtnText: { fontSize: 16, fontWeight: '700' },
   secondaryBtns: { flexDirection: 'row', gap: 10, marginTop: 10 },
   secondaryBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 13, borderRadius: 14, borderWidth: 1,
+    gap: 8, paddingVertical: 13, borderRadius: THEME.radius.lg, borderWidth: 1,
   },
   secondaryBtnText: { fontSize: 14, fontWeight: '600' },
 
   // Saved
-  savedCard: { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
+  savedCard: { borderRadius: THEME.radius.lg, borderWidth: 1, overflow: 'hidden' },
   savedRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingVertical: 12, paddingHorizontal: 14,
   },
   savedIcon: {
-    width: 36, height: 36, borderRadius: 10,
+    width: 36, height: 36, borderRadius: THEME.radius.sm,
     alignItems: 'center', justifyContent: 'center',
   },
   savedName: { fontSize: 13, fontWeight: '600' },

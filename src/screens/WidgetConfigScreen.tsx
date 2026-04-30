@@ -13,6 +13,7 @@ import {
   leerDatosWidget,
   type WidgetData,
 } from '../services/WidgetService';
+import { THEME } from '../constants/theme';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ export const WidgetConfigScreen: React.FC<Props> = ({ onBack }) => {
   // ── Widget preview ───────────────────────────────────────────────────────
   const pct = Math.min(widgetData?.porcentajeGastado ?? 0, 100);
 
-  const barColor = pct >= 100 ? '#EF4444' : pct >= 80 ? '#F59E0B' : '#10B981';
+  const barColor = pct >= 100 ? THEME.colors.expense : pct >= 80 ? '#F59E0B' : THEME.colors.income;
 
   const pasos = Platform.OS === 'android'
     ? [
@@ -196,8 +197,8 @@ export const WidgetConfigScreen: React.FC<Props> = ({ onBack }) => {
           disabled={sincronizando}
           activeOpacity={0.85}
         >
-          <Icon name={sincronizando ? 'loader' : 'refresh-cw'} size={18} color={sincronizando ? colors.textTertiary : '#FFFFFF'} />
-          <Text style={[s.syncBtnText, { color: sincronizando ? colors.textTertiary : '#FFFFFF' }]}>
+          <Icon name={sincronizando ? 'loader' : 'refresh-cw'} size={18} color={sincronizando ? colors.textTertiary : THEME.colors.surface} />
+          <Text style={[s.syncBtnText, { color: sincronizando ? colors.textTertiary : THEME.colors.surface }]}>
             {sincronizando ? 'Sincronizando…' : 'Sincronizar widget ahora'}
           </Text>
         </TouchableOpacity>
@@ -260,8 +261,8 @@ const s = StyleSheet.create({
 
   // Widget preview
   widgetPreview: {
-    backgroundColor: '#6366F1',
-    borderRadius: 20,
+    backgroundColor: THEME.colors.primary,
+    borderRadius: THEME.radius.lg,
     padding: 16,
     marginBottom: 4,
   },
@@ -272,7 +273,7 @@ const s = StyleSheet.create({
     fontSize: 9, fontWeight: '600', color: 'rgba(255,255,255,0.65)',
     letterSpacing: 0.5, marginBottom: 2,
   },
-  wBalance: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', marginBottom: 10 },
+  wBalance: { fontSize: 28, fontWeight: '800', color: THEME.colors.surface, marginBottom: 10 },
   wBarTrack: {
     height: 5, backgroundColor: 'rgba(255,255,255,0.25)',
     borderRadius: 3, marginBottom: 4, overflow: 'hidden',
@@ -286,7 +287,7 @@ const s = StyleSheet.create({
     borderRadius: 9, padding: 7,
   },
   wPillLabel: { fontSize: 7, fontWeight: '600', color: 'rgba(255,255,255,0.65)', marginBottom: 2 },
-  wPillValue: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
+  wPillValue: { fontSize: 12, fontWeight: '700', color: THEME.colors.surface },
 
   // Status
   statusCard: {
@@ -312,7 +313,7 @@ const s = StyleSheet.create({
   // Sync button
   syncBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 10, paddingVertical: 15, borderRadius: 14,
+    gap: 10, paddingVertical: 15, borderRadius: 14, // 14 is between md(12) and lg(20)
   },
   syncBtnText: { fontSize: 15, fontWeight: '700' },
 
@@ -332,7 +333,7 @@ const s = StyleSheet.create({
   // Note
   noteCard: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-    borderRadius: 12, borderWidth: 1, padding: 12, marginTop: 16,
+    borderRadius: THEME.radius.md, borderWidth: 1, padding: 12, marginTop: 16,
   },
   noteText: { fontSize: 12, flex: 1, lineHeight: 18 },
 });

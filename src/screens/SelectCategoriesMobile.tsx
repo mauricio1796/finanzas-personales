@@ -11,6 +11,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useFinance, Category } from '@/src/core/context/FinanceContext';
+import { THEME } from '../constants/theme';
 
 interface SelectCategoriesMobileProps {
   onComplete: (selectedIds: string[]) => void;
@@ -171,25 +172,25 @@ export function SelectCategoriesMobile({ onComplete }: SelectCategoriesMobilePro
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: THEME.colors.surfaceSecondary,
   },
   header: {
-    backgroundColor: '#ffffff',
+    backgroundColor: THEME.colors.surface,
     paddingHorizontal: 20,
     paddingVertical: 24,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: THEME.colors.border,
   },
   title: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
     marginBottom: 8,
     letterSpacing: 0.3,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: THEME.colors.textSecondary,
     fontWeight: '500',
     lineHeight: 21,
   },
@@ -208,21 +209,21 @@ const styles = StyleSheet.create({
   categoryButton: {
     flex: 1,
     aspectRatio: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: THEME.colors.surface,
     borderRadius: 14,
     padding: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
+    borderColor: THEME.colors.border,
+    shadowColor: THEME.colors.textPrimary,
     shadowOpacity: 0.04,
     shadowRadius: 3,
     elevation: 1,
   },
   categoryButtonSelected: {
-    backgroundColor: '#dbeafe',
-    borderColor: '#0ea5e9',
+    backgroundColor: THEME.colors.primaryLight,
+    borderColor: THEME.colors.primary,
     borderWidth: 2,
   },
   categoryEmoji: {
@@ -232,11 +233,11 @@ const styles = StyleSheet.create({
   categoryLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#374151',
+    color: THEME.colors.textSecondary,
     textAlign: 'center',
   },
   categoryLabelSelected: {
-    color: '#0ea5e9',
+    color: THEME.colors.primary,
     fontWeight: '700',
   },
   checkmark: {
@@ -244,7 +245,7 @@ const styles = StyleSheet.create({
     top: 8,
     right: 8,
     fontSize: 20,
-    color: '#0ea5e9',
+    color: THEME.colors.primary,
     fontWeight: '800',
   },
   emptyContainer: {
@@ -253,50 +254,50 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: THEME.colors.textTertiary,
     fontWeight: '500',
   },
   footer: {
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    backgroundColor: '#ffffff',
+    borderTopColor: THEME.colors.border,
+    backgroundColor: THEME.colors.surface,
   },
   selectedCount: {
     fontSize: 13,
-    color: '#6b7280',
+    color: THEME.colors.textSecondary,
     fontWeight: '600',
     marginBottom: 12,
     textAlign: 'center',
   },
   continueButton: {
-    backgroundColor: '#0ea5e9',
+    backgroundColor: THEME.colors.primary,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: THEME.colors.textPrimary,
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
   continueButtonDisabled: {
-    backgroundColor: '#d1d5db',
+    backgroundColor: THEME.colors.border,
     opacity: 0.6,
   },
   continueButtonText: {
-    color: 'white',
+    color: THEME.colors.surface,
     fontSize: 16,
     fontWeight: '700',
   },
   budgetItem: {
-    backgroundColor: '#ffffff',
+    backgroundColor: THEME.colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 10,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: THEME.colors.border,
   },
   budgetItemHeader: {
     flexDirection: 'row',
@@ -310,20 +311,20 @@ const styles = StyleSheet.create({
   budgetItemName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
     flex: 1,
   },
   budgetInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    backgroundColor: '#f9fafb',
+    borderColor: THEME.colors.border,
+    borderRadius: THEME.radius.sm,
+    backgroundColor: THEME.colors.background,
     paddingHorizontal: 10,
   },
   currencySymbol: {
-    color: '#6b7280',
+    color: THEME.colors.textSecondary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -332,10 +333,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 8,
     fontSize: 14,
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
   },
   backButton: {
-    backgroundColor: '#9ca3af',
+    backgroundColor: THEME.colors.textTertiary,
     marginBottom: 10,
   },
 });

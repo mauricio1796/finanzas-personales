@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Colors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
+import { THEME } from '../../constants/theme';
 
 interface CategoryAnalysis {
   category: string;
@@ -48,9 +49,9 @@ export const PatternAnalysis: React.FC<PatternAnalysisProps> = ({
   const getTrendColor = (trend: 'up' | 'down' | 'stable') => {
     switch (trend) {
       case 'up':
-        return '#FF6B6B';
+        return THEME.colors.expense;
       case 'down':
-        return '#10B981';
+        return THEME.colors.income;
       case 'stable':
         return Colors.textSecondary;
     }
@@ -150,7 +151,7 @@ export const PatternAnalysis: React.FC<PatternAnalysisProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     padding: Spacing.lg,
     gap: Spacing.md,
   },
@@ -164,7 +165,7 @@ const styles = StyleSheet.create({
   },
   comparisonContainer: {
     backgroundColor: Colors.background,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     padding: Spacing.md,
     gap: Spacing.sm,
   },
@@ -245,7 +246,7 @@ const styles = StyleSheet.create({
   categoryBar: {
     height: 6,
     backgroundColor: Colors.background,
-    borderRadius: 3,
+    borderRadius: THEME.radius.sm / 2,
     overflow: 'hidden',
   },
   categoryBarFill: {

@@ -13,6 +13,7 @@ import { useHaptics } from '../hooks/useHaptics';
 import { Toast, useToast } from '../components/ui/Toast';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
 import { verificarConexionWorker } from '../services/RealAIService';
+import { THEME } from '../constants/theme';
 
 interface ConfiguracionScreenProps {
   onBack: () => void;
@@ -606,7 +607,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.surface,
   },
 
   // Preview card
@@ -717,7 +718,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.surface,
   },
   // IA section
   card: {
@@ -778,7 +779,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'absolute',

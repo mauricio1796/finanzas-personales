@@ -12,6 +12,7 @@ import {
   calcularRachaSemanal, getRecompensas, getNodosHabilidades,
   getLeaderboard, getHabitos,
 } from '../services/GamificacionService';
+import { THEME } from '../constants/theme';
 
 const fmtCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
 
@@ -32,7 +33,7 @@ const ACHIEVEMENTS = [
 type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
 
 const RARITY: Record<Rarity, { bg: string; color: string }> = {
-  common:    { bg: '#F3F4F6', color: '#6B7280' },
+  common:    { bg: THEME.colors.surfaceSecondary, color: THEME.colors.textSecondary },
   rare:      { bg: '#DBEAFE', color: '#1E40AF' },
   epic:      { bg: '#EDE9FE', color: '#5B21B6' },
   legendary: { bg: '#FEF3C7', color: '#92400E' },
@@ -196,7 +197,7 @@ export function GamificacionScreen({ onNavigate, onBack }: GamificacionScreenPro
     .split(' ').slice(0, 2).map(w => (w[0] ?? '').toUpperCase()).join('') || 'U';
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#FAFAFA' }}>
+    <View style={{ flex: 1, backgroundColor: THEME.colors.background }}>
 
       {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -212,7 +213,7 @@ export function GamificacionScreen({ onNavigate, onBack }: GamificacionScreenPro
           </View>
           {onBack ? (
             <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ width: 40, alignItems: 'center' }}>
-              <Icon name="arrow-left" size={20} color="#FFFFFF" />
+              <Icon name="arrow-left" size={20} color={THEME.colors.surface} />
             </TouchableOpacity>
           ) : (
             <View style={{ width: 40 }} />
@@ -275,9 +276,9 @@ export function GamificacionScreen({ onNavigate, onBack }: GamificacionScreenPro
 
                     let cellStyle: object = styles.cellEmpty;
                     let showCheck = false;
-                    let checkColor = '#6366F1';
+                    let checkColor = THEME.colors.primary;
 
-                    if (isToday && hasTx)       { cellStyle = styles.cellTodayFull; showCheck = true; checkColor = '#fff'; }
+                    if (isToday && hasTx)       { cellStyle = styles.cellTodayFull; showCheck = true; checkColor = THEME.colors.surface; }
                     else if (isToday && !hasTx)  { cellStyle = styles.cellTodayEmpty; }
                     else if (isPast && hasTx)    { cellStyle = styles.cellDone; showCheck = true; }
 
@@ -309,9 +310,9 @@ export function GamificacionScreen({ onNavigate, onBack }: GamificacionScreenPro
                     { value: '+50', label: 'Bonus hoy', sub: 'XP', accent: true },
                   ].map((s, i) => (
                     <View key={i} style={styles.weekStat}>
-                      <Text style={[styles.weekStatVal, s.accent && { color: '#6366F1' }]}>{s.value}</Text>
+                      <Text style={[styles.weekStatVal, s.accent && { color: THEME.colors.primary }]}>{s.value}</Text>
                       <Text style={styles.weekStatLbl}>{s.label}</Text>
-                      <Text style={[styles.weekStatSub, s.accent && { color: '#6366F1' }]}>{s.sub}</Text>
+                      <Text style={[styles.weekStatSub, s.accent && { color: THEME.colors.primary }]}>{s.sub}</Text>
                     </View>
                   ))}
                 </View>
@@ -367,7 +368,7 @@ export function GamificacionScreen({ onNavigate, onBack }: GamificacionScreenPro
                             <Icon
                               name={nodo.iconName as any}
                               size={20}
-                              color={done ? '#fff' : active ? '#6366F1' : '#D1D5DB'}
+                              color={done ? THEME.colors.surface : active ? THEME.colors.primary : THEME.colors.border}
                             />
                           </Animated.View>
                           <Text style={[styles.skillLabel, done ? styles.skillLabelDone : styles.skillLabelOther]} numberOfLines={2}>
@@ -387,11 +388,11 @@ export function GamificacionScreen({ onNavigate, onBack }: GamificacionScreenPro
                     <View style={styles.skillPillDot} />
                     <Text style={styles.skillPillText}>
                       {'Próximo: completa '}
-                      <Text style={{ fontWeight: '500', color: '#111827' }}>{activeNode.label}</Text>
+                      <Text style={{ fontWeight: '500', color: THEME.colors.textPrimary }}>{activeNode.label}</Text>
                       {nextLocked && (
                         <>
                           {' para desbloquear '}
-                          <Text style={{ fontWeight: '500', color: '#111827' }}>{nextLocked.label}</Text>
+                          <Text style={{ fontWeight: '500', color: THEME.colors.textPrimary }}>{nextLocked.label}</Text>
                         </>
                       )}
                     </Text>
@@ -469,7 +470,7 @@ export function GamificacionScreen({ onNavigate, onBack }: GamificacionScreenPro
                 <View style={styles.rankPill}>
                   <Text style={styles.rankPillText}>
                     {'Gana '}
-                    <Text style={{ fontWeight: '500', color: '#111827' }}>
+                    <Text style={{ fontWeight: '500', color: THEME.colors.textPrimary }}>
                       {Math.round(xpToNext).toLocaleString('es-CO')} XP más
                     </Text>
                     {` para subir al puesto ${userPos}`}
@@ -518,7 +519,7 @@ export function GamificacionScreen({ onNavigate, onBack }: GamificacionScreenPro
                       activeOpacity={active ? 0.8 : 1}
                     >
                       <View style={[styles.rewardIconBox, { backgroundColor: r.iconBg }]}>
-                        <Icon name={r.iconName as any} size={18} color={active ? r.iconColor : '#9CA3AF'} />
+                        <Icon name={r.iconName as any} size={18} color={active ? r.iconColor : THEME.colors.textTertiary} />
                       </View>
                       <Text style={styles.rewardName}>{r.nombre}</Text>
                       {r.canjeada ? (
@@ -539,14 +540,14 @@ export function GamificacionScreen({ onNavigate, onBack }: GamificacionScreenPro
               <Text style={styles.sectionLabel}>Cómo ganar XP</Text>
               <View style={styles.card}>
                 {[
-                  { icon: 'trending-down', bg: '#EEF2FF', label: 'Registrar gasto',   xp: '+10 XP' },
+                  { icon: 'trending-down', bg: THEME.colors.primaryLight, label: 'Registrar gasto',   xp: '+10 XP' },
                   { icon: 'check-circle',  bg: '#D1FAE5', label: 'Pagar categoría',   xp: '+50 XP' },
                   { icon: 'star',          bg: '#FEF3C7', label: 'Completar reto',    xp: '+100 XP' },
                   { icon: 'book-open',     bg: '#EDE9FE', label: 'Completar lección', xp: '+30 XP' },
                 ].map((row, i, arr) => (
                   <View key={row.label} style={[styles.xpRow, i < arr.length - 1 && styles.xpRowBorder]}>
                     <View style={[styles.xpRowIcon, { backgroundColor: row.bg }]}>
-                      <Icon name={row.icon as any} size={16} color="#6366F1" />
+                      <Icon name={row.icon as any} size={16} color={THEME.colors.primary} />
                     </View>
                     <Text style={styles.xpRowLabel}>{row.label}</Text>
                     <Text style={styles.xpRowValue}>{row.xp}</Text>
@@ -567,7 +568,7 @@ export function GamificacionScreen({ onNavigate, onBack }: GamificacionScreenPro
 const styles = StyleSheet.create({
   // Header
   header: {
-    backgroundColor: '#6366F1',
+    backgroundColor: THEME.colors.primary,
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
@@ -581,14 +582,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   userInitials: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#6366F1',
+    color: THEME.colors.primary,
   },
   levelBadge: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -600,7 +601,7 @@ const styles = StyleSheet.create({
   levelBadgeText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#fff',
+    color: THEME.colors.surface,
   },
   xpSubLabel: {
     fontSize: 10,
@@ -610,7 +611,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: '500',
-    color: '#fff',
+    color: THEME.colors.surface,
     marginTop: 8,
     marginBottom: 12,
   },
@@ -633,7 +634,7 @@ const styles = StyleSheet.create({
   },
   xpFill: {
     height: '100%',
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.surface,
     borderRadius: 6,
   },
   milestones: {
@@ -654,9 +655,9 @@ const styles = StyleSheet.create({
   // Tab bar
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.surface,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: THEME.colors.border,
   },
   tabItem: {
     flex: 1,
@@ -666,15 +667,15 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabItemActive: {
-    borderBottomColor: '#6366F1',
+    borderBottomColor: THEME.colors.primary,
   },
   tabText: {
     fontSize: 13,
     fontWeight: '400',
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
   },
   tabTextActive: {
-    color: '#6366F1',
+    color: THEME.colors.primary,
     fontWeight: '500',
   },
 
@@ -684,22 +685,22 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: THEME.colors.surface,
+    borderRadius: THEME.radius.lg,
     borderWidth: 0.5,
-    borderColor: '#E5E7EB',
+    borderColor: THEME.colors.border,
     padding: 14,
   },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
     marginBottom: 12,
   },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginTop: 4,
@@ -724,28 +725,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cellDone: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: THEME.colors.primaryLight,
   },
   cellTodayFull: {
-    backgroundColor: '#6366F1',
+    backgroundColor: THEME.colors.primary,
   },
   cellTodayEmpty: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: THEME.colors.primaryLight,
     borderWidth: 1.5,
-    borderColor: '#6366F1',
+    borderColor: THEME.colors.primary,
   },
   cellEmpty: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: THEME.colors.background,
     borderWidth: 0.5,
-    borderColor: '#E5E7EB',
+    borderColor: THEME.colors.border,
   },
   dayLabel: {
     fontSize: 9,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '400',
   },
   dayLabelToday: {
-    color: '#6366F1',
+    color: THEME.colors.primary,
     fontWeight: '500',
   },
 
@@ -754,7 +755,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderTopWidth: 0.5,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: THEME.colors.surfaceSecondary,
     paddingTop: 12,
   },
   weekStat: {
@@ -764,16 +765,16 @@ const styles = StyleSheet.create({
   weekStatVal: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
   },
   weekStatLbl: {
     fontSize: 10,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '400',
   },
   weekStatSub: {
     fontSize: 9,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '400',
   },
 
@@ -786,7 +787,7 @@ const styles = StyleSheet.create({
   },
   habitRowBorder: {
     borderBottomWidth: 0.5,
-    borderBottomColor: '#F9FAFB',
+    borderBottomColor: THEME.colors.background,
   },
   habitIcon: {
     width: 32,
@@ -798,16 +799,16 @@ const styles = StyleSheet.create({
   habitName: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
   },
   habitDesc: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '400',
   },
   habitTrack: {
     height: 4,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: THEME.colors.surfaceSecondary,
     borderRadius: 2,
     overflow: 'hidden',
   },
@@ -817,7 +818,7 @@ const styles = StyleSheet.create({
   },
   habitProgress: {
     fontSize: 10,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '400',
   },
   habitXP: {
@@ -845,16 +846,16 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   skillNodeDone: {
-    backgroundColor: '#6366F1',
-    borderColor: '#4F46E5',
+    backgroundColor: THEME.colors.primary,
+    borderColor: THEME.colors.primary,
   },
   skillNodeActive: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#6366F1',
+    backgroundColor: THEME.colors.primaryLight,
+    borderColor: THEME.colors.primary,
   },
   skillNodeLocked: {
-    backgroundColor: '#F9FAFB',
-    borderColor: '#E5E7EB',
+    backgroundColor: THEME.colors.background,
+    borderColor: THEME.colors.border,
   },
   skillLabel: {
     fontSize: 10,
@@ -864,26 +865,26 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   skillLabelDone: {
-    color: '#6366F1',
+    color: THEME.colors.primary,
     fontWeight: '500',
   },
   skillLabelOther: {
-    color: '#6B7280',
+    color: THEME.colors.textSecondary,
   },
   skillConnector: {
     flex: 1,
     height: 2,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: THEME.colors.border,
     marginBottom: 24,
   },
   skillConnectorDone: {
-    backgroundColor: '#6366F1',
+    backgroundColor: THEME.colors.primary,
   },
   skillPill: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 10,
+    backgroundColor: THEME.colors.background,
+    borderRadius: THEME.radius.sm,
     padding: 10,
     gap: 8,
   },
@@ -891,13 +892,13 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#6366F1',
+    backgroundColor: THEME.colors.primary,
     marginTop: 3,
   },
   skillPillText: {
     flex: 1,
     fontSize: 12,
-    color: '#6B7280',
+    color: THEME.colors.textSecondary,
     fontWeight: '400',
     lineHeight: 18,
   },
@@ -909,8 +910,8 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+    backgroundColor: THEME.colors.background,
+    borderRadius: THEME.radius.md,
     padding: 10,
     alignItems: 'center',
     gap: 4,
@@ -918,11 +919,11 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 18,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
   },
   statLabel: {
     fontSize: 10,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '400',
     textAlign: 'center',
   },
@@ -931,7 +932,7 @@ const styles = StyleSheet.create({
   achHeader: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
     marginBottom: 8,
   },
   achGrid: {
@@ -941,10 +942,10 @@ const styles = StyleSheet.create({
   },
   achCard: {
     width: '48%',
-    backgroundColor: '#fff',
-    borderRadius: 14,
+    backgroundColor: THEME.colors.surface,
+    borderRadius: THEME.radius.md,
     borderWidth: 0.5,
-    borderColor: '#E5E7EB',
+    borderColor: THEME.colors.border,
     padding: 12,
     gap: 6,
   },
@@ -958,11 +959,11 @@ const styles = StyleSheet.create({
   achTitle: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
   },
   achDesc: {
     fontSize: 10,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '400',
     lineHeight: 14,
   },
@@ -986,23 +987,23 @@ const styles = StyleSheet.create({
   },
   rankRowBorder: {
     borderBottomWidth: 0.5,
-    borderBottomColor: '#F9FAFB',
+    borderBottomColor: THEME.colors.background,
   },
   rankRowUser: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 10,
+    backgroundColor: THEME.colors.primaryLight,
+    borderRadius: THEME.radius.sm,
     paddingHorizontal: 8,
     marginHorizontal: -4,
   },
   rankNum: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     width: 20,
     textAlign: 'center',
   },
   rankNumTop: {
-    color: '#F59E0B',
+    color: '#F59E0B', // gold for top rank — intentional
   },
   rankAvatar: {
     width: 32,
@@ -1018,20 +1019,20 @@ const styles = StyleSheet.create({
   rankName: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
   },
   rankTitle: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '400',
   },
   rankXP: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#6366F1',
+    color: THEME.colors.primary,
   },
   rankYouBadge: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: THEME.colors.primaryLight,
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 1,
@@ -1039,24 +1040,24 @@ const styles = StyleSheet.create({
   rankYouText: {
     fontSize: 10,
     fontWeight: '500',
-    color: '#6366F1',
+    color: THEME.colors.primary,
   },
   rankPill: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+    backgroundColor: THEME.colors.background,
+    borderRadius: THEME.radius.md,
     padding: 12,
     alignItems: 'center',
   },
   rankPillText: {
     fontSize: 13,
-    color: '#6B7280',
+    color: THEME.colors.textSecondary,
     fontWeight: '400',
     textAlign: 'center',
   },
 
   // Tienda
   balanceCard: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: THEME.colors.primaryLight,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -1067,24 +1068,24 @@ const styles = StyleSheet.create({
   balanceLabel: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#6366F1',
+    color: THEME.colors.primary,
     marginBottom: 2,
   },
   balanceValue: {
     fontSize: 22,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
   },
   earnBtn: {
-    backgroundColor: '#6366F1',
-    borderRadius: 10,
+    backgroundColor: THEME.colors.primary,
+    borderRadius: THEME.radius.sm,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   earnBtnText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#fff',
+    color: THEME.colors.surface,
   },
   rewardsRow: {
     gap: 10,
@@ -1099,14 +1100,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   rewardActive: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: THEME.colors.primaryLight,
     borderWidth: 0.5,
-    borderColor: '#6366F1',
+    borderColor: THEME.colors.primary,
   },
   rewardLocked: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: THEME.colors.background,
     borderWidth: 0.5,
-    borderColor: '#E5E7EB',
+    borderColor: THEME.colors.border,
   },
   rewardIconBox: {
     width: 36,
@@ -1118,27 +1119,27 @@ const styles = StyleSheet.create({
   rewardName: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
     textAlign: 'center',
   },
   rewardCosto: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#6366F1',
+    color: THEME.colors.primary,
   },
   rewardCostoLocked: {
     fontSize: 11,
     fontWeight: '400',
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
   },
   rewardFaltan: {
     fontSize: 10,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '400',
   },
   rewardCanjeada: {
     fontSize: 11,
-    color: '#10B981',
+    color: THEME.colors.income,
     fontWeight: '500',
   },
   xpRow: {
@@ -1149,7 +1150,7 @@ const styles = StyleSheet.create({
   },
   xpRowBorder: {
     borderBottomWidth: 0.5,
-    borderBottomColor: '#F9FAFB',
+    borderBottomColor: THEME.colors.background,
   },
   xpRowIcon: {
     width: 32,
@@ -1162,11 +1163,11 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '400',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
   },
   xpRowValue: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#6366F1',
+    color: THEME.colors.primary,
   },
 });

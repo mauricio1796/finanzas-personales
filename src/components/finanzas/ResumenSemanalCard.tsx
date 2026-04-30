@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform } from 're
 import { useFinance } from '../../state';
 import { Icon } from '../ui/Icon';
 import { computeWeeklyMetrics } from '../../services/WeeklyReportService';
+import { THEME } from '../../constants/theme';
 
 const fmtCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
 
@@ -39,7 +40,7 @@ export function ResumenSemanalCard({ onPress }: ResumenSemanalCardProps) {
 
   const diffPct    = Math.round(metrics.gastos.diffPercent);
   const diffPositive = diffPct > 0;
-  const diffColor  = diffPositive ? '#EF4444' : '#10B981';
+  const diffColor  = diffPositive ? THEME.colors.expense : THEME.colors.income;
   const diffLabel  = diffPositive ? `+${diffPct}%` : `${diffPct}%`;
 
   return (
@@ -51,13 +52,13 @@ export function ResumenSemanalCard({ onPress }: ResumenSemanalCardProps) {
         {/* Header row */}
         <View style={styles.headerRow}>
           <View style={styles.iconBox}>
-            <Icon name="bar-chart-2" size={16} color="#6366F1" />
+            <Icon name="bar-chart-2" size={16} color={THEME.colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>Semana {weekShort}</Text>
             <Text style={styles.subtitle}>Resumen semanal listo</Text>
           </View>
-          <Icon name="chevron-right" size={18} color="#9CA3AF" />
+          <Icon name="chevron-right" size={18} color={THEME.colors.textTertiary} />
         </View>
 
         {/* Metric strip */}
@@ -69,7 +70,7 @@ export function ResumenSemanalCard({ onPress }: ResumenSemanalCardProps) {
           <View style={styles.stripDivider} />
           <View style={styles.stripItem}>
             <Text style={styles.stripLabel}>Ahorrado</Text>
-            <Text style={[styles.stripValue, { color: '#10B981' }]}>{fmtCOP(Math.max(0, metrics.totalSaved))}</Text>
+            <Text style={[styles.stripValue, { color: THEME.colors.income }]}>{fmtCOP(Math.max(0, metrics.totalSaved))}</Text>
           </View>
           <View style={styles.stripDivider} />
           <View style={styles.stripItem}>
@@ -94,13 +95,13 @@ const styles = StyleSheet.create({
   card: {
     marginHorizontal: 16,
     marginBottom: 12,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: THEME.colors.surface,
+    borderRadius: THEME.radius.lg,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: THEME.colors.border,
     padding: 14,
     ...(Platform.OS !== 'web'
-      ? { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }
+      ? { ...THEME.shadow.card }
       : {}),
   },
   headerRow: {
@@ -113,24 +114,24 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: THEME.colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
   },
   subtitle: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '400',
     marginTop: 1,
   },
   strip: {
     flexDirection: 'row',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: THEME.colors.background,
     borderRadius: 10,
     padding: 10,
     marginBottom: 10,
@@ -141,19 +142,19 @@ const styles = StyleSheet.create({
   },
   stripDivider: {
     width: 0.5,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: THEME.colors.border,
     marginVertical: 2,
   },
   stripLabel: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '400',
     marginBottom: 2,
   },
   stripValue: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
   },
   insightRow: {
     flexDirection: 'row',
@@ -164,19 +165,19 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#6366F1',
+    backgroundColor: THEME.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   finnMiniText: {
     fontSize: 10,
     fontWeight: '500',
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
   },
   insightText: {
     flex: 1,
     fontSize: 12,
-    color: '#6B7280',
+    color: THEME.colors.textSecondary,
     fontWeight: '400',
     lineHeight: 17,
   },

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, ScrollView, Animated, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { Category } from '../../types';
+import { THEME } from '../../constants/theme';
 
 const COLORES = ['#F87171','#34D399','#818CF8','#FBBF24','#38BDF8','#A78BFA','#FB923C','#4ADE80','#F472B6','#2DD4BF'];
 const EMOJIS = ['🏠','🚗','🍔','💡','📱','💊','🎓','👗','🎉','💳','🐾','💰','🎮','📚','🏋️','🎵','🎬','🛒','🔐','🏦','🚌','💧','🗂️'];
@@ -73,11 +74,11 @@ export const ModalCategoria: React.FC<Props> = ({ visible, editing, existingCoun
           <ScrollView style={s.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             {error ? <Text style={s.error}>{error}</Text> : null}
             <Text style={s.fieldLabel}>Nombre del gasto</Text>
-            <TextInput style={s.input} placeholder="Ej: Gimnasio, Netflix..." placeholderTextColor="#9CA3AF" value={nombre} onChangeText={t => { setNombre(t); setError(""); }} maxLength={30} />
+            <TextInput style={s.input} placeholder="Ej: Gimnasio, Netflix..." placeholderTextColor={THEME.colors.textTertiary} value={nombre} onChangeText={t => { setNombre(t); setError(""); }} maxLength={30} />
             <Text style={s.fieldLabel}>Presupuesto mensual (COP)</Text>
             <View style={s.amountRow}>
               <Text style={s.currencySign}>$</Text>
-              <TextInput style={[s.input, s.amountInput]} keyboardType="numeric" placeholder="0" placeholderTextColor="#9CA3AF" value={presupuesto} onChangeText={t => setPresupuesto(formatInput(t))} />
+              <TextInput style={[s.input, s.amountInput]} keyboardType="numeric" placeholder="0" placeholderTextColor={THEME.colors.textTertiary} value={presupuesto} onChangeText={t => setPresupuesto(formatInput(t))} />
             </View>
             <Text style={s.fieldLabel}>Tipo de gasto</Text>
             <View style={s.tipoRow}>
@@ -95,7 +96,7 @@ export const ModalCategoria: React.FC<Props> = ({ visible, editing, existingCoun
               {EMOJIS.map(e => (<TouchableOpacity key={e} style={[s.emojiBtn, emoji === e && s.emojiBtnActive]} onPress={() => setEmoji(e)} activeOpacity={0.7}><Text style={s.emojiChar}>{e}</Text></TouchableOpacity>))}
             </ScrollView>
             <Text style={s.fieldLabel}>Dia de pago (opcional, 1-28)</Text>
-            <TextInput style={s.input} keyboardType="numeric" placeholder="Sin fecha fija" placeholderTextColor="#9CA3AF" value={diaPago} onChangeText={t => { const v = t.replace(/[^0-9]/g,""); setDiaPago(v.length > 2 ? v.slice(0,2) : v); }} maxLength={2} />
+            <TextInput style={s.input} keyboardType="numeric" placeholder="Sin fecha fija" placeholderTextColor={THEME.colors.textTertiary} value={diaPago} onChangeText={t => { const v = t.replace(/[^0-9]/g,""); setDiaPago(v.length > 2 ? v.slice(0,2) : v); }} maxLength={2} />
             <TouchableOpacity style={s.saveBtn} onPress={handleSave} activeOpacity={0.85}>
               <Text style={s.saveBtnText}>Guardar categoria</Text>
             </TouchableOpacity>
@@ -109,30 +110,30 @@ export const ModalCategoria: React.FC<Props> = ({ visible, editing, existingCoun
 const s = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.4)" },
   kavWrap: { flex: 1, justifyContent: "flex-end" },
-  sheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "90%" as any },
-  handle: { width: 36, height: 4, backgroundColor: "#D1D5DB", borderRadius: 2, alignSelf: "center", marginTop: 10, marginBottom: 4 },
-  hdr: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
-  title: { fontSize: 17, fontWeight: "700", color: "#111827" },
-  cancel: { fontSize: 15, color: "#6366F1", fontWeight: "600" },
+  sheet: { backgroundColor: THEME.colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "90%" as any },
+  handle: { width: 36, height: 4, backgroundColor: THEME.colors.border, borderRadius: 2, alignSelf: "center", marginTop: 10, marginBottom: 4 },
+  hdr: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: THEME.colors.surfaceSecondary },
+  title: { fontSize: 17, fontWeight: "700", color: THEME.colors.textPrimary },
+  cancel: { fontSize: 15, color: THEME.colors.primary, fontWeight: "600" },
   body: { paddingHorizontal: 20, paddingTop: 16 },
-  fieldLabel: { fontSize: 12, fontWeight: "700", color: "#9CA3AF", letterSpacing: 0.8, marginBottom: 6, marginTop: 14 },
-  input: { backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: "#111827" },
+  fieldLabel: { fontSize: 12, fontWeight: "700", color: THEME.colors.textTertiary, letterSpacing: 0.8, marginBottom: 6, marginTop: 14 },
+  input: { backgroundColor: THEME.colors.background, borderWidth: 1, borderColor: THEME.colors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: THEME.colors.textPrimary },
   amountRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  currencySign: { fontSize: 18, fontWeight: "700", color: "#111827" },
+  currencySign: { fontSize: 18, fontWeight: "700", color: THEME.colors.textPrimary },
   amountInput: { flex: 1 },
   tipoRow: { flexDirection: "row", gap: 10 },
-  tipoBtn: { flex: 1, borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 12, padding: 12, alignItems: "center", gap: 4 },
-  tipoBtnActive: { borderColor: "#6366F1", backgroundColor: "#EEF2FF" },
+  tipoBtn: { flex: 1, borderWidth: 1, borderColor: THEME.colors.border, borderRadius: THEME.radius.md, padding: 12, alignItems: "center", gap: 4 },
+  tipoBtnActive: { borderColor: THEME.colors.primary, backgroundColor: THEME.colors.primaryLight },
   tipoEmoji: { fontSize: 20 },
-  tipoText: { fontSize: 14, fontWeight: "700", color: "#6B7280" },
-  tipoTextActive: { color: "#6366F1" },
-  tipoSub: { fontSize: 10, color: "#9CA3AF", textAlign: "center" },
-  tipoSubActive: { color: "#818CF8" },
+  tipoText: { fontSize: 14, fontWeight: "700", color: THEME.colors.textSecondary },
+  tipoTextActive: { color: THEME.colors.primary },
+  tipoSub: { fontSize: 10, color: THEME.colors.textTertiary, textAlign: "center" },
+  tipoSubActive: { color: THEME.colors.primary },
   emojiScroll: { marginBottom: 4 },
-  emojiBtn: { width: 44, height: 44, borderRadius: 10, alignItems: "center", justifyContent: "center", marginRight: 8, backgroundColor: "#F3F4F6" },
-  emojiBtnActive: { backgroundColor: "#EEF2FF", borderWidth: 2, borderColor: "#6366F1" },
+  emojiBtn: { width: 44, height: 44, borderRadius: 10, alignItems: "center", justifyContent: "center", marginRight: 8, backgroundColor: THEME.colors.surfaceSecondary },
+  emojiBtnActive: { backgroundColor: THEME.colors.primaryLight, borderWidth: 2, borderColor: THEME.colors.primary },
   emojiChar: { fontSize: 22 },
-  saveBtn: { backgroundColor: "#6366F1", borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 24 },
-  saveBtnText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
-  error: { color: "#EF4444", fontSize: 13, fontWeight: "600", marginBottom: 8, marginTop: 4 },
+  saveBtn: { backgroundColor: THEME.colors.primary, borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 24 },
+  saveBtnText: { color: THEME.colors.surface, fontSize: 16, fontWeight: "700" },
+  error: { color: THEME.colors.expense, fontSize: 13, fontWeight: "600", marginBottom: 8, marginTop: 4 },
 });

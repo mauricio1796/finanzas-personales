@@ -14,6 +14,7 @@ import { useBottomPadding } from '../hooks/useBottomPadding';
 import { calcularMetricasFinancieras } from '../utils/ingresoUtils';
 import { simularDecision, ResultadoSimulacion, VeredictoSimulador } from '../utils/simuladorUtils';
 import { getPaletaItem } from '../constants/catalogoCategorias';
+import { THEME } from '../constants/theme';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -160,7 +161,7 @@ export const SimuladorDecisionesScreen: React.FC<Props> = ({ onBack, onNavigate 
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             activeOpacity={0.7}
           >
-            <Icon name="arrow-left" size={16} color="#FFFFFF" />
+            <Icon name="arrow-left" size={16} color={THEME.colors.surface} />
           </TouchableOpacity>
           <Text style={s.headerTitle}>Simulador</Text>
           <View style={{ width: 34 }} />
@@ -256,7 +257,7 @@ export const SimuladorDecisionesScreen: React.FC<Props> = ({ onBack, onNavigate 
             ]}
             activeOpacity={0.85}
           >
-            <Icon name="zap" size={18} color={monto ? '#FFFFFF' : colors.textTertiary} />
+            <Icon name="zap" size={18} color={monto ? THEME.colors.surface : colors.textTertiary} />
             <Text style={[s.simularBtnText, { color: monto ? '#FFFFFF' : colors.textTertiary }]}>
               Analizar compra
             </Text>
@@ -508,16 +509,16 @@ const s = StyleSheet.create({
   header:          { paddingHorizontal: 20, paddingBottom: 20 },
   headerNav:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   backBtn:         { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  headerTitle:     { fontSize: 17, fontWeight: '500', color: '#FFFFFF' },
+  headerTitle:     { fontSize: 17, fontWeight: '500', color: THEME.colors.surface },
   headerSub:       { fontSize: 13, color: 'rgba(255,255,255,0.75)', textAlign: 'center', lineHeight: 18, marginBottom: 14 },
   statsRow:        { flexDirection: 'row', gap: 8 },
   statPill:        { flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12, padding: 10, alignItems: 'center' },
-  statPillValue:   { fontSize: 12, fontWeight: '500', color: '#FFFFFF' },
+  statPillValue:   { fontSize: 12, fontWeight: '500', color: THEME.colors.surface },
   statPillLabel:   { fontSize: 9, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
 
   // Input
   inputWrap:       { margin: 16 },
-  inputCard:       { borderRadius: 20, padding: 20, alignItems: 'center', gap: 10 },
+  inputCard:       { borderRadius: THEME.radius.lg, padding: 20, alignItems: 'center', gap: 10 },
   inputPrompt:     { fontSize: 13 },
   amountRow:       { flexDirection: 'row', alignItems: 'center', gap: 4 },
   currencySign:    { fontSize: 28, fontWeight: '400' },
@@ -527,7 +528,7 @@ const s = StyleSheet.create({
   quickMontoLabel: { fontSize: 12 },
 
   // Botón simular
-  simularBtn:      { marginHorizontal: 16, borderRadius: 16, padding: 15, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  simularBtn:      { marginHorizontal: 16, borderRadius: THEME.radius.lg, padding: 15, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
   simularBtnText:  { fontSize: 15, fontWeight: '500' },
 
   // Historial
@@ -541,14 +542,14 @@ const s = StyleSheet.create({
   resultadoWrap:   { gap: 12, marginTop: 16, paddingHorizontal: 16, paddingBottom: 8 },
 
   // Veredicto card
-  veredictoCard:   { borderRadius: 20, borderWidth: 1, padding: 20, alignItems: 'center', gap: 8 },
+  veredictoCard:   { borderRadius: THEME.radius.lg, borderWidth: 1, padding: 20, alignItems: 'center', gap: 8 },
   veredictoIconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   veredictoTitulo: { fontSize: 22, fontWeight: '500' },
   veredictoSub:    { fontSize: 13, textAlign: 'center' },
   veredictoMonto:  { fontSize: 26, fontWeight: '500' },
 
   // Cards genéricas
-  card:            { borderRadius: 16, borderWidth: 0.5, padding: 14, gap: 10 },
+  card:            { borderRadius: THEME.radius.lg, borderWidth: 0.5, padding: 14, gap: 10 },
   cardTitle:       { fontSize: 13, fontWeight: '600' },
 
   // Barras de impacto
@@ -582,16 +583,16 @@ const s = StyleSheet.create({
   planValor:       { fontSize: 12, fontWeight: '500' },
 
   // Finn
-  finnCard:        { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 14, borderWidth: 0.5, padding: 14 },
+  finnCard:        { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 14, borderWidth: 0.5, padding: 14 }, // borderRadius 14 is intentionally between md(12) and lg(20)
   finnAvatar:      { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  finnLetter:      { fontSize: 11, fontWeight: '600', color: '#FFFFFF' },
+  finnLetter:      { fontSize: 11, fontWeight: '600', color: THEME.colors.surface },
   finnLabel:       { fontSize: 10, fontWeight: '600', letterSpacing: 0.4, marginBottom: 3 },
   finnText:        { fontSize: 13, lineHeight: 20 },
 
   // Acciones
   accionesRow:     { flexDirection: 'row', gap: 8, paddingBottom: 8 },
-  accionBtnOutline: { flex: 1, borderRadius: 14, borderWidth: 0.5, padding: 13, alignItems: 'center' },
+  accionBtnOutline: { flex: 1, borderRadius: 14, borderWidth: 0.5, padding: 13, alignItems: 'center' }, // 14 is between md/lg
   accionBtnOutlineText: { fontSize: 13 },
-  accionBtn:       { flex: 1, borderRadius: 14, padding: 13, alignItems: 'center' },
-  accionBtnText:   { fontSize: 13, fontWeight: '500', color: '#FFFFFF' },
+  accionBtn:       { flex: 1, borderRadius: 14, padding: 13, alignItems: 'center' }, // 14 is between md/lg
+  accionBtnText:   { fontSize: 13, fontWeight: '500', color: THEME.colors.surface },
 });

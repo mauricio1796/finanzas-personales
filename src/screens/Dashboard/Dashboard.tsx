@@ -11,6 +11,7 @@ import { ThemedView } from '@/components/themed-view';
 import { useFinance } from '@/src/state';
 import { Transaction } from '@/src/types';
 import FinanceDonutChart from '@/src/components/charts/FinanceDonutChart';
+import { THEME } from '@/src/constants/theme';
 
 interface DashboardProps {
   transactions: Transaction[];
@@ -127,7 +128,7 @@ export function Dashboard({ transactions, monthlySalary, onNavigateToSection }: 
               styles.progressFill,
               {
                 width: `${Math.min(percentage, 100)}%`,
-                backgroundColor: isOverBudget ? '#b91c1c' : '#2563eb',
+                backgroundColor: isOverBudget ? THEME.colors.expense : THEME.colors.primary,
               },
             ]}
           />
@@ -157,18 +158,18 @@ export function Dashboard({ transactions, monthlySalary, onNavigateToSection }: 
             <StatCard
               label="Saldo"
               value={`$${stats.balance.toFixed(2)}`}
-              color={stats.balance >= 0 ? '#2563eb' : '#b91c1c'}
+              color={stats.balance >= 0 ? THEME.colors.primary : THEME.colors.expense}
               subtext={`${stats.savingsPercentage.toFixed(1)}% del salario`}
             />
             <StatCard
               label="Ingresos"
               value={`$${stats.income.toFixed(2)}`}
-              color="#2563eb"
+              color={THEME.colors.primary}
             />
             <StatCard
               label="Gastos"
               value={`$${stats.expenses.toFixed(2)}`}
-              color="#b91c1c"
+              color={THEME.colors.expense}
             />
           </View>
           {chartData.length > 0 && (
@@ -216,34 +217,31 @@ const styles = StyleSheet.create({
   },
   statCard: {
     padding: 16,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     marginBottom: 8,
     backgroundColor: '#23272f',
     borderLeftWidth: 3,
     borderLeftColor: '#2563eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    ...THEME.shadow.card,
   },
   statLabel: {
     fontSize: 12,
     opacity: 0.7,
     marginBottom: 4,
-    color: '#a1a1aa',
+    color: THEME.colors.textTertiary,
     fontFamily: 'System',
   },
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#e5e7eb',
+    color: THEME.colors.border,
     fontFamily: 'System',
   },
   statSubtext: {
     fontSize: 12,
     opacity: 0.6,
     marginTop: 4,
-    color: '#a1a1aa',
+    color: THEME.colors.textTertiary,
     fontFamily: 'System',
   },
   chartSection: {
@@ -269,13 +267,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     backgroundColor: '#23272f',
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#444',
   },
   quickAccessButtonText: {
-    color: '#e5e7eb',
+    color: THEME.colors.border,
     fontWeight: '600',
     fontFamily: 'System',
   },
@@ -283,24 +281,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
-    color: '#e5e7eb',
+    color: THEME.colors.border,
     fontFamily: 'System',
   },
   budgetCard: {
     padding: 12,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     marginBottom: 12,
     backgroundColor: '#23272f',
     borderLeftWidth: 3,
     borderLeftColor: '#444',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
+    ...THEME.shadow.card,
   },
   budgetCardOverflow: {
     opacity: 0.7,
-    borderColor: '#b91c1c',
+    borderColor: THEME.colors.expense,
     borderWidth: 1,
   },
   budgetHeader: {
@@ -317,13 +312,13 @@ const styles = StyleSheet.create({
   budgetName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#e5e7eb',
+    color: THEME.colors.border,
     fontFamily: 'System',
   },
   budgetAmount: {
     fontSize: 12,
     opacity: 0.6,
-    color: '#a1a1aa',
+    color: THEME.colors.textTertiary,
     fontFamily: 'System',
   },
   progressBar: {
@@ -338,7 +333,7 @@ const styles = StyleSheet.create({
   },
   overBudgetText: {
     fontSize: 12,
-    color: '#b91c1c',
+    color: THEME.colors.expense,
     marginTop: 6,
     fontWeight: '600',
     fontFamily: 'System',

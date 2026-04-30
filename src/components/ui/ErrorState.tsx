@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../state/ThemeContext';
 import { Icon } from './Icon';
+import { THEME } from '../../constants/theme';
 
 interface ErrorStateProps {
   titulo?: string;
@@ -72,7 +73,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
               paddingVertical: 10,
             }}
           >
-            <Text style={{ fontSize: 14, fontWeight: '500', color: '#fff' }}>Reintentar</Text>
+            <Text style={{ fontSize: 14, fontWeight: '500', color: THEME.colors.surface }}>Reintentar</Text>
           </TouchableOpacity>
         )}
       </View>

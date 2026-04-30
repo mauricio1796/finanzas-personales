@@ -4,8 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, FeatherName } from '../components/ui/Icon';
 import { useFinance } from '../state/FinanceContext';
 import { RETOS_DISPONIBLES, RetoComunidad, calcularProgresoReto, getDiasRestantes } from '../services/RetosService';
+import { THEME } from '../constants/theme';
 
-const DIFICULTAD_COLORS = { facil: '#10B981', medio: '#F59E0B', dificil: '#EF4444' };
+const DIFICULTAD_COLORS = { facil: THEME.colors.income, medio: '#F59E0B', dificil: THEME.colors.expense };
 const DIFICULTAD_LABELS = { facil: 'Facil', medio: 'Medio', dificil: 'Dificil' };
 
 interface RetosScreenProps { onPremiumPress?: () => void; onBack?: () => void; }
@@ -46,18 +47,18 @@ export const RetosScreen: React.FC<RetosScreenProps> = ({ onPremiumPress, onBack
       <View style={styles.header}>
         {onBack ? (
           <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
-            <Icon name="arrow-left" size={20} color="#111827" />
+            <Icon name="arrow-left" size={20} color={THEME.colors.textPrimary} />
           </TouchableOpacity>
         ) : null}
         <Text style={[styles.headerTitle, onBack && { flex: 1, textAlign: 'center' }]}>Retos</Text>
-        <Icon name="award" size={20} color="#6366F1" />
+        <Icon name="award" size={20} color={THEME.colors.primary} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Reto activo */}
         {retoActivoData && retoActivo && (
           <View style={styles.activoCard}>
             <View style={styles.activoHeader}>
-              <Icon name={(retoActivoData.emoji || 'target') as FeatherName} size={24} color="#6366F1" />
+              <Icon name={(retoActivoData.emoji || 'target') as FeatherName} size={24} color={THEME.colors.primary} />
               <Text style={styles.activoTitle}>{retoActivoData.titulo}</Text>
               <View style={[styles.difBadge, { backgroundColor: DIFICULTAD_COLORS[retoActivoData.dificultad] + '20' }]}>
                 <Text style={[styles.difText, { color: DIFICULTAD_COLORS[retoActivoData.dificultad] }]}>{DIFICULTAD_LABELS[retoActivoData.dificultad]}</Text>
@@ -90,12 +91,12 @@ export const RetosScreen: React.FC<RetosScreenProps> = ({ onPremiumPress, onBack
           return (
             <View key={reto.id} style={[styles.retoCard, completado && styles.retoCardDone]}>
               <View style={styles.retoHeader}>
-                <Icon name={(reto.emoji || 'target') as FeatherName} size={20} color={bloqueado ? '#9CA3AF' : '#6366F1'} />
+                <Icon name={(reto.emoji || 'target') as FeatherName} size={20} color={bloqueado ? THEME.colors.textTertiary : THEME.colors.primary} />
                 <View style={{ flex: 1 }}>
                   <View style={styles.retoTitleRow}>
                     <Text style={styles.retoTitle}>{reto.titulo}</Text>
                     {bloqueado && <View style={styles.premiumBadge}><Text style={styles.premiumText}>PREMIUM</Text></View>}
-                    {completado && <Icon name="check-circle" size={16} color="#10B981" />}
+                    {completado && <Icon name="check-circle" size={16} color={THEME.colors.income} />}
                   </View>
                   <Text style={styles.retoDesc}>{reto.descripcion}</Text>
                 </View>
@@ -110,8 +111,8 @@ export const RetosScreen: React.FC<RetosScreenProps> = ({ onPremiumPress, onBack
               </View>
               {!completado && (
                 <TouchableOpacity style={[styles.btnUnirse, bloqueado && styles.btnUnirseBlocked]} onPress={() => handleIniciarReto(reto)} activeOpacity={0.8}>
-                  <Icon name={bloqueado ? 'lock' : 'play'} size={14} color={bloqueado ? '#9CA3AF' : '#6366F1'} />
-                  <Text style={[styles.btnUnirseText, bloqueado && { color: '#9CA3AF' }]}>{bloqueado ? 'Desbloquear Premium' : 'Unirme al reto'}</Text>
+                  <Icon name={bloqueado ? 'lock' : 'play'} size={14} color={bloqueado ? THEME.colors.textTertiary : THEME.colors.primary} />
+                  <Text style={[styles.btnUnirseText, bloqueado && { color: THEME.colors.textTertiary }]}>{bloqueado ? 'Desbloquear Premium' : 'Unirme al reto'}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -123,38 +124,38 @@ export const RetosScreen: React.FC<RetosScreenProps> = ({ onPremiumPress, onBack
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FAFAFA' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', backgroundColor: '#FFFFFF' },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  container: { flex: 1, backgroundColor: THEME.colors.background },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: THEME.colors.border, backgroundColor: THEME.colors.surface },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: THEME.colors.textPrimary },
   scroll: { padding: 16, paddingBottom: 32, gap: 14 },
-  activoCard: { backgroundColor: '#EEF2FF', borderRadius: 16, borderWidth: 2, borderColor: '#6366F1', padding: 16, gap: 10 },
+  activoCard: { backgroundColor: THEME.colors.primaryLight, borderRadius: THEME.radius.lg, borderWidth: 2, borderColor: THEME.colors.primary, padding: 16, gap: 10 },
   activoHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  activoTitle: { flex: 1, fontSize: 15, fontWeight: '800', color: '#111827' },
-  progressTrack: { height: 8, backgroundColor: '#FFFFFF', borderRadius: 4, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: '#6366F1', borderRadius: 4 },
-  activoSub: { fontSize: 12, color: '#6B7280' },
-  activoParticipantes: { fontSize: 12, color: '#6366F1', fontWeight: '600' },
+  activoTitle: { flex: 1, fontSize: 15, fontWeight: '800', color: THEME.colors.textPrimary },
+  progressTrack: { height: 8, backgroundColor: THEME.colors.surface, borderRadius: 4, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: THEME.colors.primary, borderRadius: 4 },
+  activoSub: { fontSize: 12, color: THEME.colors.textSecondary },
+  activoParticipantes: { fontSize: 12, color: THEME.colors.primary, fontWeight: '600' },
   activoBtns: { flexDirection: 'row', gap: 8 },
-  btnCompletar: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#6366F1', borderRadius: 10, paddingVertical: 10 },
-  btnCompletarText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  btnAbandonar: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB' },
-  btnAbandonarText: { fontSize: 13, fontWeight: '600', color: '#9CA3AF' },
-  sectionLabel: { fontSize: 11, fontWeight: '700', color: '#9CA3AF', letterSpacing: 0.8, textTransform: 'uppercase' },
-  retoCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB', padding: 14, gap: 10 },
-  retoCardDone: { borderColor: '#DCFCE7', backgroundColor: '#F0FDF4' },
+  btnCompletar: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: THEME.colors.primary, borderRadius: 10, paddingVertical: 10 },
+  btnCompletarText: { fontSize: 13, fontWeight: '700', color: THEME.colors.surface },
+  btnAbandonar: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: THEME.colors.surface, borderWidth: 1, borderColor: THEME.colors.border },
+  btnAbandonarText: { fontSize: 13, fontWeight: '600', color: THEME.colors.textTertiary },
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: THEME.colors.textTertiary, letterSpacing: 0.8, textTransform: 'uppercase' },
+  retoCard: { backgroundColor: THEME.colors.surface, borderRadius: THEME.radius.lg, borderWidth: 1, borderColor: THEME.colors.border, padding: 14, gap: 10 },
+  retoCardDone: { borderColor: THEME.colors.income, backgroundColor: THEME.colors.surfaceSecondary },
   retoHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   retoTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
-  retoTitle: { flex: 1, fontSize: 14, fontWeight: '700', color: '#111827' },
-  retoDesc: { fontSize: 12, color: '#9CA3AF', lineHeight: 18 },
+  retoTitle: { flex: 1, fontSize: 14, fontWeight: '700', color: THEME.colors.textPrimary },
+  retoDesc: { fontSize: 12, color: THEME.colors.textTertiary, lineHeight: 18 },
   retoMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  difBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  difBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: THEME.radius.pill },
   difText: { fontSize: 10, fontWeight: '700' },
-  retoDuracion: { fontSize: 11, color: '#9CA3AF' },
-  retoXP: { fontSize: 11, fontWeight: '700', color: '#6366F1' },
-  retoParticipantes: { fontSize: 11, color: '#9CA3AF' },
-  btnUnirse: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: '#6366F1', borderRadius: 10, paddingVertical: 9 },
-  btnUnirseBlocked: { borderColor: '#E5E7EB' },
-  btnUnirseText: { fontSize: 13, fontWeight: '700', color: '#6366F1' },
-  premiumBadge: { backgroundColor: '#6366F1', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 },
-  premiumText: { fontSize: 9, fontWeight: '800', color: '#FFFFFF' },
+  retoDuracion: { fontSize: 11, color: THEME.colors.textTertiary },
+  retoXP: { fontSize: 11, fontWeight: '700', color: THEME.colors.primary },
+  retoParticipantes: { fontSize: 11, color: THEME.colors.textTertiary },
+  btnUnirse: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: THEME.colors.primary, borderRadius: 10, paddingVertical: 9 },
+  btnUnirseBlocked: { borderColor: THEME.colors.border },
+  btnUnirseText: { fontSize: 13, fontWeight: '700', color: THEME.colors.primary },
+  premiumBadge: { backgroundColor: THEME.colors.primary, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5 },
+  premiumText: { fontSize: 9, fontWeight: '800', color: THEME.colors.surface },
 });

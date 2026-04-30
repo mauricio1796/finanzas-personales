@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { BudgetCard, ChatBubble, OptionButton, ProgressIndicator } from '../../components/onboarding';
 import { COLORS, SPACING } from '../../constants';
+import { THEME } from '../../constants/theme';
 import { useTheme } from '../../state/ThemeContext';
 import { useFinance } from '../../state';
 

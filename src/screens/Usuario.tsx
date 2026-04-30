@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFinance } from '@/src/core/context/FinanceContext';
 import { useTheme } from '../state/ThemeContext';
 import { Icon } from '../components/ui/Icon';
+import { THEME } from '../constants/theme';
 
 const formatCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
 
@@ -355,7 +356,7 @@ export function Usuario({ onLogout, onReset, onStartTour, onNavigate }: UsuarioP
           {isEditing && (
             <View style={styles.editButtons}>
               <Pressable style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSave}>
-                <Text style={[styles.saveBtnText, { color: '#FFFFFF' }]}>Guardar</Text>
+                <Text style={[styles.saveBtnText, { color: THEME.colors.surface }]}>Guardar</Text>
               </Pressable>
               <Pressable
                 style={[styles.cancelBtn, { backgroundColor: 'transparent', borderColor: colors.border }]}
@@ -496,7 +497,7 @@ export function Usuario({ onLogout, onReset, onStartTour, onNavigate }: UsuarioP
 }
 
 const CARD_SHADOW = Platform.OS !== 'web'
-  ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 2 }
+  ? { ...THEME.shadow.card }
   : {};
 
 const styles = StyleSheet.create({
@@ -521,17 +522,17 @@ const styles = StyleSheet.create({
   avatarWrap: {
     marginTop: 28,
     borderWidth: 3,
-    borderColor: '#FFFFFF',
+    borderColor: THEME.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.2)',
     ...(Platform.OS !== 'web'
-      ? { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 6 }
+      ? { shadowColor: THEME.colors.textPrimary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 6 }
       : {}),
   },
-  avatarLetter: { color: '#FFFFFF', fontWeight: '700' },
+  avatarLetter: { color: THEME.colors.surface, fontWeight: '700' },
 
-  headerName: { color: '#FFFFFF', fontWeight: '600', marginTop: 10 },
+  headerName: { color: THEME.colors.surface, fontWeight: '600', marginTop: 10 },
   headerEmail: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 2 },
 
   headerDetails: { alignItems: 'center', width: '100%', paddingHorizontal: 32 },
@@ -540,21 +541,21 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingVertical: 4,
     paddingHorizontal: 14,
-    borderRadius: 99,
+    borderRadius: THEME.radius.pill,
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  levelPillText: { color: '#FFFFFF', fontSize: 12, fontWeight: '500' },
+  levelPillText: { color: THEME.colors.surface, fontSize: 12, fontWeight: '500' },
 
   xpSection: { width: '100%', marginTop: 14, gap: 6 },
   xpLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
   xpLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '500', letterSpacing: 0.8 },
-  xpValue: { color: '#FFFFFF', fontSize: 11, fontWeight: '500' },
+  xpValue: { color: THEME.colors.surface, fontSize: 11, fontWeight: '500' },
   xpTrack: { height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
-  xpFill: { height: '100%', borderRadius: 3, backgroundColor: '#FFFFFF' },
+  xpFill: { height: '100%', borderRadius: 3, backgroundColor: THEME.colors.surface },
 
   // Cards
   card: {
-    borderRadius: 20,
+    borderRadius: THEME.radius.lg,
     borderWidth: 1,
     padding: 20,
     ...CARD_SHADOW,
@@ -564,7 +565,7 @@ const styles = StyleSheet.create({
   editPill: {
     paddingVertical: 5,
     paddingHorizontal: 14,
-    borderRadius: 99,
+    borderRadius: THEME.radius.pill,
   },
   editPillText: { fontSize: 12, fontWeight: '500' },
 
@@ -597,16 +598,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   editButtons: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  saveBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  saveBtn: { flex: 1, paddingVertical: 14, borderRadius: THEME.radius.md, alignItems: 'center' },
   saveBtnText: { fontSize: 14, fontWeight: '600' },
-  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1.5 },
+  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: THEME.radius.md, alignItems: 'center', borderWidth: 1.5 },
   cancelBtnText: { fontSize: 14, fontWeight: '500' },
 
   // Stats row
   statsRow: { flexDirection: 'row' },
   statCard: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: THEME.radius.lg,
     borderWidth: 1,
     padding: 16,
     gap: 8,
@@ -634,7 +635,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 14,
     ...CARD_SHADOW,
-  },
+  }, // borderRadius 14 is between md(12) and lg(20)
   actionIconCircle: {
     width: 36,
     height: 36,

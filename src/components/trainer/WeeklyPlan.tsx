@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Colors } from '@/constants/colors';
 import { Spacing } from '@/constants/spacing';
+import { THEME } from '../../constants/theme';
 
 interface Challenge {
   id: string;
@@ -128,7 +129,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     padding: Spacing.lg,
     gap: Spacing.md,
   },
@@ -149,7 +150,7 @@ const styles = StyleSheet.create({
   },
   xpBadge: {
     backgroundColor: Colors.primary,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     alignItems: 'center',
@@ -199,20 +200,20 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: Spacing.md,
     backgroundColor: Colors.background,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   challengeCompleted: {
-    backgroundColor: `${'#10B981'}10`,
-    borderColor: '#10B981',
+    backgroundColor: `${THEME.colors.income}10`,
+    borderColor: THEME.colors.income,
   },
   challengeIcon: {
     width: 40,
     height: 40,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     backgroundColor: Colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
@@ -243,7 +244,7 @@ const styles = StyleSheet.create({
   },
   completedCheckmark: {
     fontSize: 24,
-    color: '#10B981',
+    color: THEME.colors.income,
     fontWeight: '700',
   },
   xpReward: {
@@ -257,7 +258,7 @@ const styles = StyleSheet.create({
   },
   motivationContainer: {
     backgroundColor: `${Colors.primary}10`,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     padding: Spacing.md,
     borderLeftWidth: 4,
     borderLeftColor: Colors.primary,

@@ -157,6 +157,16 @@ export function calcularMetricasFinancieras(
   };
 }
 
+// ── Tipos extras para contexto enriquecido ────────────────────────────────────
+
+export interface ContextoExtraIA {
+  metas?: Array<{ nombre: string; objetivo: number; actual: number; completada: boolean }>;
+  deudas?: Array<{ nombre: string; saldo: number; cuota: number }>;
+  recurrentes?: Array<{ nombre: string; monto: number; activo: boolean }>;
+  nivel?: { level: number; experience: number; title: string };
+  memoriaFinn?: string; // contexto de memoria persistente de Finn
+}
+
 // ── Contexto para IA ───────────────────────────────────────────────────────────
 
 export function buildContextoIA(
@@ -166,6 +176,7 @@ export function buildContextoIA(
   profile: any,
   mes: number,
   año: number,
+  extra?: ContextoExtraIA,
 ): string {
   const f = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
   const mesLabel = new Date(año, mes, 1).toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
@@ -189,9 +200,9 @@ export function buildContextoIA(
     .map((c: any) => c.diaPago ? `${c.name} (día ${c.diaPago}: ${f(c.budget)})` : `${c.name} (presupuesto: ${f(c.budget)})`)
     .join(', ');
 
-  return `
+  const partes: string[] = [`
 CONTEXTO FINANCIERO — ${mesLabel}
-Usuario: ${profile?.name || 'Usuario'} | Empleo: ${profile?.employmentType || 'no especificado'}
+Usuario: ${profile?.name || 'Usuario'} | Empleo: ${profile?.employmentType || 'no especificado'} | Preocupación principal: ${profile?.mainFinancialConcern || 'no especificada'}
 
 INGRESOS:
 - Ingreso del mes: ${f(metricas.ingresoEfectivo)} ${metricas.esIngresoReal ? '(registrado)' : '(estimado del perfil)'}
@@ -210,6 +221,48 @@ BALANCE:
 - Balance final proyectado: ${f(metricas.balanceFinal)} (${metricas.porcentajeLibre}%)
 - Ahorro proyectado: ${f(metricas.ahorroProyectado)}
 - Días restantes: ${metricas.diasRestantesMes}
-- Presupuesto diario recomendado: ${f(metricas.gastoPromedioRecomendadoDia)}/día
-`.trim();
+- Presupuesto diario recomendado: ${f(metricas.gastoPromedioRecomendadoDia)}/día`.trim()];
+
+  // Metas de ahorro
+  if (extra?.metas && extra.metas.length > 0) {
+    const metasActivas = extra.metas.filter(m => !m.completada);
+    if (metasActivas.length > 0) {
+      const metasStr = metasActivas.map(m => {
+        const pct = m.objetivo > 0 ? Math.round((m.actual / m.objetivo) * 100) : 0;
+        return `${m.nombre}: ${f(m.actual)}/${f(m.objetivo)} (${pct}%)`;
+      }).join(' | ');
+      partes.push(`\nMETAS DE AHORRO:\n- ${metasStr}`);
+    }
+  }
+
+  // Deudas activas
+  if (extra?.deudas && extra.deudas.length > 0) {
+    const deudasActivas = extra.deudas.filter(d => d.saldo > 0);
+    if (deudasActivas.length > 0) {
+      const totalDeudas = deudasActivas.reduce((s, d) => s + d.saldo, 0);
+      const deudasStr = deudasActivas.map(d => `${d.nombre}: ${f(d.saldo)} (cuota ${f(d.cuota)})`).join(' | ');
+      partes.push(`\nDEUDAS ACTIVAS:\n- Total: ${f(totalDeudas)}\n- Detalle: ${deudasStr}`);
+    }
+  }
+
+  // Gastos recurrentes activos
+  if (extra?.recurrentes && extra.recurrentes.length > 0) {
+    const activos = extra.recurrentes.filter(r => r.activo);
+    if (activos.length > 0) {
+      const totalRec = activos.reduce((s, r) => s + r.monto, 0);
+      partes.push(`\nGASTOS RECURRENTES: ${activos.length} activos | Total mensual: ${f(totalRec)}`);
+    }
+  }
+
+  // Nivel de gamificación
+  if (extra?.nivel) {
+    partes.push(`\nNIVEL FINANCIERO: ${extra.nivel.title} (Nivel ${extra.nivel.level} | ${extra.nivel.experience} XP)`);
+  }
+
+  // Memoria persistente de Finn
+  if (extra?.memoriaFinn) {
+    partes.push(`\n${extra.memoriaFinn}`);
+  }
+
+  return partes.join('\n');
 }

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../state/ThemeContext';
+import { THEME } from '../../constants/theme';
 import { Icon } from './Icon';
 import {
   iniciarGrabacion,
@@ -155,7 +156,7 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({ onParsed, size = 'norm
 
   // ── Button appearance ────────────────────────────────────────────────────
   const isRecording = voiceState === 'recording';
-  const btnColor    = isRecording ? '#EF4444' : colors.primary;
+  const btnColor    = isRecording ? THEME.colors.expense : colors.primary;
   const btnBg       = isRecording ? '#FEE2E250' : colors.primaryLight;
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -171,11 +172,11 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({ onParsed, size = 'norm
           <>
             <Animated.View style={[
               StyleSheet.absoluteFill,
-              { borderRadius: dim / 2, backgroundColor: '#EF444425', transform: [{ scale: pulseOuter }] },
+              { borderRadius: dim / 2, backgroundColor: `${THEME.colors.expense}25`, transform: [{ scale: pulseOuter }] },
             ]} />
             <Animated.View style={[
               StyleSheet.absoluteFill,
-              { borderRadius: dim / 2, backgroundColor: '#EF444438', transform: [{ scale: pulseInner }] },
+              { borderRadius: dim / 2, backgroundColor: `${THEME.colors.expense}38`, transform: [{ scale: pulseInner }] },
             ]} />
           </>
         )}
@@ -250,8 +251,8 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({ onParsed, size = 'norm
                 disabled={!transcript.trim() || voiceState === 'processing'}
               >
                 {voiceState === 'processing'
-                  ? <ActivityIndicator size="small" color="#FFFFFF" />
-                  : <Text style={[st.btnTxt, { color: '#FFFFFF' }]}>Registrar →</Text>
+                  ? <ActivityIndicator size="small" color={THEME.colors.surface} />
+                  : <Text style={[st.btnTxt, { color: THEME.colors.surface }]}>Registrar →</Text>
                 }
               </TouchableOpacity>
             </View>

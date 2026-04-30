@@ -16,12 +16,14 @@ import { Icon, getCategoryIcon } from '../../components/ui/Icon';
 import { getPaletaItem } from '../../constants/catalogoCategorias';
 import { generarInsightDiario } from '../../services/RealAIService';
 import { calcularMetricasFinancieras } from '../../utils/ingresoUtils';
+import { THEME } from '../../constants/theme';
 import { QuickAddSheet, type QuickAddInitialData } from '../../components/ui/QuickAddSheet';
 import { VoiceButton } from '../../components/ui/VoiceButton';
 import { type ParsedTransaction } from '../../services/VoiceService';
 import { SwipeableRow } from '../../components/ui/SwipeableRow';
 import { DrawerMenu } from '../../components/layout/DrawerMenu';
 import { Transaction } from '../../types';
+import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtCOP = (n: number) =>
@@ -41,6 +43,180 @@ function getNombreMes(mes: number): string {
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
+
+// ─── WeeklyAreaChart ─────────────────────────────────────────────────────────
+
+const CHART_H = 110;
+const CHART_W_OFFSET = 32; // left label space
+
+interface WeeklyAreaChartProps {
+  transactions: Transaction[];
+}
+
+const WeeklyAreaChart: React.FC<WeeklyAreaChartProps> = ({ transactions }) => {
+  const { width: screenW } = require('react-native').Dimensions.get('window');
+  const chartW = screenW - 32 - CHART_W_OFFSET; // 16px padding each side
+
+  // Build last-7-days data
+  const days = useMemo(() => {
+    const result: { label: string; gastos: number; ingresos: number }[] = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      const dayStr = d.toDateString();
+      const label = d.toLocaleDateString('es-CO', { weekday: 'short' })
+        .replace('.', '')
+        .charAt(0).toUpperCase() + d.toLocaleDateString('es-CO', { weekday: 'short' }).replace('.', '').slice(1, 3);
+      const gastos   = transactions.filter(t => t.type === 'expense' && new Date(t.date).toDateString() === dayStr).reduce((a, t) => a + t.amount, 0);
+      const ingresos = transactions.filter(t => t.type === 'income'  && new Date(t.date).toDateString() === dayStr).reduce((a, t) => a + t.amount, 0);
+      result.push({ label, gastos, ingresos });
+    }
+    return result;
+  }, [transactions]);
+
+  const maxVal = useMemo(() => Math.max(...days.map(d => Math.max(d.gastos, d.ingresos)), 1), [days]);
+
+  const makeAreaPath = (values: number[], closed = true): string => {
+    const pts = values.map((v, i) => ({
+      x: CHART_W_OFFSET + (i / (values.length - 1)) * chartW,
+      y: CHART_H - 8 - (v / maxVal) * (CHART_H - 20),
+    }));
+
+    // Smooth catmull-rom
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 1; i < pts.length; i++) {
+      const cp1x = pts[i - 1].x + (pts[i].x - pts[i - 1].x) / 3;
+      const cp1y = pts[i - 1].y;
+      const cp2x = pts[i].x - (pts[i].x - pts[i - 1].x) / 3;
+      const cp2y = pts[i].y;
+      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${pts[i].x} ${pts[i].y}`;
+    }
+    if (closed) {
+      d += ` L ${pts[pts.length - 1].x} ${CHART_H} L ${pts[0].x} ${CHART_H} Z`;
+    }
+    return d;
+  };
+
+  const gastosPath   = makeAreaPath(days.map(d => d.gastos));
+  const ingresosPath = makeAreaPath(days.map(d => d.ingresos));
+  const gastosLine   = makeAreaPath(days.map(d => d.gastos), false);
+  const ingresosLine = makeAreaPath(days.map(d => d.ingresos), false);
+
+  // Y-axis labels
+  const yLabels = [0, Math.round(maxVal / 2), maxVal].map(v =>
+    v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` :
+    v >= 1_000     ? `${Math.round(v / 1_000)}K` : String(v)
+  );
+
+  return (
+    <View style={ac.wrap}>
+      <View style={ac.header}>
+        <Text style={ac.title}>Flujo semanal</Text>
+        <View style={ac.legend}>
+          <View style={ac.legendDot} />
+          <Text style={ac.legendText}>Gastos</Text>
+          <View style={[ac.legendDot, { backgroundColor: '#1D9E75' }]} />
+          <Text style={ac.legendText}>Ingresos</Text>
+        </View>
+      </View>
+
+      <View style={{ flexDirection: 'row', height: CHART_H }}>
+        {/* Y-axis */}
+        <View style={{ width: CHART_W_OFFSET, height: CHART_H, justifyContent: 'space-between', paddingBottom: 16 }}>
+          {[yLabels[2], yLabels[1], yLabels[0]].map((l, i) => (
+            <Text key={i} style={ac.yLabel}>{l}</Text>
+          ))}
+        </View>
+
+        {/* Chart */}
+        <Svg width={chartW} height={CHART_H}>
+          <Defs>
+            <LinearGradient id="gastoGrad" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0"   stopColor="#6156E8" stopOpacity="0.25" />
+              <Stop offset="1"   stopColor="#6156E8" stopOpacity="0.01" />
+            </LinearGradient>
+            <LinearGradient id="ingresoGrad" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0"   stopColor="#1D9E75" stopOpacity="0.18" />
+              <Stop offset="1"   stopColor="#1D9E75" stopOpacity="0.01" />
+            </LinearGradient>
+          </Defs>
+          {/* Grid lines */}
+          {[0.25, 0.5, 0.75].map((f, i) => (
+            <Path key={i} d={`M 0 ${CHART_H * f - 4} H ${chartW}`} stroke="#E5E7EB" strokeWidth="0.5" />
+          ))}
+          {/* Areas */}
+          <Path d={gastosPath}   fill="url(#gastoGrad)"   />
+          <Path d={ingresosPath} fill="url(#ingresoGrad)" />
+          {/* Lines */}
+          <Path d={gastosLine}   fill="none" stroke="#6156E8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <Path d={ingresosLine} fill="none" stroke="#1D9E75" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      </View>
+
+      {/* X-axis labels */}
+      <View style={{ flexDirection: 'row', paddingLeft: CHART_W_OFFSET }}>
+        {days.map((d, i) => (
+          <Text key={i} style={[ac.xLabel, { flex: 1, textAlign: i === 0 ? 'left' : i === days.length - 1 ? 'right' : 'center' }]}>
+            {d.label}
+          </Text>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+const ac = StyleSheet.create({
+  wrap: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  legend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#6156E8',
+  },
+  legendText: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginRight: 6,
+  },
+  yLabel: {
+    fontSize: 9,
+    color: '#9CA3AF',
+    textAlign: 'right',
+    width: CHART_W_OFFSET - 6,
+  },
+  xLabel: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginTop: 6,
+  },
+});
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface FinancialFeedProps {
@@ -100,6 +276,14 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
         return acc;
       }, {} as Record<string, number>);
   }, [txMesSel]);
+
+  const ingresosMes = useMemo(() =>
+    txMesSel.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0),
+  [txMesSel]);
+
+  const gastosMes = useMemo(() =>
+    txMesSel.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0),
+  [txMesSel]);
 
   // ── Today / Yesterday transactions ─────────────────────────────────────────
   const hoyStr  = now.toDateString();
@@ -269,19 +453,19 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
     const hora = new Date(tx.date).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
     return (
       <SwipeableRow key={tx.id} onDelete={() => ctxDelete(tx.id)}>
-        <View style={[s.txCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[s.txIcon, { backgroundColor: bg, borderRadius: 10 }]}>
-            <Icon name={icon as any} size={16} color={color} />
+        <View style={s.txCard}>
+          <View style={[s.txIcon, { backgroundColor: bg }]}>
+            <Icon name={icon as any} size={18} color={color} />
           </View>
           <View style={s.txInfo}>
-            <Text style={[s.txName, { color: colors.textPrimary }]} numberOfLines={1}>
+            <Text style={[s.txName, { color: THEME.colors.textPrimary }]} numberOfLines={1}>
               {tx.description || tx.category}
             </Text>
-            <Text style={[s.txSub, { color: colors.textTertiary }]}>
+            <Text style={s.txSub}>
               {tx.category} · {hora}
             </Text>
           </View>
-          <Text style={[s.txAmount, { color: isIncome ? colors.income : colors.expense }]}>
+          <Text style={[s.txAmount, { color: isIncome ? THEME.colors.income : THEME.colors.expense }]}>
             {isIncome ? '+' : '-'}{fmtCOP(tx.amount)}
           </Text>
         </View>
@@ -324,7 +508,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
           </Text>
         </View>
         {/* Progress bar */}
-        <View style={[s.barTrack, { backgroundColor: colors.borderSubtle }]}>
+        <View style={s.barTrack}>
           <Animated.View
             style={[
               s.barFill,
@@ -390,57 +574,51 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
+    <View style={[s.root, { backgroundColor: THEME.colors.background }]}>
       {/* ── HERO ─────────────────────────────────────────────────────── */}
-      <View style={[s.hero, { backgroundColor: colors.headerBg, paddingTop: insets.top + 12 }]}>
+      <View style={[s.hero, { backgroundColor: THEME.colors.background, paddingTop: insets.top + 16 }]}>
         {/* Top bar */}
         <View style={s.heroTopBar}>
-          {/* Avatar */}
-          <TouchableOpacity
-            style={[s.avatar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
-            onPress={() => onNavigate('perfil')}
-          >
+          {/* Avatar - 40×40, light indigo */}
+          <TouchableOpacity style={s.avatar} onPress={() => onNavigate('perfil')}>
             <Text style={s.avatarLetter}>{(user?.name ?? 'U').charAt(0).toUpperCase()}</Text>
           </TouchableOpacity>
 
-          {/* Greeting */}
+          {/* Greeting + month subtitle */}
           <View style={s.greetingWrap}>
             <Text style={s.greetingText} numberOfLines={1}>
               {getSaludo()}, {firstName}
             </Text>
+            <Text style={s.greetingMonth}>
+              {capitalize(getNombreMes(mesActual))} {añoActual}
+            </Text>
           </View>
 
-          {/* Icon buttons */}
+          {/* Icon buttons — light-themed */}
           <View style={s.heroIconsRow}>
-            <TouchableOpacity
-              style={[s.heroIconBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
-              onPress={() => onNavigate('calendario')}
-            >
-              <Icon name="bell" size={16} color="#FFFFFF" />
+            <TouchableOpacity style={s.heroIconBtn} onPress={() => onNavigate('calendario')}>
+              <Icon name="bell" size={16} color={THEME.colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={s.heroIconBtn} onPress={() => onNavigate('historial')}>
+              <Icon name="search" size={16} color={THEME.colors.textSecondary} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={[s.heroIconBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
-              onPress={() => onNavigate('historial')}
-            >
-              <Icon name="search" size={16} color="#FFFFFF" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.heroIconBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
+              style={s.heroIconBtn}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 setDrawerVisible(true);
               }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Icon name="menu" size={16} color="#FFFFFF" />
+              <Icon name="menu" size={16} color={THEME.colors.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Balance */}
+        {/* ── Balance Card — purple ─────────────────────────────────── */}
         <Animated.View
           style={[
-            s.balanceWrap,
+            s.balanceCard,
             {
               opacity: heroAnim,
               transform: [{ scale: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) }],
@@ -456,6 +634,20 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
           <Text style={s.balanceMonth}>
             {capitalize(getNombreMes(mesActual))} {añoActual}
           </Text>
+
+          {/* Sub-cards: ingresos / gastos */}
+          <View style={s.balanceSubCards}>
+            <View style={s.balanceSubCard}>
+              <Icon name="arrow-up" size={12} color="rgba(255,255,255,0.7)" />
+              <Text style={s.balanceSubLabel}>Ingresos</Text>
+              <Text style={s.balanceSubValue}>{fmtCOP(ingresosMes)}</Text>
+            </View>
+            <View style={s.balanceSubCard}>
+              <Icon name="arrow-down" size={12} color="rgba(255,255,255,0.7)" />
+              <Text style={s.balanceSubLabel}>Gastos</Text>
+              <Text style={s.balanceSubValue}>{fmtCOP(gastosMes)}</Text>
+            </View>
+          </View>
 
           {/* 3-segment breakdown bar */}
           <View style={s.segBarWrap}>
@@ -504,7 +696,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
 
       {/* ── SCROLL BODY ───────────────────────────────────────────────── */}
       <ScrollView
-        style={[s.scrollBody, { backgroundColor: colors.background }]}
+        style={s.scrollBody}
         contentContainerStyle={[s.scrollContent, { paddingBottom: 120 }]}
         showsVerticalScrollIndicator={false}
       >
@@ -536,6 +728,54 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
             </View>
           ))}
         </View>
+
+        {/* ── Area chart ─────────────────────────────────────────────── */}
+        <WeeklyAreaChart transactions={transactions} />
+
+        {/* ── Categorías — estilo imagen ──────────────────────────────── */}
+        <View style={s.sectionHeader}>
+          <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>Flujo por categoría</Text>
+          <TouchableOpacity onPress={() => onNavigate('estadisticas')}>
+            <Text style={[s.sectionLink, { color: colors.primary }]}>Ver más</Text>
+          </TouchableOpacity>
+        </View>
+        {categories
+          .filter((c: any) => c.isSelected && (gastosPorCatSel[c.name] ?? 0) > 0)
+          .sort((a: any, b: any) => (gastosPorCatSel[b.name] ?? 0) - (gastosPorCatSel[a.name] ?? 0))
+          .slice(0, 5)
+          .map((cat: any) => {
+            const gasto   = gastosPorCatSel[cat.name] ?? 0;
+            const budget  = cat.budget ?? 0;
+            const iconName = (cat.icon as any) || getCategoryIcon(cat.name);
+            const iconBg   = ICON_MAP[cat.name]?.bg    ?? colors.cardSecondary;
+            const iconCol  = ICON_MAP[cat.name]?.color ?? colors.textSecondary;
+            const pct      = budget > 0 ? Math.min((gasto / budget) * 100, 100) : 0;
+            const pctColor = pct >= 100 ? colors.expense : pct >= 80 ? colors.warning : colors.income;
+            return (
+              <View key={cat.id} style={cf.row}>
+                <View style={[cf.iconCircle, { backgroundColor: iconBg }]}>
+                  <Icon name={iconName as any} size={18} color={iconCol} />
+                </View>
+                <View style={cf.info}>
+                  <Text style={cf.catName} numberOfLines={1}>{cat.name}</Text>
+                  {budget > 0 && (
+                    <View style={cf.barWrap}>
+                      <View style={[cf.barFill, { width: `${pct}%` as any, backgroundColor: pctColor }]} />
+                    </View>
+                  )}
+                  <Text style={cf.budgetLabel}>
+                    {budget > 0 ? `Presupuesto ${fmtCOP(budget)}` : 'Sin presupuesto'}
+                  </Text>
+                </View>
+                <Text style={[cf.amount, { color: colors.expense }]}>−{fmtCOP(gasto)}</Text>
+              </View>
+            );
+          })}
+        {categories.filter((c: any) => c.isSelected && (gastosPorCatSel[c.name] ?? 0) > 0).length === 0 && (
+          <View style={[cf.empty, { backgroundColor: colors.card }]}>
+            <Text style={{ fontSize: 12, color: colors.textTertiary }}>Sin gastos registrados este mes</Text>
+          </View>
+        )}
 
         {/* ── Metas carousel ─────────────────────────────────────────── */}
         {metas.filter(m => !m.completada).length > 0 && (
@@ -614,7 +854,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
               onPress={() => onNavigate('calendario')}
             >
               <View style={[s.alertIcon, { backgroundColor: isVencido ? colors.warning : colors.border }]}>
-                <Icon name="alert-triangle" size={14} color={isVencido ? '#FFFFFF' : colors.textSecondary} />
+                <Icon name="alert-triangle" size={14} color={isVencido ? THEME.colors.surface : colors.textSecondary} />
               </View>
               <Text style={[s.alertText, { color: isVencido ? colors.warning : colors.textSecondary }]}>
                 {texto}
@@ -647,15 +887,15 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
                 style={[
                   s.monthPill,
                   active
-                    ? { backgroundColor: colors.primary }
-                    : { backgroundColor: colors.cardSecondary, borderWidth: 0.5, borderColor: colors.border },
+                    ? { backgroundColor: THEME.colors.primary }
+                    : { backgroundColor: '#F4F3F8' },
                 ]}
                 onPress={() => setMesSeleccionado({ mes: m.mes, año: m.año })}
               >
                 <Text
                   style={[
                     s.monthPillText,
-                    { color: active ? '#FFFFFF' : colors.textSecondary, fontWeight: active ? '600' : '400' },
+                    { color: active ? '#FFFFFF' : '#6B7280', fontWeight: active ? '600' : '400' },
                   ]}
                 >
                   {m.label}
@@ -829,37 +1069,49 @@ const s = StyleSheet.create({
     flex: 1,
   },
 
-  // Hero
+  // Hero — light background
   hero: {
     paddingHorizontal: 20,
-    paddingBottom: 72,
+    paddingBottom: 20,
   },
   heroTopBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
+
+  // Avatar — 40×40, light indigo
   avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: THEME.radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#EEF0FF',
   },
   avatarLetter: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#6156E8',
   },
+
+  // Greeting
   greetingWrap: {
     flex: 1,
-    alignItems: 'center',
   },
   greetingText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#111827',
+    letterSpacing: -0.5,
   },
+  greetingMonth: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+
+  // Hero icon buttons — light themed
   heroIconsRow: {
     flexDirection: 'row',
     gap: 8,
@@ -867,68 +1119,82 @@ const s = StyleSheet.create({
   heroIconBtn: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: THEME.radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: THEME.colors.surfaceSecondary,
   },
 
-  // Balance
-  balanceWrap: {
-    marginTop: 28,
-    alignItems: 'flex-start',
+  // Balance Card — purple
+  balanceCard: {
+    backgroundColor: '#6156E8',
+    borderRadius: 20,
+    padding: 24,
+    marginTop: 20,
   },
   balanceLabel: {
     fontSize: 11,
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.65)',
+    color: 'rgba(255,255,255,0.7)',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     marginBottom: 6,
   },
   balanceAmount: {
-    fontSize: 42,
-    fontWeight: '500',
+    fontSize: 32,
+    fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: -1,
-    lineHeight: 50,
+    lineHeight: 40,
   },
   balanceMonth: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.55)',
     marginTop: 4,
   },
-  changeBadge: {
+
+  // Balance sub-cards
+  balanceSubCards: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginTop: 10,
+    gap: 8,
+    marginTop: 16,
+    marginBottom: 4,
   },
-  changeBadgeText: {
-    fontSize: 11,
+  balanceSubCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    padding: 12,
+    gap: 4,
+  },
+  balanceSubLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: '500',
+  },
+  balanceSubValue: {
+    fontSize: 14,
     color: '#FFFFFF',
+    fontWeight: '700',
   },
 
   // Segment bar
   segBarWrap: {
     flexDirection: 'row',
-    height: 5,
-    borderRadius: 3,
+    height: 6,
+    borderRadius: 100,
     overflow: 'hidden',
     width: '100%',
     marginTop: 14,
     gap: 2,
   },
   segSlice: {
-    borderRadius: 3,
+    borderRadius: 100,
   },
   segLabelsRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 6,
+    marginTop: 8,
   },
   segLabel: {
     fontSize: 10,
@@ -973,9 +1239,10 @@ const s = StyleSheet.create({
   // Scroll body
   scrollBody: {
     flex: 1,
-    marginTop: -40,
+    marginTop: -16,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    backgroundColor: '#F8F7FF',
   },
   scrollContent: {
     paddingTop: 20,
@@ -996,7 +1263,7 @@ const s = StyleSheet.create({
   quickActionCircle: {
     width: 52,
     height: 52,
-    borderRadius: 26,
+    borderRadius: THEME.radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1028,7 +1295,7 @@ const s = StyleSheet.create({
   finnLetter: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
   },
   insightContent: {
     flex: 1,
@@ -1079,12 +1346,14 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
+    color: THEME.colors.textPrimary,
   },
   sectionLink: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: THEME.colors.primary,
   },
 
   // Month pills
@@ -1096,12 +1365,13 @@ const s = StyleSheet.create({
     paddingRight: 4,
   },
   monthPill: {
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 5,
+    borderRadius: 100,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
   },
   monthPillText: {
     fontSize: 12,
+    fontWeight: '500',
   },
 
   // Category card
@@ -1128,11 +1398,11 @@ const s = StyleSheet.create({
   catName: {
     flex: 1,
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   catPct: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   catAmountsRow: {
     flexDirection: 'row',
@@ -1145,14 +1415,17 @@ const s = StyleSheet.create({
   catOf: {
     fontSize: 11,
   },
+
+  // Progress bar — semaphore
   barTrack: {
-    height: 4,
-    borderRadius: 2,
+    height: 6,
+    borderRadius: 100,
     overflow: 'hidden',
+    backgroundColor: '#E5E7EB',
   },
   barFill: {
-    height: 4,
-    borderRadius: 2,
+    height: 6,
+    borderRadius: 100,
   },
 
   // Empty category
@@ -1182,37 +1455,45 @@ const s = StyleSheet.create({
     paddingVertical: 8,
   },
 
-  // Tx card
+  // Transaction card
   txCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    borderRadius: 12,
-    borderWidth: 0.5,
-    padding: 12,
-    marginBottom: 2,
+    gap: 12,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 3,
   },
   txIcon: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   txInfo: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
   txName: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: THEME.colors.textPrimary,
   },
   txSub: {
     fontSize: 11,
+    color: '#9CA3AF',
   },
   txAmount: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 
   // Empty activity
@@ -1226,5 +1507,83 @@ const s = StyleSheet.create({
   },
   emptyActivitySub: {
     fontSize: 12,
+  },
+
+  // FAB
+  fab: {
+    position: 'absolute',
+    bottom: 28,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#6156E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#6156E8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+});
+
+// ─── Category-flow styles ────────────────────────────────────────────────────
+const cf = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  info: {
+    flex: 1,
+    gap: 4,
+  },
+  catName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  barWrap: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#E5E7EB',
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: 3,
+    borderRadius: 2,
+  },
+  budgetLabel: {
+    fontSize: 10,
+    color: '#9CA3AF',
+  },
+  amount: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  empty: {
+    borderRadius: 14,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 16,
   },
 });

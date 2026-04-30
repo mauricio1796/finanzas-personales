@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useFinance } from '../../state';
 import { COLORS, SPACING } from '../../constants';
+import { THEME } from '../../constants/theme';
 import { ChatBubble } from '../../components/onboarding';
 
 interface OnboardingDashboardOverlayProps {
@@ -127,7 +128,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 500,
     backgroundColor: COLORS.background,
-    borderRadius: 20,
+    borderRadius: THEME.radius.lg,
     padding: SPACING.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -136,7 +137,7 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   containerMobile: {
-    borderRadius: 16,
+    borderRadius: THEME.radius.lg,
     padding: SPACING.md,
   },
   content: {
@@ -152,7 +153,7 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     padding: SPACING.md,
     backgroundColor: COLORS.cardSecondary,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
   },
   featureIcon: {
     fontSize: 24,
@@ -179,12 +180,12 @@ const styles = StyleSheet.create({
   completeButton: {
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.lg,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   completeButtonText: {
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
     fontSize: 16,
     fontWeight: '700',
   },

@@ -30,6 +30,7 @@ import {
   getIconoTx,
 } from '../utils/historialUtils';
 import { type Transaction } from '../types';
+import { THEME } from '../constants/theme';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -93,8 +94,8 @@ const ev = StyleSheet.create({
   iconWrap: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   title:    { fontSize: 16, fontWeight: '500', textAlign: 'center' },
   sub:      { fontSize: 13, textAlign: 'center', lineHeight: 20 },
-  btn:      { borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 },
-  btnText:  { fontSize: 13, fontWeight: '500', color: '#fff' },
+  btn:      { borderRadius: THEME.radius.md, paddingHorizontal: 20, paddingVertical: 10 },
+  btnText:  { fontSize: 13, fontWeight: '500', color: THEME.colors.surface },
 });
 
 // ── Filtros por defecto ───────────────────────────────────────────────────────
@@ -389,7 +390,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
             style={s.headerIconBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Icon name="arrow-left" size={16} color="#fff" />
+            <Icon name="arrow-left" size={16} color={THEME.colors.surface} />
           </TouchableOpacity>
 
           {/* Título o barra de búsqueda */}
@@ -429,7 +430,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
               style={[s.headerIconBtn, mostrarBusqueda && s.headerIconBtnActive]}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Icon name={mostrarBusqueda ? 'x' : 'search'} size={15} color="#fff" />
+              <Icon name={mostrarBusqueda ? 'x' : 'search'} size={15} color={THEME.colors.surface} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -437,7 +438,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
               style={[s.headerIconBtn, filtrosActivosCount > 0 && s.headerIconBtnActive]}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Icon name="sliders" size={15} color="#fff" />
+              <Icon name="sliders" size={15} color={THEME.colors.surface} />
               {filtrosActivosCount > 0 && (
                 <View
                   style={[
@@ -486,7 +487,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
                       },
                     ]}
                   >
-                    <Text style={[s.pillTxt, { color: activo ? '#fff' : colors.textSecondary }]}>
+                    <Text style={[s.pillTxt, { color: activo ? THEME.colors.surface : colors.textSecondary }]}>
                       {labels[i]}
                     </Text>
                   </TouchableOpacity>
@@ -527,7 +528,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
                       },
                     ]}
                   >
-                    <Text style={[s.pillSmTxt, { color: activo ? '#fff' : colors.textSecondary }]}>
+                    <Text style={[s.pillSmTxt, { color: activo ? THEME.colors.surface : colors.textSecondary }]}>
                       {f.label}
                     </Text>
                   </TouchableOpacity>
@@ -577,7 +578,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
                         },
                       ]}
                     >
-                      <Text style={[s.pillSmTxt, { color: activo ? '#fff' : colors.textSecondary }]}>
+                      <Text style={[s.pillSmTxt, { color: activo ? THEME.colors.surface : colors.textSecondary }]}>
                         {cat}
                       </Text>
                     </TouchableOpacity>
@@ -851,7 +852,7 @@ const s = StyleSheet.create({
     flex: 1,
     fontSize: 17,
     fontWeight: '500',
-    color: '#fff',
+    color: THEME.colors.surface,
     textAlign: 'center',
   },
   headerActions: {
@@ -861,7 +862,7 @@ const s = StyleSheet.create({
   headerIconBtn: {
     width: 34,
     height: 34,
-    borderRadius: 17,
+    borderRadius: THEME.radius.pill,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -883,7 +884,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     paddingHorizontal: 12,
     height: 38,
     gap: 8,
@@ -891,7 +892,7 @@ const s = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: '#fff',
+    color: THEME.colors.surface,
     height: 38,
     padding: 0,
   },
@@ -968,7 +969,7 @@ const s = StyleSheet.create({
     gap: 12,
     borderBottomWidth: 0.5,
   },
-  txIcon:    { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  txIcon:    { width: 40, height: 40, borderRadius: THEME.radius.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   txInfo:    { flex: 1, gap: 2 },
   txTitle:   { fontSize: 14, fontWeight: '500' },
   txMeta:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -990,7 +991,7 @@ const s = StyleSheet.create({
   modalHeaderTitle: { fontSize: 16, fontWeight: '500' },
   modalScrollContent: { padding: 20, gap: 16 },
   modalAmountWrap: { alignItems: 'center', gap: 8, paddingVertical: 8 },
-  modalAmountIcon: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  modalAmountIcon: { width: 64, height: 64, borderRadius: THEME.radius.lg, alignItems: 'center', justifyContent: 'center' },
   modalAmount:    { fontSize: 32, fontWeight: '500' },
   modalAmountSub: { fontSize: 14 },
   modalRow: {

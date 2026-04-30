@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
+import { THEME } from '../../constants/theme';
 
 const SWIPE_THRESHOLD = -60;
 const DELETE_WIDTH    = 72;
@@ -117,7 +118,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: DELETE_WIDTH,
-    backgroundColor: '#EF4444',
+    backgroundColor: THEME.colors.expense,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -130,7 +131,7 @@ const styles = StyleSheet.create({
   },
   deleteLabel: {
     fontSize: 10,
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
     fontWeight: '700',
   },
 

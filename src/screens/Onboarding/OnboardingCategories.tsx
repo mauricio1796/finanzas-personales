@@ -9,6 +9,7 @@ import { useTheme } from '../../state/ThemeContext';
 import { Icon, FeatherName } from '../../components/ui/Icon';
 import { OnboardingShell } from '../../components/onboarding/OnboardingShell';
 import { CATALOGO_CATEGORIAS } from '../../constants/catalogoCategorias';
+import { THEME } from '../../constants/theme';
 
 interface Props { onNext: () => void; onBack: () => void; }
 
@@ -95,7 +96,7 @@ const CatCard: React.FC<CardProps> = ({ cat, isSelected, onPress, delay, cardSiz
         </Text>
         {isSelected && (
           <View style={[s.checkDot, { backgroundColor: colors.primary }]}>
-            <Icon name="check" size={9} color="#FFFFFF" />
+            <Icon name="check" size={9} color={THEME.colors.surface} />
           </View>
         )}
       </TouchableOpacity>
@@ -234,17 +235,17 @@ const s = StyleSheet.create({
   topArea:      { paddingTop: 8, gap: 10, marginBottom: 8 },
   finnRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   finnAvatar:   { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
-  finnLetter:   { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+  finnLetter:   { fontSize: 16, fontWeight: '600', color: THEME.colors.surface },
   bubble:       { flex: 1, borderRadius: 14, borderTopLeftRadius: 4, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
   bubbleText:   { fontSize: 15, lineHeight: 22 },
   bubbleSub:    { fontSize: 12, marginTop: 2 },
-  counterBadge: { alignSelf: 'flex-end', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  counterBadge: { alignSelf: 'flex-end', paddingHorizontal: 12, paddingVertical: 5, borderRadius: THEME.radius.pill },
   counterText:  { fontSize: 12, fontWeight: '700' },
   grid:         { paddingTop: 4 },
-  card:         { borderRadius: 16, alignItems: 'center', justifyContent: 'center', gap: 6, position: 'relative' },
+  card:         { borderRadius: THEME.radius.lg, alignItems: 'center', justifyContent: 'center', gap: 6, position: 'relative' },
   cardLabel:    { fontSize: 11, fontWeight: '500', textAlign: 'center', paddingHorizontal: 4 },
   checkDot:     { position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   footer:       { paddingTop: 8 },
-  btn:          { borderRadius: 16, padding: 16, alignItems: 'center' },
-  btnText:      { fontSize: 16, fontWeight: '500', color: '#FFFFFF' },
+  btn:          { borderRadius: THEME.radius.lg, padding: 16, alignItems: 'center' },
+  btnText:      { fontSize: 16, fontWeight: '500', color: THEME.colors.surface },
 });

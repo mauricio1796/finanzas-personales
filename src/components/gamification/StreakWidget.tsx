@@ -7,6 +7,7 @@ import {
   Alert,
 } from 'react-native';
 import { COLORS, SPACING } from '../../constants';
+import { THEME } from '../../constants/theme';
 
 interface StreakWidgetProps {
   currentStreak: number;
@@ -76,7 +77,7 @@ export const StreakWidget: React.FC<StreakWidgetProps> = ({
             {
               transform: [{ scale: scaleAnim }],
               backgroundColor: isAtRisk ? '#FEF2F2' : '#FFF7E6',
-              borderColor: isAtRisk ? '#EF4444' : '#F59E0B',
+              borderColor: isAtRisk ? THEME.colors.expense : '#F59E0B',
             },
           ]}
         >
@@ -103,7 +104,7 @@ export const StreakWidget: React.FC<StreakWidgetProps> = ({
           <Text
             style={[
               styles.streakDays,
-              { color: isAtRisk ? '#EF4444' : '#F59E0B' },
+              { color: isAtRisk ? THEME.colors.expense : '#F59E0B' },
             ]}
           >
             {currentStreak} día{currentStreak !== 1 ? 's' : ''}
@@ -153,7 +154,7 @@ export const StreakWidget: React.FC<StreakWidgetProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.cardSecondary,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     padding: SPACING.lg,
     gap: SPACING.md,
   },
@@ -180,7 +181,7 @@ const styles = StyleSheet.create({
     color: '#F59E0B',
   },
   streakAtRisk: {
-    color: '#EF4444',
+    color: THEME.colors.expense,
   },
   streakInfo: {
     flex: 1,
@@ -202,23 +203,23 @@ const styles = StyleSheet.create({
   },
   warningBadge: {
     backgroundColor: '#FEF2F2',
-    borderColor: '#EF4444',
+    borderColor: THEME.colors.expense,
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
   },
   warningText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#EF4444',
+    color: THEME.colors.expense,
   },
   bestStreakContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
     backgroundColor: COLORS.background,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     padding: SPACING.md,
   },
   bestStreakIcon: {
@@ -245,14 +246,14 @@ const styles = StyleSheet.create({
   },
   motivationContainer: {
     backgroundColor: `${COLORS.primary}10`,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     padding: SPACING.md,
     borderLeftWidth: 4,
     borderLeftColor: COLORS.primary,
   },
   motivationRisk: {
     backgroundColor: '#FEF2F2',
-    borderLeftColor: '#EF4444',
+    borderLeftColor: THEME.colors.expense,
   },
   motivationText: {
     fontSize: 12,

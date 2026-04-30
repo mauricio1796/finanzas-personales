@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { aiService } from '../../services/ai/AIService';
 import { COLORS, SPACING } from '../../constants';
+import { THEME } from '../../constants/theme';
 
 interface DailyInsightProps {
   isDarkMode?: boolean;
@@ -71,7 +72,7 @@ export const DailyInsight: React.FC<DailyInsightProps> = ({
   const urgencyConfig = {
     low: {
       bgColor: '#ECFDF5',
-      borderColor: '#10B981',
+      borderColor: THEME.colors.income,
       icon: '💡',
     },
     medium: {
@@ -81,7 +82,7 @@ export const DailyInsight: React.FC<DailyInsightProps> = ({
     },
     high: {
       bgColor: '#FEF2F2',
-      borderColor: '#EF4444',
+      borderColor: THEME.colors.expense,
       icon: '🚨',
     },
   };
@@ -128,7 +129,7 @@ export const DailyInsight: React.FC<DailyInsightProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     borderWidth: 1,
     padding: SPACING.md,
     gap: SPACING.md,

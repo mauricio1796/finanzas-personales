@@ -10,6 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useFinance, Transaction } from '@/src/core/context/FinanceContext';
 import FinanceDonutChart from '@/src/components/FinanceDonutChart';
+import { THEME } from '@/src/constants/theme';
 
 interface DashboardProps {
   transactions: Transaction[];
@@ -228,7 +229,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '800',
     marginBottom: 24,
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
     letterSpacing: 0.3,
   },
   userCard: {
@@ -243,32 +244,29 @@ const styles = StyleSheet.create({
   userGreeting: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
     marginBottom: 8,
   },
   salaryInfo: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
   },
   statsGrid: {
     gap: 16,
   },
   statCard: {
     padding: 20,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     marginBottom: 8,
-    backgroundColor: '#f9fafb',
+    backgroundColor: THEME.colors.surfaceSecondary,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    borderColor: THEME.colors.border,
+    ...THEME.shadow.card,
   },
   statLabel: {
     fontSize: 13,
-    color: '#6b7280',
+    color: THEME.colors.textSecondary,
     marginBottom: 8,
     fontWeight: '600',
   },
@@ -278,30 +276,30 @@ const styles = StyleSheet.create({
   },
   statSubtext: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: THEME.colors.textTertiary,
     marginTop: 6,
     fontWeight: '500',
   },
   budgetSection: {
     padding: 20,
-    borderRadius: 12,
-    backgroundColor: '#f9fafb',
+    borderRadius: THEME.radius.md,
+    backgroundColor: THEME.colors.surfaceSecondary,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: THEME.colors.border,
   },
   budgetSectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 16,
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
   },
   budgetCard: {
     padding: 16,
     borderRadius: 10,
     marginBottom: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: THEME.colors.surface,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: THEME.colors.border,
     gap: 12,
   },
   budgetCardOverflow: {
@@ -322,18 +320,18 @@ const styles = StyleSheet.create({
   budgetName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
   },
   budgetAmount: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6b7280',
+    color: THEME.colors.textSecondary,
     marginTop: 4,
   },
   progressBar: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: THEME.colors.border,
     overflow: 'hidden',
   },
   progressFill: {
@@ -342,26 +340,23 @@ const styles = StyleSheet.create({
   },
   overBudgetText: {
     fontSize: 12,
-    color: '#ef4444',
+    color: THEME.colors.expense,
     fontWeight: '700',
   },
   chartContainer: {
     padding: 20,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: THEME.colors.surfaceSecondary,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    borderColor: THEME.colors.border,
+    ...THEME.shadow.card,
   },
   chartTitle: {
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 20,
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
   },
   chartWrapper: {
     alignItems: 'center',
@@ -369,21 +364,18 @@ const styles = StyleSheet.create({
   },
   quickAccessContainer: {
     padding: 20,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     marginTop: 12,
-    backgroundColor: '#f9fafb',
+    backgroundColor: THEME.colors.surfaceSecondary,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    borderColor: THEME.colors.border,
+    ...THEME.shadow.card,
   },
   quickAccessTitle: {
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 16,
-    color: '#1f2937',
+    color: THEME.colors.textPrimary,
   },
   quickAccessGrid: {
     flexDirection: 'row',
@@ -429,17 +421,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fbbf24',
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
   },
   emptyStateButtonText: {
-    color: '#ffffff',
+    color: THEME.colors.surface,
     fontSize: 14,
     fontWeight: '700',
   },
   subtext: {
     fontSize: 14,
     textAlign: 'center',
-    color: '#6b7280',
+    color: THEME.colors.textSecondary,
     marginTop: 12,
     fontWeight: '500',
   },

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS, SPACING } from '../../constants';
+import { THEME } from '../../constants/theme';
 
 interface GoalProgressProps {
   goalName: string;
@@ -51,7 +52,7 @@ export const GoalProgress: React.FC<GoalProgressProps> = ({
             styles.progressBar,
             {
               width: `${progress}%`,
-              backgroundColor: isComplete ? '#10B981' : COLORS.primary,
+              backgroundColor: isComplete ? THEME.colors.income : COLORS.primary,
             },
           ]}
         />
@@ -74,7 +75,7 @@ export const GoalProgress: React.FC<GoalProgressProps> = ({
           <Text
             style={[
               styles.amountValue,
-              { color: isComplete ? '#10B981' : '#FF6B6B' },
+              { color: isComplete ? THEME.colors.income : THEME.colors.expense },
             ]}
           >
             ${Math.max(remaining, 0).toFixed(2)}
@@ -111,7 +112,7 @@ export const GoalProgress: React.FC<GoalProgressProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.cardSecondary,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     padding: SPACING.lg,
     gap: SPACING.md,
   },
@@ -193,6 +194,6 @@ const styles = StyleSheet.create({
   completeText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#10B981',
+    color: THEME.colors.income,
   },
 });

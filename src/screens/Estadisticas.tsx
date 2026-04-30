@@ -6,13 +6,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, {
   Rect, Circle, Path, Line,
-  Text as SvgText, Defs, LinearGradient, Stop,
+  Text as SvgText, Defs, LinearGradient, Stop, G,
 } from 'react-native-svg';
+import { getCategoryIcon } from '../components/ui/Icon';
 
 import { useFinance } from '../state';
 import { useTheme } from '../state/ThemeContext';
 import { Icon } from '../components/ui/Icon';
 import { calcularMetricasFinancieras } from '../utils/ingresoUtils';
+import { THEME } from '../constants/theme';
 import {
   getMesLabel, getMesLabelLargo, getDiaLabel,
   getBarData, getAreaData, getHeatmapData, getDonutData, getTreemapData,
@@ -232,7 +234,7 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
   // ── Render helpers ─────────────────────────────────────────────────────────
 
   const card = (children: React.ReactNode, extra?: object) => (
-    <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }, extra]}>
+    <View style={[s.card, extra]}>
       {children}
     </View>
   );
@@ -240,121 +242,244 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
   // ── TAB: RESUMEN ───────────────────────────────────────────────────────────
 
   const renderResumen = () => {
-    const pctGastado = donutData.find(d => d.label === 'Gastos')?.percentage ?? 0;
+    // ── Per-category donut data ───────────────────────────────────────────────
+    const CAT_COLORS = [
+      '#1E88C7', '#00B89F', '#F45B69', '#9B5DE5',
+      '#F5A623', '#E91E8C', '#43AA8B', '#577590',
+      '#FF6B6B', '#4ECDC4', '#FFE66D', '#A8DADC',
+    ];
+
+    const gastoPorCat: Record<string, number> = {};
+    transactions
+      .filter(t => {
+        const d = new Date(t.date);
+        return t.type === 'expense' && d.getMonth() === mes && d.getFullYear() === año;
+      })
+      .forEach(t => { gastoPorCat[t.category] = (gastoPorCat[t.category] ?? 0) + t.amount; });
+
+    const totalGastos = Object.values(gastoPorCat).reduce((a, b) => a + b, 0);
+
+    // Build slices sorted desc by amount, group tiny ones as "Otros"
+    const sorted = Object.entries(gastoPorCat)
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount);
+
+    const mainSlices = sorted.filter(s => s.amount / Math.max(totalGastos, 1) >= 0.04);
+    const otrosTotal = sorted.filter(s => s.amount / Math.max(totalGastos, 1) < 0.04)
+      .reduce((a, s) => a + s.amount, 0);
+
+    const rawSlices = [
+      ...mainSlices,
+      ...(otrosTotal > 0 ? [{ name: 'Otros', amount: otrosTotal }] : []),
+    ].map((s, idx) => ({
+      ...s,
+      color: CAT_COLORS[idx % CAT_COLORS.length],
+      pct: totalGastos > 0 ? Math.round((s.amount / totalGastos) * 100) : 0,
+    }));
+
+    // Donut geometry
+    const DSVG  = Math.min(SCREEN_W - 32, 290);
+    const CX    = DSVG / 2;
+    const CY    = DSVG / 2;
+    const R     = DSVG * 0.315;
+    const SW    = DSVG * 0.10;
+    const CIRC  = 2 * Math.PI * R;
+    const GAP   = (3 / 360) * CIRC; // 3° gap between slices
+
+    // Compute cumulative offsets
+    let cumulative = 0;
+    const slices = rawSlices.map(s => {
+      const dashLength = (s.pct / 100) * CIRC;
+      const offset     = cumulative;
+      cumulative += dashLength;
+      return { ...s, dashLength, offset };
+    });
+
+    // Label position (midpoint of each arc, outside the ring)
+    const labelPos = (offset: number, dashLength: number) => {
+      const midFrac = (offset + dashLength / 2) / CIRC;
+      const angle   = midFrac * 2 * Math.PI - Math.PI / 2;
+      const lr      = R + SW / 2 + 22;
+      return { x: CX + lr * Math.cos(angle), y: CY + lr * Math.sin(angle) };
+    };
+
+    // Category grid (all selected categories)
+    const catGrid = (categories as any[]).filter(c => c.isSelected).slice(0, 9);
+
     return (
       <>
-        {/* Quick metrics 3-col */}
+        {/* ── Hero donut card ── */}
+        <View style={[s.card, { alignItems: 'center', paddingTop: 24, paddingBottom: 24 }]}>
+          <Text style={[s.cardTitle, { marginBottom: 2, textAlign: 'center' }]}>
+            Gastos por categoría
+          </Text>
+          <Text style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 20 }}>
+            {capitalize(getMesLabelLargo(mes, año))}
+          </Text>
+
+          {totalGastos === 0 ? (
+            <View style={s.emptyWrap}>
+              <Icon name="pie-chart" size={32} color={colors.textTertiary} />
+              <Text style={[s.emptyText, { color: colors.textSecondary }]}>
+                Sin gastos registrados este mes
+              </Text>
+            </View>
+          ) : (
+            <Svg width={DSVG} height={DSVG}>
+              {/* Background track */}
+              <Circle cx={CX} cy={CY} r={R} fill="none" stroke="#F0EFFF" strokeWidth={SW} />
+
+              {/* One circle per category slice */}
+              {slices.map((sl, i) => {
+                const dash = Math.max(0, sl.dashLength - GAP);
+                const gap  = Math.max(0, CIRC - dash);
+                return (
+                  <Circle
+                    key={i}
+                    cx={CX} cy={CY} r={R}
+                    fill="none"
+                    stroke={sl.color}
+                    strokeWidth={SW}
+                    strokeLinecap="butt"
+                    strokeDasharray={`${dash.toFixed(2)} ${gap.toFixed(2)}`}
+                    strokeDashoffset={`${(-(sl.offset) + GAP / 2).toFixed(2)}`}
+                    transform={`rotate(-90 ${CX} ${CY})`}
+                  />
+                );
+              })}
+
+              {/* Percentage labels outside ring — only for slices ≥ 7% */}
+              {slices.filter(sl => sl.pct >= 7).map((sl, i) => {
+                const { x, y } = labelPos(sl.offset, sl.dashLength);
+                return (
+                  <SvgText
+                    key={i}
+                    x={x} y={y + 4}
+                    textAnchor="middle"
+                    fontSize={11}
+                    fontWeight="700"
+                    fill={sl.color}
+                  >
+                    {sl.pct}%
+                  </SvgText>
+                );
+              })}
+
+              {/* Center: total gastos */}
+              <SvgText
+                x={CX} y={CY - 12}
+                textAnchor="middle"
+                fontSize={Math.round(DSVG * 0.065)}
+                fontWeight="800"
+                fill="#111827"
+              >
+                {fmtCOP(totalGastos)}
+              </SvgText>
+              <SvgText
+                x={CX} y={CY + 8}
+                textAnchor="middle"
+                fontSize={10}
+                fill="#9CA3AF"
+              >
+                total gastado
+              </SvgText>
+              {salary > 0 && (
+                <SvgText
+                  x={CX} y={CY + 24}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fontWeight="700"
+                  fill="#6156E8"
+                >
+                  {metricasIngreso.porcentajeGastado}% del salario
+                </SvgText>
+              )}
+            </Svg>
+          )}
+
+          {/* Legend chips */}
+          {totalGastos > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 16 }}>
+              {slices.map((sl, i) => (
+                <View key={i} style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 5,
+                  backgroundColor: sl.color + '18', borderRadius: 100,
+                  paddingHorizontal: 10, paddingVertical: 4,
+                }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: sl.color }} />
+                  <Text style={{ fontSize: 11, color: '#374151', fontWeight: '500' }}>
+                    {sl.name}
+                  </Text>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: sl.color }}>
+                    {sl.pct}%
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Change badge */}
+          {metricas.cambioPctVsMesAnterior !== 0 && (
+            <View style={[s.changeBadge, {
+              marginTop: 14, alignSelf: 'center',
+              backgroundColor: metricas.cambioPctVsMesAnterior < 0 ? colors.incomeLight : colors.expenseLight,
+            }]}>
+              <Icon
+                name={metricas.cambioPctVsMesAnterior < 0 ? 'trending-down' : 'trending-up'}
+                size={11}
+                color={metricas.cambioPctVsMesAnterior < 0 ? colors.income : colors.expense}
+              />
+              <Text style={[s.changeText, { color: metricas.cambioPctVsMesAnterior < 0 ? colors.income : colors.expense }]}>
+                {Math.abs(metricas.cambioPctVsMesAnterior)}% vs mes anterior
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* ── Quick metrics ── */}
         <View style={s.metricGrid}>
           {[
-            { val: fmtCOP(metricasIngreso.totalGastado),   label: 'Total gastado', color: colors.expense },
-            { val: fmtCOP(metricasIngreso.balanceFinal),   label: 'Balance final', color: colors.income  },
-            { val: `${metricasIngreso.porcentajeGastado}%`, label: 'Gastado',      color: colors.primary },
+            { val: fmtCOP(metricasIngreso.totalGastado),    label: 'Total gastado', color: THEME.colors.expense },
+            { val: fmtCOP(metricasIngreso.balanceFinal),    label: 'Balance final', color: THEME.colors.income  },
+            { val: `${metricasIngreso.porcentajeGastado}%`, label: 'Gastado',       color: '#6156E8' },
           ].map(m => (
-            <View key={m.label} style={[s.metricCell, { backgroundColor: colors.cardSecondary }]}>
+            <View key={m.label} style={s.metricCell}>
               <Text style={[s.metricVal, { color: m.color }]} numberOfLines={1}>{m.val}</Text>
-              <Text style={[s.metricLabel, { color: colors.textTertiary }]}>{m.label}</Text>
+              <Text style={s.metricLabel}>{m.label}</Text>
             </View>
           ))}
         </View>
 
-        {/* Secondary 2-col */}
         <View style={[s.metricGrid, { marginTop: 8 }]}>
           {[
             { val: fmtCOP(metricasIngreso.gastoPromedioRecomendadoDia), label: 'Presup. diario' },
             { val: metricas.categoriaMayorGasto,                         label: 'Mayor categoría' },
           ].map(m => (
-            <View key={m.label} style={[s.metricCell2, { backgroundColor: colors.cardSecondary }]}>
-              <Text style={[s.metricVal2, { color: colors.textPrimary }]} numberOfLines={1}>{m.val}</Text>
-              <Text style={[s.metricLabel, { color: colors.textTertiary }]}>{m.label}</Text>
+            <View key={m.label} style={s.metricCell2}>
+              <Text style={s.metricVal2} numberOfLines={1}>{m.val}</Text>
+              <Text style={s.metricLabel}>{m.label}</Text>
             </View>
           ))}
         </View>
 
-        {/* Donut */}
-        {card(
-          <>
-            <Text style={[s.cardTitle, { color: colors.textPrimary }]}>Distribución del salario</Text>
-            {donutData.length === 0 ? (
-              <View style={s.emptyWrap}>
-                <Icon name="pie-chart" size={28} color={colors.textTertiary} />
-                <Text style={[s.emptyText, { color: colors.textSecondary }]}>Sin transacciones este mes</Text>
-              </View>
-            ) : (
-              <View style={s.donutRow}>
-                {/* SVG */}
-                <Svg width={110} height={110} viewBox="0 0 110 110">
-                  {/* Base track */}
-                  <Circle cx={55} cy={55} r={40} fill="none" stroke={colors.borderSubtle} strokeWidth={16} />
-                  {/* Segments */}
-                  {donutData.map((seg, i) => {
-                    const dash = donutDashes[i] ?? 0;
-                    const gap = Math.max(0, C - dash);
-                    return (
-                      <Circle
-                        key={i}
-                        cx={55} cy={55} r={40}
-                        fill="none"
-                        stroke={seg.color}
-                        strokeWidth={16}
-                        strokeLinecap="butt"
-                        strokeDasharray={`${dash.toFixed(1)} ${gap.toFixed(1)}`}
-                        strokeDashoffset={`${-seg.staticOffset.toFixed(1)}`}
-                        transform="rotate(-90 55 55)"
-                      />
-                    );
-                  })}
-                  {/* Center text */}
-                  <SvgText
-                    x={55} y={51}
-                    textAnchor="middle"
-                    fontSize={14}
-                    fontWeight="500"
-                    fill={colors.textPrimary}
-                  >
-                    {pctGastado}%
-                  </SvgText>
-                  <SvgText
-                    x={55} y={63}
-                    textAnchor="middle"
-                    fontSize={9}
-                    fill={colors.textTertiary}
-                  >
-                    gastado
-                  </SvgText>
-                </Svg>
-
-                {/* Legend */}
-                <View style={s.donutLegend}>
-                  {donutData.map((seg, i) => (
-                    <View key={i} style={s.legendItem}>
-                      <View style={s.legendRow}>
-                        <View style={[s.legendDot, { backgroundColor: seg.color }]} />
-                        <Text style={[s.legendLabel, { color: colors.textPrimary }]}>{seg.label}</Text>
-                        <Text style={[s.legendPct, { color: colors.textPrimary }]}>{seg.percentage}%</Text>
-                      </View>
-                      <View style={[s.legendBarTrack, { backgroundColor: colors.borderSubtle }]}>
-                        <View style={[s.legendBarFill, { backgroundColor: seg.color, width: `${seg.percentage}%` as any }]} />
-                      </View>
-                    </View>
-                  ))}
-                  {metricas.cambioPctVsMesAnterior !== 0 && (
-                    <View style={[s.changeBadge, { backgroundColor: metricas.cambioPctVsMesAnterior < 0 ? colors.incomeLight : colors.expenseLight }]}>
-                      <Icon
-                        name={metricas.cambioPctVsMesAnterior < 0 ? 'trending-down' : 'trending-up'}
-                        size={10}
-                        color={metricas.cambioPctVsMesAnterior < 0 ? colors.income : colors.expense}
-                      />
-                      <Text style={[s.changeText, { color: metricas.cambioPctVsMesAnterior < 0 ? colors.income : colors.expense }]}>
-                        {Math.abs(metricas.cambioPctVsMesAnterior)}% vs mes anterior
-                      </Text>
-                    </View>
-                  )}
+        {/* ── Category icon grid ── */}
+        <View style={[s.card, { marginTop: 16 }]}>
+          <Text style={s.cardTitle}>Mis categorías</Text>
+          <View style={dg.grid}>
+            {catGrid.map((cat: any, idx: number) => {
+              const accent   = CAT_COLORS[idx % CAT_COLORS.length];
+              const iconName = (cat.icon as any) || getCategoryIcon(cat.name);
+              return (
+                <View key={cat.id} style={dg.cell}>
+                  <View style={[dg.circle, { backgroundColor: accent + '18' }]}>
+                    <Icon name={iconName} size={24} color={accent} />
+                  </View>
+                  <Text style={dg.label} numberOfLines={1}>{cat.name}</Text>
                 </View>
-              </View>
-            )}
-          </>,
-          { marginTop: 16 },
-        )}
+              );
+            })}
+          </View>
+        </View>
       </>
     );
   };
@@ -380,12 +505,12 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
               style={[
                 s.periodoPill,
                 periodoBars === p
-                  ? { backgroundColor: colors.primaryLight }
-                  : { backgroundColor: colors.cardSecondary, borderWidth: 0.5, borderColor: colors.border },
+                  ? { backgroundColor: '#6156E8' }
+                  : { backgroundColor: '#FFFFFF', borderWidth: 0.5, borderColor: '#E5E7EB' },
               ]}
               onPress={() => setPeriodoBars(p)}
             >
-              <Text style={[s.periodoPillText, { color: periodoBars === p ? colors.primary : colors.textSecondary }]}>
+              <Text style={[s.periodoPillText, { color: periodoBars === p ? '#FFFFFF' : '#6B7280' }]}>
                 {p} meses
               </Text>
             </TouchableOpacity>
@@ -492,9 +617,9 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
               { val: fmtCOP(minG),     label: 'Menor gasto' },
               { val: fmtCOP(promedio), label: 'Promedio' },
             ].map(m => (
-              <View key={m.label} style={[s.metricCell, { backgroundColor: colors.cardSecondary }]}>
-                <Text style={[s.metricVal, { color: colors.textPrimary }]} numberOfLines={1}>{m.val}</Text>
-                <Text style={[s.metricLabel, { color: colors.textTertiary }]}>{m.label}</Text>
+              <View key={m.label} style={s.metricCell}>
+                <Text style={[s.metricVal, { color: '#6156E8' }]} numberOfLines={1}>{m.val}</Text>
+                <Text style={s.metricLabel}>{m.label}</Text>
               </View>
             ))}
           </View>
@@ -517,7 +642,7 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
       <>
         {card(
           <>
-            <Text style={[s.cardTitle, { color: colors.textPrimary }]}>Ahorro acumulado</Text>
+            <Text style={s.cardTitle}>Ahorro acumulado</Text>
             {sinDatos ? (
               <View style={s.emptyWrap}>
                 <Icon name="trending-up" size={28} color={colors.textTertiary} />
@@ -838,9 +963,9 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
 
   // ── MAIN RENDER ────────────────────────────────────────────────────────────
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
+    <View style={[s.root, { backgroundColor: '#F8F7FF' }]}>
       {/* Header */}
-      <View style={[s.header, { backgroundColor: colors.headerBg, paddingTop: insets.top + 12 }]}>
+      <View style={[s.header, { backgroundColor: '#F8F7FF', paddingTop: insets.top + 12 }]}>
         <Text style={s.headerTitle}>Estadísticas</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={s.monthBadge}>
@@ -850,9 +975,9 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
           </View>
           <TouchableOpacity
             onPress={() => onNavigate?.('exportar')}
-            style={[s.downloadBtn, { backgroundColor: colors.primaryLight }]}
+            style={[s.downloadBtn, { backgroundColor: THEME.colors.primaryLight }]}
           >
-            <Icon name="download" size={16} color={colors.primary} />
+            <Icon name="download" size={16} color={THEME.colors.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -861,7 +986,7 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={[s.monthScroll, { backgroundColor: colors.background }]}
+        style={[s.monthScroll, { backgroundColor: '#F8F7FF' }]}
         contentContainerStyle={s.monthScrollContent}
       >
         {mesesDisponibles.map((m, i) => {
@@ -872,12 +997,12 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
               style={[
                 s.monthPill,
                 active
-                  ? { backgroundColor: colors.primary }
-                  : { backgroundColor: colors.cardSecondary, borderWidth: 0.5, borderColor: colors.border },
+                  ? { backgroundColor: '#6156E8' }
+                  : { backgroundColor: '#FFFFFF', borderWidth: 0.5, borderColor: '#E5E7EB' },
               ]}
               onPress={() => setMesSeleccionado({ mes: m.mes, año: m.año })}
             >
-              <Text style={[s.monthPillText, { color: active ? '#FFFFFF' : colors.textSecondary, fontWeight: active ? '500' : '400' }]}>
+              <Text style={[s.monthPillText, { color: active ? '#FFFFFF' : '#6B7280', fontWeight: active ? '600' : '400' }]}>
                 {m.label}
               </Text>
             </TouchableOpacity>
@@ -892,23 +1017,23 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Resumen ── */}
-        <Text style={[s.sectionHeading, { color: colors.textTertiary }]}>RESUMEN</Text>
+        <Text style={s.sectionHeading}>RESUMEN</Text>
         {renderResumen()}
 
         {/* ── Comparativo ── */}
-        <Text style={[s.sectionHeading, { color: colors.textTertiary, marginTop: 8 }]}>COMPARATIVO</Text>
+        <Text style={[s.sectionHeading, { marginTop: 8 }]}>COMPARATIVO</Text>
         {renderComparativo()}
 
         {/* ── Ahorro ── */}
-        <Text style={[s.sectionHeading, { color: colors.textTertiary, marginTop: 8 }]}>AHORRO</Text>
+        <Text style={[s.sectionHeading, { marginTop: 8 }]}>AHORRO</Text>
         {renderAhorro()}
 
         {/* ── Mapa de calor ── */}
-        <Text style={[s.sectionHeading, { color: colors.textTertiary, marginTop: 8 }]}>MAPA DE CALOR</Text>
+        <Text style={[s.sectionHeading, { marginTop: 8 }]}>MAPA DE CALOR</Text>
         {renderCalor()}
 
         {/* ── Treemap ── */}
-        <Text style={[s.sectionHeading, { color: colors.textTertiary, marginTop: 8 }]}>DISTRIBUCIÓN</Text>
+        <Text style={[s.sectionHeading, { marginTop: 8 }]}>DISTRIBUCIÓN</Text>
         {renderTreemap()}
       </ScrollView>
     </View>
@@ -920,34 +1045,40 @@ export const Estadisticas = EstadisticasScreen;
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root:   { flex: 1 },
+  root: { flex: 1 },
 
-  // Header
+  // Header — light themed
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingBottom: 12,
   },
   headerTitle: {
-    fontSize: 22, fontWeight: '600', color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
   },
   monthBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: THEME.colors.primaryLight,
     borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  monthBadgeText: { fontSize: 12, color: '#FFFFFF' },
+  monthBadgeText: { fontSize: 12, color: '#6156E8', fontWeight: '500' },
   downloadBtn: {
-    width: 32, height: 32, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'center',
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Month scroll
   monthScroll:        { maxHeight: 50, flexShrink: 0 },
   monthScrollContent: { paddingHorizontal: 16, paddingVertical: 8, gap: 6 },
-  monthPill:          { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5 },
+  monthPill:          { borderRadius: 100, paddingHorizontal: 14, height: 34, justifyContent: 'center' },
   monthPillText:      { fontSize: 12 },
 
   // Section heading
@@ -958,24 +1089,50 @@ const s = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 8,
     marginTop: 4,
+    color: '#9CA3AF',
   },
 
   tabContent: { paddingHorizontal: 16, paddingTop: 12, gap: 0 },
 
-  // Card
+  // Card — white, rounded, shadow
   card: {
-    borderRadius: 16, borderWidth: 0.5,
-    padding: CARD_PADDING, marginBottom: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 3,
   },
-  cardTitle: { fontSize: 13, fontWeight: '500', marginBottom: 12 },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 16,
+  },
 
   // Metric grids
   metricGrid:  { flexDirection: 'row', gap: 8 },
-  metricCell:  { flex: 1, borderRadius: 12, padding: 10, gap: 4 },
-  metricCell2: { flex: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, gap: 4 },
-  metricVal:   { fontSize: 15, fontWeight: '500' },
-  metricVal2:  { fontSize: 13, fontWeight: '500' },
-  metricLabel: { fontSize: 10, fontWeight: '400' },
+  metricCell:  {
+    flex: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 4,
+    backgroundColor: '#F8F7FF',
+  },
+  metricCell2: {
+    flex: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 4,
+    backgroundColor: '#F8F7FF',
+  },
+  metricVal:   { fontSize: 22, fontWeight: '700', color: '#6156E8' },
+  metricVal2:  { fontSize: 15, fontWeight: '700', color: '#6156E8' },
+  metricLabel: { fontSize: 11, fontWeight: '400', color: '#9CA3AF' },
 
   // Donut
   donutRow:       { flexDirection: 'row', alignItems: 'center', gap: 16 },
@@ -987,32 +1144,32 @@ const s = StyleSheet.create({
   legendPct:      { fontSize: 11, fontWeight: '500' },
   legendBarTrack: { height: 3, borderRadius: 2, overflow: 'hidden' },
   legendBarFill:  { height: 3, borderRadius: 2 },
-  changeBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginTop: 4 },
+  changeBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: THEME.radius.sm, paddingHorizontal: 8, paddingVertical: 4, marginTop: 4 },
   changeText:     { fontSize: 10, fontWeight: '500' },
 
   // Comparativo
   periodoRow:      { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  periodoPill:     { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
-  periodoPillText: { fontSize: 12 },
+  periodoPill:     { borderRadius: 100, paddingHorizontal: 18, height: 34, justifyContent: 'center' },
+  periodoPillText: { fontSize: 12, fontWeight: '500' },
   barLegend:       { flexDirection: 'row', gap: 16, marginTop: 8, justifyContent: 'center' },
 
   // Ahorro
   areaFooter:    { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
-  areaFooterVal: { fontSize: 15, fontWeight: '500' },
+  areaFooterVal: { fontSize: 15, fontWeight: '700' },
 
   // Calor
-  heatExplain:     { fontSize: 11, marginBottom: 8 },
+  heatExplain:     { fontSize: 11, marginBottom: 8, color: '#9CA3AF' },
   heatLegend:      { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 12 },
   heatLegendCell:  { width: 14, height: 14, borderRadius: 3 },
   insightRow:      { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  insightPill:     { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
-  insightPillText: { fontSize: 11 },
+  insightPill:     { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FFFFFF' },
+  insightPillText: { fontSize: 11, color: '#6B7280' },
 
   // Tooltip
-  tooltip:      { marginTop: 10, borderRadius: 10, borderWidth: 0.5, padding: 10, gap: 2 },
-  tooltipTitle: { fontSize: 11, fontWeight: '500' },
-  tooltipVal:   { fontSize: 14, fontWeight: '500' },
-  tooltipSub:   { fontSize: 10 },
+  tooltip:      { marginTop: 10, borderRadius: 12, borderWidth: 0.5, borderColor: '#E5E7EB', padding: 12, gap: 2, backgroundColor: '#FFFFFF' },
+  tooltipTitle: { fontSize: 11, fontWeight: '500', color: '#111827' },
+  tooltipVal:   { fontSize: 14, fontWeight: '700', color: '#6156E8' },
+  tooltipSub:   { fontSize: 10, color: '#9CA3AF' },
 
   // Treemap
   treemapRow:        { flexDirection: 'row', gap: 3, marginBottom: 3 },
@@ -1023,10 +1180,39 @@ const s = StyleSheet.create({
   treemapLegend:     { gap: 8, paddingRight: 8 },
   treemapLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   treemapLegendDot:  { width: 10, height: 10, borderRadius: 2 },
-  treemapLegendText: { fontSize: 10 },
+  treemapLegendText: { fontSize: 10, color: '#6B7280' },
 
   // Empty
   emptyWrap:   { alignItems: 'center', paddingVertical: 24, gap: 8 },
-  emptyText:   { fontSize: 13, textAlign: 'center' },
-  emptyAction: { fontSize: 13, fontWeight: '500' },
+  emptyText:   { fontSize: 13, textAlign: 'center', color: '#6B7280' },
+  emptyAction: { fontSize: 13, fontWeight: '600', color: '#6156E8' },
+});
+
+// ── Category grid styles ──────────────────────────────────────────────────────
+const dg = StyleSheet.create({
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 0,
+  },
+  cell: {
+    width: '33.33%',
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  circle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+    textAlign: 'center',
+    maxWidth: 80,
+  },
 });

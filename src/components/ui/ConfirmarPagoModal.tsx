@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { View, Text, StyleSheet, Modal, Animated, TouchableOpacity, TextInput, Keyboard, KeyboardAvoidingView, Platform, TouchableWithoutFeedback } from "react-native";
 import { useFinance } from "../../state";
 import { aiService } from "../../services/ai/AIService";
+import { THEME } from "../../constants/theme";
 
 interface Props { visible: boolean; compromiso: any | null; onClose: () => void; }
 const fmtCOP = (n: number) => "$" + Math.round(Math.abs(n)).toLocaleString("es-CO").replace(/,/g, ".");
@@ -107,7 +108,7 @@ return (
                     <TextInput
                       style={[s.montoInput, focused && s.montoInputFocused]}
                       placeholder={fmtCOP(compromiso.budget || 0)}
-                      placeholderTextColor="#9CA3AF"
+                      placeholderTextColor={THEME.colors.textTertiary}
                       keyboardType="numeric"
                       value={monto}
                       onChangeText={(txt) => { const d = txt.replace(/\./g, '').replace(/[^0-9]/g, ''); const n = parseInt(d, 10); setMonto(isNaN(n) ? '' : n.toLocaleString('es-CO').replace(/,/g, '.')); }}
@@ -162,39 +163,39 @@ return (
 };
 
 const s = StyleSheet.create({
-  sheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32 },
-  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#E5E7EB", alignSelf: "center", marginTop: 10 },
-  headerRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
-  finnAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#6366F1", alignItems: "center", justifyContent: "center" },
-  finnSymbol: { fontSize: 20, color: "#FFFFFF", fontWeight: "700" },
-  finnName: { fontSize: 15, fontWeight: "700", color: "#111827" },
-  finnSub: { fontSize: 12, color: "#6B7280", marginTop: 1 },
-  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center" },
-  closeX: { fontSize: 16, color: "#6B7280", fontWeight: "600" },
+  sheet: { backgroundColor: THEME.colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32 },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: THEME.colors.border, alignSelf: "center", marginTop: 10 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: THEME.colors.surfaceSecondary },
+  finnAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: THEME.colors.primary, alignItems: "center", justifyContent: "center" },
+  finnSymbol: { fontSize: 20, color: THEME.colors.surface, fontWeight: "700" },
+  finnName: { fontSize: 15, fontWeight: "700", color: THEME.colors.textPrimary },
+  finnSub: { fontSize: 12, color: THEME.colors.textSecondary, marginTop: 1 },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: THEME.colors.surfaceSecondary, alignItems: "center", justifyContent: "center" },
+  closeX: { fontSize: 16, color: THEME.colors.textSecondary, fontWeight: "600" },
   body: { paddingHorizontal: 20, paddingTop: 20, gap: 14 },
   centerBody: { alignItems: "center", paddingVertical: 32 },
-  compromisCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#F9FAFB", borderRadius: 12, padding: 14, borderWidth: 1, borderColor: "#E5E7EB" },
+  compromisCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: THEME.colors.background, borderRadius: THEME.radius.md, padding: 14, borderWidth: 1, borderColor: THEME.colors.border },
   catIcon: { fontSize: 28 },
-  catName: { fontSize: 16, fontWeight: "700", color: "#111827" },
-  catBudget: { fontSize: 13, color: "#6B7280", marginTop: 2 },
-  catDay: { fontSize: 12, color: "#9CA3AF", marginTop: 1 },
-  inputLabel: { fontSize: 13, fontWeight: "600", color: "#374151" },
-  montoInput: { backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 24, fontWeight: "700", color: "#111827", textAlign: "center" },
-  montoInputFocused: { borderColor: "#6366F1", borderWidth: 2 },
-  confirmBtn: { backgroundColor: "#6366F1", borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 4 },
-  confirmBtnText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
-  finnAvatarLg: { width: 72, height: 72, borderRadius: 36, backgroundColor: "#6366F1", alignItems: "center", justifyContent: "center", marginBottom: 16 },
-  finnSymbolLg: { fontSize: 34, color: "#FFFFFF", fontWeight: "700" },
-  analyzingTitle: { fontSize: 17, fontWeight: "600", color: "#111827", marginBottom: 20 },
+  catName: { fontSize: 16, fontWeight: "700", color: THEME.colors.textPrimary },
+  catBudget: { fontSize: 13, color: THEME.colors.textSecondary, marginTop: 2 },
+  catDay: { fontSize: 12, color: THEME.colors.textTertiary, marginTop: 1 },
+  inputLabel: { fontSize: 13, fontWeight: "600", color: THEME.colors.textPrimary },
+  montoInput: { backgroundColor: THEME.colors.background, borderWidth: 1, borderColor: THEME.colors.border, borderRadius: THEME.radius.md, paddingHorizontal: 16, paddingVertical: 14, fontSize: 24, fontWeight: "700", color: THEME.colors.textPrimary, textAlign: "center" },
+  montoInputFocused: { borderColor: THEME.colors.primary, borderWidth: 2 },
+  confirmBtn: { backgroundColor: THEME.colors.primary, borderRadius: 14, paddingVertical: 16, alignItems: "center", marginTop: 4 },
+  confirmBtnText: { fontSize: 16, fontWeight: "700", color: THEME.colors.surface },
+  finnAvatarLg: { width: 72, height: 72, borderRadius: 36, backgroundColor: THEME.colors.primary, alignItems: "center", justifyContent: "center", marginBottom: 16 },
+  finnSymbolLg: { fontSize: 34, color: THEME.colors.surface, fontWeight: "700" },
+  analyzingTitle: { fontSize: 17, fontWeight: "600", color: THEME.colors.textPrimary, marginBottom: 20 },
   dotsRow: { flexDirection: "row", gap: 8 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#6366F1" },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: THEME.colors.primary },
   resultCard: { alignItems: "center", gap: 8, paddingVertical: 8 },
-  checkCircle: { fontSize: 40, color: "#10B981" },
-  resultTitle: { fontSize: 20, fontWeight: "800", color: "#111827" },
-  xpBadge: { backgroundColor: "#EEF2FF", color: "#6366F1", fontWeight: "700", fontSize: 13, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20 },
-  finnMsgCard: { flexDirection: "row", gap: 10, alignItems: "flex-start", backgroundColor: "#F9FAFB", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "rgba(99,102,241,0.15)" },
-  finnAvatarSm: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#6366F1", alignItems: "center", justifyContent: "center" },
-  finnMsg: { flex: 1, fontSize: 14, color: "#374151", lineHeight: 21 },
-  closeFullBtn: { backgroundColor: "#111827", borderRadius: 14, paddingVertical: 15, alignItems: "center", marginTop: 4 },
-  closeFullBtnText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
+  checkCircle: { fontSize: 40, color: THEME.colors.income },
+  resultTitle: { fontSize: 20, fontWeight: "800", color: THEME.colors.textPrimary },
+  xpBadge: { backgroundColor: THEME.colors.primaryLight, color: THEME.colors.primary, fontWeight: "700", fontSize: 13, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20 },
+  finnMsgCard: { flexDirection: "row", gap: 10, alignItems: "flex-start", backgroundColor: THEME.colors.background, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "rgba(99,102,241,0.15)" },
+  finnAvatarSm: { width: 32, height: 32, borderRadius: 16, backgroundColor: THEME.colors.primary, alignItems: "center", justifyContent: "center" },
+  finnMsg: { flex: 1, fontSize: 14, color: THEME.colors.textPrimary, lineHeight: 21 },
+  closeFullBtn: { backgroundColor: THEME.colors.textPrimary, borderRadius: 14, paddingVertical: 15, alignItems: "center", marginTop: 4 },
+  closeFullBtnText: { fontSize: 16, fontWeight: "700", color: THEME.colors.surface },
 });

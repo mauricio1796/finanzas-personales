@@ -1,17 +1,33 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Animated, PanResponder, ScrollView, StyleSheet,
-  Text, TouchableOpacity, View,
+  Animated, ScrollView, StyleSheet, Text,
+  TextInput, TouchableOpacity, View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useFinance } from '../../state';
-import { useTheme } from '../../state/ThemeContext';
 import { Icon } from '../../components/ui/Icon';
 import { OnboardingShell } from '../../components/onboarding/OnboardingShell';
+import { THEME } from '../../constants/theme';
+import { reprogramarTodasLasNotificaciones } from '../../services/NotificacionesService';
 
 interface Props { onNext: () => void; onBack: () => void; }
 
-const fmtCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
+const PRIMARY       = '#6156E8';
+const PRIMARY_LIGHT = '#EEF0FF';
+const BG            = '#F8F7FF';
+const SURFACE       = '#FFFFFF';
+const BORDER        = '#E5E7EB';
+const TEXT_PRIMARY  = '#111827';
+const TEXT_SEC      = '#6B7280';
+const TEXT_TERT     = '#9CA3AF';
+const INCOME_COLOR  = '#1D9E75';
+const EXPENSE_COLOR = '#F55B5B';
+
+const fmtCOP = (n: number) =>
+  '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
+
+const parseCOP = (s: string) =>
+  parseInt(s.replace(/[^0-9]/g, '') || '0', 10);
 
 const SUGERIDOS: Record<string, number> = {
   alimentacion:    0.25,
@@ -33,116 +49,222 @@ const SUGERIDOS_FIJOS: Record<string, number> = {
   otros: 50000,
 };
 
-interface SliderItemProps {
-  cat: { id: string; name: string; icon: string; color?: string };
-  value: number;
-  maxValue: number;
-  onChange: (v: number) => void;
-}
-
 const STEP = 10000;
 
-const SliderItem: React.FC<SliderItemProps> = ({ cat, value, maxValue, onChange }) => {
-  const { colors } = useTheme();
-  const trackWidth = useRef(0);
-  const panX = useRef(0);
-  const fillAnim = useRef(new Animated.Value(value / Math.max(maxValue, 1))).current;
+// ── CategoryCard ──────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    Animated.timing(fillAnim, {
-      toValue: value / Math.max(maxValue, 1),
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
-  }, [value, maxValue]);
+interface CategoryCardProps {
+  cat: { id: string; name: string; icon: string; color?: string };
+  budget: number;
+  diaPago: number | undefined;
+  onBudgetChange: (v: number) => void;
+  onDiaChange: (d: number) => void;
+}
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder:  () => true,
-      onPanResponderGrant: (e) => {
-        const loc = e.nativeEvent.locationX;
-        const pct = Math.max(0, Math.min(1, loc / Math.max(trackWidth.current, 1)));
-        const raw = pct * maxValue;
-        const snapped = Math.round(raw / STEP) * STEP;
-        onChange(snapped);
-        panX.current = loc;
-      },
-      onPanResponderMove: (_, gs) => {
-        const loc = panX.current + gs.dx;
-        const pct = Math.max(0, Math.min(1, loc / Math.max(trackWidth.current, 1)));
-        const raw = pct * maxValue;
-        const snapped = Math.round(raw / STEP) * STEP;
-        onChange(snapped);
-      },
-    })
-  ).current;
+const CategoryCard: React.FC<CategoryCardProps> = ({
+  cat, budget, diaPago, onBudgetChange, onDiaChange,
+}) => {
+  const [rawInput, setRawInput] = useState(budget > 0 ? String(Math.round(budget)) : '');
+  const accent = cat.color || PRIMARY;
 
-  const fillWidth = fillAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
+  const decrement = () => {
+    const next = Math.max(0, budget - STEP);
+    onBudgetChange(next);
+    setRawInput(next > 0 ? String(next) : '');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  };
+  const increment = () => {
+    const next = budget + STEP;
+    onBudgetChange(next);
+    setRawInput(String(next));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  };
+  const handleInputChange = (text: string) => {
+    setRawInput(text);
+    onBudgetChange(parseCOP(text));
+  };
+  const handleInputBlur = () => {
+    const v = parseCOP(rawInput);
+    setRawInput(v > 0 ? String(v) : '');
+    onBudgetChange(v);
+  };
+
+  // Day pills: 1-28
+  const days = Array.from({ length: 28 }, (_, i) => i + 1);
 
   return (
-    <View style={[si.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={si.header}>
-        <View style={[si.iconWrap, { backgroundColor: (cat.color || colors.primary) + '20' }]}>
-          <Icon name={cat.icon as any} size={20} color={cat.color || colors.primary} />
+    <View style={cc.card}>
+      {/* Header */}
+      <View style={cc.header}>
+        <View style={[cc.iconWrap, { backgroundColor: accent + '18' }]}>
+          <Icon name={cat.icon as any} size={20} color={accent} />
         </View>
-        <Text style={[si.catName, { color: colors.textPrimary }]}>{cat.name}</Text>
-        <Text style={[si.valueText, { color: value > 0 ? colors.primary : colors.textTertiary }]}>
-          {value > 0 ? fmtCOP(value) : '$0'}
-        </Text>
+        <Text style={cc.catName}>{cat.name}</Text>
       </View>
 
-      <View
-        style={[si.trackWrap, { backgroundColor: colors.inputBg }]}
-        onLayout={e => { trackWidth.current = e.nativeEvent.layout.width; }}
-        {...panResponder.panHandlers}
-      >
-        <Animated.View style={[si.fill, { width: fillWidth, backgroundColor: colors.primary }]} />
-        <Animated.View
-          style={[
-            si.thumb,
-            {
-              left: fillWidth,
-              borderColor: colors.primary,
-              backgroundColor: colors.card,
-            },
-          ]}
+      {/* Budget stepper */}
+      <View style={cc.stepperRow}>
+        <TouchableOpacity style={cc.stepBtn} onPress={decrement} activeOpacity={0.7}>
+          <Icon name="minus" size={16} color={TEXT_SEC} />
+        </TouchableOpacity>
+
+        <TextInput
+          style={cc.input}
+          keyboardType="numeric"
+          value={rawInput}
+          onChangeText={handleInputChange}
+          onBlur={handleInputBlur}
+          placeholder="$0"
+          placeholderTextColor={TEXT_TERT}
+          selectTextOnFocus
         />
+
+        <TouchableOpacity style={cc.stepBtn} onPress={increment} activeOpacity={0.7}>
+          <Icon name="plus" size={16} color={TEXT_SEC} />
+        </TouchableOpacity>
       </View>
 
-      <View style={si.rangeRow}>
-        <Text style={[si.rangeLabel, { color: colors.textTertiary }]}>$0</Text>
-        <Text style={[si.rangeLabel, { color: colors.textTertiary }]}>
-          {fmtCOP(maxValue)}
-        </Text>
+      {/* Día de pago */}
+      <View style={cc.daySection}>
+        <View style={cc.dayHeaderRow}>
+          <Icon name="bell" size={13} color={TEXT_TERT} />
+          <Text style={cc.dayLabel}>Día de pago (recibirás aviso un día antes)</Text>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={cc.daysScroll}
+          nestedScrollEnabled
+        >
+          {days.map(d => {
+            const active = diaPago === d;
+            return (
+              <TouchableOpacity
+                key={d}
+                onPress={() => {
+                  onDiaChange(active ? 0 : d);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                }}
+                style={[cc.dayPill, active && cc.dayPillActive]}
+                activeOpacity={0.7}
+              >
+                <Text style={[cc.dayPillText, active && cc.dayPillTextActive]}>
+                  {d}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
     </View>
   );
 };
 
-const si = StyleSheet.create({
-  card:       { borderRadius: 16, borderWidth: 1, padding: 16, gap: 12 },
-  header:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  iconWrap:   { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  catName:    { flex: 1, fontSize: 15, fontWeight: '600' },
-  valueText:  { fontSize: 15, fontWeight: '700' },
-  trackWrap:  { height: 6, borderRadius: 3, position: 'relative', justifyContent: 'center' },
-  fill:       { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 3 },
-  thumb:      { position: 'absolute', width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, marginLeft: -11, top: -8, elevation: 2, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } },
-  rangeRow:   { flexDirection: 'row', justifyContent: 'space-between' },
-  rangeLabel: { fontSize: 10 },
+const cc = StyleSheet.create({
+  card: {
+    backgroundColor: SURFACE,
+    borderRadius: 20,
+    borderWidth: 0.5,
+    borderColor: BORDER,
+    padding: 16,
+    marginBottom: 12,
+    gap: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  catName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: TEXT_PRIMARY,
+    flex: 1,
+  },
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  stepBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#F4F3F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  input: {
+    flex: 1,
+    height: 42,
+    backgroundColor: '#F4F3F8',
+    borderRadius: 12,
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '700',
+    color: TEXT_PRIMARY,
+    paddingHorizontal: 8,
+  },
+  daySection: {
+    gap: 8,
+  },
+  dayHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  dayLabel: {
+    fontSize: 11,
+    color: TEXT_TERT,
+    fontWeight: '500',
+  },
+  daysScroll: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  dayPill: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#F4F3F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayPillActive: {
+    backgroundColor: PRIMARY,
+  },
+  dayPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: TEXT_SEC,
+  },
+  dayPillTextActive: {
+    color: SURFACE,
+  },
 });
+
+// ── Main screen ───────────────────────────────────────────────────────────────
 
 export const OnboardingMontos: React.FC<Props> = ({ onNext, onBack }) => {
   const { categories, updateCategory, profile } = useFinance();
-  const { colors } = useTheme();
   const sal = profile?.monthlySalary || 0;
-  const maxSlider = Math.max(Math.round(sal * 0.8), 2000000);
 
-  const budgetCats = categories.filter(c => c.tipo === 'gasto' || c.tipo === 'variable' || c.tipo === 'fijo' || !c.tipo);
+  const budgetCats = categories.filter(
+    c => c.tipo === 'gasto' || c.tipo === 'variable' || c.tipo === 'fijo' || !c.tipo,
+  );
 
   const [budgets, setBudgets] = useState<Record<string, number>>(() => {
     const init: Record<string, number> = {};
@@ -154,11 +276,17 @@ export const OnboardingMontos: React.FC<Props> = ({ onNext, onBack }) => {
     return init;
   });
 
+  const [diasPago, setDiasPago] = useState<Record<string, number>>(() => {
+    const init: Record<string, number> = {};
+    budgetCats.forEach(c => { init[c.id] = c.diaPago ?? 0; });
+    return init;
+  });
+
   const totalAsignado = Object.values(budgets).reduce((s, v) => s + v, 0);
   const pctTotal = sal > 0 ? Math.min(totalAsignado / sal, 1) : 0;
   const overBudget = totalAsignado > sal && sal > 0;
 
-  const barAnim = useRef(new Animated.Value(pctTotal)).current;
+  const barAnim    = useRef(new Animated.Value(pctTotal)).current;
   const bubbleAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -168,17 +296,26 @@ export const OnboardingMontos: React.FC<Props> = ({ onNext, onBack }) => {
   useEffect(() => {
     Animated.timing(barAnim, { toValue: pctTotal, duration: 250, useNativeDriver: false }).start();
     if (overBudget) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-  }, [pctTotal]);
+  }, [pctTotal]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleChange = (id: string, val: number) => {
-    setBudgets(prev => ({ ...prev, [id]: val }));
-  };
-
-  const handleNext = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    budgetCats.forEach(cat => {
-      updateCategory(cat.id, { budget: budgets[cat.id] ?? 0 });
+  const handleNext = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    const updated = budgetCats.map(cat => {
+      const patch: Partial<typeof cat> = {
+        budget: budgets[cat.id] ?? 0,
+        diaPago: diasPago[cat.id] || undefined,
+      };
+      updateCategory(cat.id, patch);
+      return { ...cat, ...patch };
     });
+    // Reschedule all notifications so new diaPago values are picked up
+    const allCats = categories.map(c => {
+      const up = updated.find(u => u.id === c.id);
+      return up ? { ...c, ...up } : c;
+    });
+    try {
+      await reprogramarTodasLasNotificaciones(allCats as any);
+    } catch (_) {}
     onNext();
   };
 
@@ -191,53 +328,62 @@ export const OnboardingMontos: React.FC<Props> = ({ onNext, onBack }) => {
 
   return (
     <OnboardingShell step={4} totalSteps={5} onBack={onBack} keyboardAvoiding={false}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={[s.scrollContent, { paddingHorizontal: 16 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={s.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+      >
         {/* Finn bubble */}
-        <View style={[s.finnRow, { marginBottom: 16 }]}>
-          <View style={[s.finnAvatar, { backgroundColor: colors.primary }]}>
+        <View style={s.finnRow}>
+          <View style={s.finnAvatar}>
             <Text style={s.finnLetter}>F</Text>
           </View>
-          <Animated.View style={[s.bubble, { backgroundColor: colors.card, borderColor: colors.border }, bubbleSlide]}>
-            <Text style={[s.bubbleText, { color: colors.textPrimary }]}>
-              Asigna un presupuesto mensual a cada categoria
+          <Animated.View style={[s.bubble, bubbleSlide]}>
+            <Text style={s.bubbleText}>
+              Asigna un presupuesto mensual a cada categoría y elige su día de pago para que te avisemos un día antes.
             </Text>
           </Animated.View>
         </View>
 
-        {/* Sliders */}
         {budgetCats.map(cat => (
-          <View key={cat.id} style={{ marginBottom: 12 }}>
-            <SliderItem
-              cat={cat}
-              value={budgets[cat.id] ?? 0}
-              maxValue={maxSlider}
-              onChange={v => handleChange(cat.id, v)}
-            />
-          </View>
+          <CategoryCard
+            key={cat.id}
+            cat={cat}
+            budget={budgets[cat.id] ?? 0}
+            diaPago={diasPago[cat.id] || undefined}
+            onBudgetChange={v => setBudgets(prev => ({ ...prev, [cat.id]: v }))}
+            onDiaChange={d => setDiasPago(prev => ({ ...prev, [cat.id]: d }))}
+          />
         ))}
 
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Fixed bottom: budget indicator + button */}
-      <View style={[s.footer, { backgroundColor: colors.background, borderTopColor: colors.border, paddingHorizontal: 16, paddingBottom: 16 }]}>
-        <View style={[s.budgetCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {/* Fixed bottom */}
+      <View style={s.footer}>
+        <View style={s.budgetCard}>
           <View style={s.budgetRow}>
-            <Text style={[s.budgetLabel, { color: colors.textSecondary }]}>Asignado</Text>
-            <Text style={[s.budgetValue, { color: overBudget ? colors.expense : colors.textPrimary }]}>
+            <Text style={s.budgetLabel}>Asignado</Text>
+            <Text style={[s.budgetValue, overBudget && { color: EXPENSE_COLOR }]}>
               {fmtCOP(totalAsignado)}
-              <Text style={[s.budgetOf, { color: colors.textTertiary }]}>{sal > 0 ? ' / ' + fmtCOP(sal) : ''}</Text>
+              {sal > 0 && (
+                <Text style={s.budgetOf}>{' / ' + fmtCOP(sal)}</Text>
+              )}
             </Text>
           </View>
-          <View style={[s.budgetTrack, { backgroundColor: colors.border }]}>
-            <Animated.View style={[s.budgetFill, { width: barWidth, backgroundColor: overBudget ? colors.expense : colors.income }]} />
+          <View style={s.budgetTrack}>
+            <Animated.View
+              style={[s.budgetFill, {
+                width: barWidth,
+                backgroundColor: overBudget ? EXPENSE_COLOR : INCOME_COLOR,
+              }]}
+            />
           </View>
         </View>
-        <TouchableOpacity
-          style={[s.btn, { backgroundColor: colors.primary }]}
-          onPress={handleNext}
-          activeOpacity={0.85}
-        >
+
+        <TouchableOpacity style={s.btn} onPress={handleNext} activeOpacity={0.85}>
           <Text style={s.btnText}>Confirmar presupuestos</Text>
         </TouchableOpacity>
       </View>
@@ -246,20 +392,108 @@ export const OnboardingMontos: React.FC<Props> = ({ onNext, onBack }) => {
 };
 
 const s = StyleSheet.create({
-  scrollContent: { paddingTop: 8, paddingBottom: 16 },
-  finnRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  finnAvatar:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
-  finnLetter:    { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
-  bubble:        { flex: 1, borderRadius: 14, borderTopLeftRadius: 4, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
-  bubbleText:    { fontSize: 15, lineHeight: 22 },
-  footer:        { borderTopWidth: 1, paddingTop: 12, gap: 10 },
-  budgetCard:    { borderRadius: 12, borderWidth: 1, padding: 12, gap: 8 },
-  budgetRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  budgetLabel:   { fontSize: 12, fontWeight: '500' },
-  budgetValue:   { fontSize: 15, fontWeight: '700' },
-  budgetOf:      { fontSize: 12, fontWeight: '400' },
-  budgetTrack:   { height: 6, borderRadius: 3, overflow: 'hidden' },
-  budgetFill:    { height: '100%', borderRadius: 3 },
-  btn:           { borderRadius: 16, padding: 16, alignItems: 'center' },
-  btnText:       { fontSize: 16, fontWeight: '500', color: '#FFFFFF' },
+  scrollContent: {
+    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  finnRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 16,
+  },
+  finnAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  finnLetter: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: SURFACE,
+  },
+  bubble: {
+    flex: 1,
+    backgroundColor: SURFACE,
+    borderRadius: 14,
+    borderTopLeftRadius: 4,
+    borderWidth: 0.5,
+    borderColor: BORDER,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  bubbleText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: TEXT_PRIMARY,
+  },
+  footer: {
+    backgroundColor: SURFACE,
+    borderTopWidth: 0.5,
+    borderTopColor: BORDER,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    gap: 10,
+  },
+  budgetCard: {
+    backgroundColor: BG,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: BORDER,
+    padding: 12,
+    gap: 8,
+  },
+  budgetRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  budgetLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: TEXT_SEC,
+  },
+  budgetValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: TEXT_PRIMARY,
+  },
+  budgetOf: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: TEXT_TERT,
+  },
+  budgetTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: BORDER,
+    overflow: 'hidden',
+  },
+  budgetFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  btn: {
+    backgroundColor: PRIMARY,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+  },
+  btnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: SURFACE,
+  },
 });

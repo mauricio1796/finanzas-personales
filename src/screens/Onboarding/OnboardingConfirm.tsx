@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFinance } from '../../state';
 import { useTheme } from '../../state/ThemeContext';
 import { Icon } from '../../components/ui/Icon';
+import { THEME } from '../../constants/theme';
 
 interface Props { onDone: () => void; }
 
@@ -199,7 +200,7 @@ const s = StyleSheet.create({
   confettiPiece: { position: 'absolute', width: 8, height: 8, borderRadius: 2 },
   finnWrap:      { alignItems: 'center', marginBottom: 4 },
   finn:          { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
-  finnLetter:    { fontSize: 26, fontWeight: '500', color: '#FFFFFF' },
+  finnLetter:    { fontSize: 26, fontWeight: '500', color: THEME.colors.surface },
   title:         { fontSize: 26, fontWeight: '700', textAlign: 'center', letterSpacing: -0.5 },
   summaryCard:   { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 0.5, padding: 14 },
   cardTitle:     { fontSize: 11, fontWeight: '600', textTransform: 'uppercase' as any, letterSpacing: 0.5, marginBottom: 2 },
@@ -208,6 +209,6 @@ const s = StyleSheet.create({
   miniFill:      { height: '100%', borderRadius: 2 },
   msgBubble:     { borderRadius: 14, borderWidth: 1, padding: 16 },
   msgText:       { fontSize: 15, lineHeight: 22, fontWeight: '500' },
-  btn:           { borderRadius: 16, padding: 16, alignItems: 'center' },
-  btnText:       { fontSize: 16, fontWeight: '500', color: '#FFFFFF' },
+  btn:           { borderRadius: THEME.radius.lg, padding: 16, alignItems: 'center' },
+  btnText:       { fontSize: 16, fontWeight: '500', color: THEME.colors.surface },
 });

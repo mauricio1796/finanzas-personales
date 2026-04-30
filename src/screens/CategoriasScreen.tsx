@@ -16,6 +16,7 @@ import { Icon } from '../components/ui/Icon';
 import { calcularMetricasFinancieras } from '../utils/ingresoUtils';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
 import { CATALOGO_CATEGORIAS, catalogoItemToCategory, getPaletaItem } from '../constants/catalogoCategorias';
+import { THEME } from '../constants/theme';
 import { Category, Transaction } from '../types';
 import {
   getGastoTotalMes,
@@ -684,7 +685,7 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
             onPress={guardarCategoria}
             disabled={!formNombre.trim()}
           >
-            <Text style={[s.saveBtnText, { color: formNombre.trim() ? '#FFFFFF' : colors.textTertiary }]}>
+            <Text style={[s.saveBtnText, { color: formNombre.trim() ? THEME.colors.surface : colors.textTertiary }]}>
               {modalEditar ? 'Actualizar' : 'Guardar'}
             </Text>
           </TouchableOpacity>
@@ -765,7 +766,7 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
               style={[s.payBtnConfirm, { backgroundColor: colors.primary }]}
               onPress={confirmarPago}
             >
-              <Icon name="check" size={16} color="#FFFFFF" />
+              <Icon name="check" size={16} color={THEME.colors.surface} />
               <Text style={s.payBtnConfirmText}>Confirmar pago</Text>
             </TouchableOpacity>
           </View>
@@ -815,14 +816,14 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
               style={[s.headerBtn, s.headerBtnCatalog]}
               onPress={() => { setSeleccionNueva(new Set()); setModalCatalogo(true); }}
             >
-              <Icon name="grid" size={13} color="#FFFFFF" />
+              <Icon name="grid" size={13} color={THEME.colors.surface} />
               <Text style={s.headerBtnCatalogText}>Catálogo</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.headerBtn} onPress={toggleBusqueda}>
-              <Icon name={mostrarBusqueda ? 'x' : 'search'} size={15} color="#FFFFFF" />
+              <Icon name={mostrarBusqueda ? 'x' : 'search'} size={15} color={THEME.colors.surface} />
             </TouchableOpacity>
             <TouchableOpacity style={s.headerBtn} onPress={ciclarOrden}>
-              <Icon name="sliders" size={15} color="#FFFFFF" />
+              <Icon name="sliders" size={15} color={THEME.colors.surface} />
             </TouchableOpacity>
           </View>
         </View>
@@ -850,9 +851,9 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
         {/* Summary cards */}
         <View style={[s.summaryRow, { marginTop: mostrarBusqueda ? 4 : 16 }]}>
           {[
-            { val: fmtCOP(gastoTotal),       label: 'Gastado',     color: '#FFFFFF' },
+            { val: fmtCOP(gastoTotal),       label: 'Gastado',     color: THEME.colors.surface },
             { val: fmtCOP(disponibleTotal),  label: 'Disponible',  color: colors.income },
-            { val: String(categoriasEnriquecidas.length), label: 'Categorías', color: '#FFFFFF' },
+            { val: String(categoriasEnriquecidas.length), label: 'Categorías', color: THEME.colors.surface },
           ].map(m => (
             <View key={m.label} style={s.summaryCard}>
               <Text style={[s.summaryVal, { color: m.color }]} numberOfLines={1}>{m.val}</Text>
@@ -870,7 +871,7 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
           <View style={s.budgetBarTrack}>
             <View style={[s.budgetBarFill, {
               width: `${Math.min(pctTotal, 100)}%` as any,
-              backgroundColor: pctTotal >= 100 ? colors.expense : pctTotal >= 80 ? colors.warning : '#FFFFFF',
+              backgroundColor: pctTotal >= 100 ? colors.expense : pctTotal >= 80 ? colors.warning : THEME.colors.surface,
             }]} />
           </View>
           <View style={s.budgetBarLabels}>
@@ -900,7 +901,7 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
               ]}
               onPress={() => setFiltro(f.key)}
             >
-              <Text style={[s.filterPillText, { color: active ? '#FFFFFF' : colors.textSecondary, fontWeight: active ? '500' : '400' }]}>
+              <Text style={[s.filterPillText, { color: active ? THEME.colors.surface : colors.textSecondary, fontWeight: active ? '500' : '400' }]}>
                 {f.label}
               </Text>
               {f.count > 0 && (
@@ -960,7 +961,7 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
           style={[s.fabBtn, { backgroundColor: colors.primary }]}
           onPress={abrirAgregar}
         >
-          <Icon name="plus" size={22} color="#FFFFFF" />
+          <Icon name="plus" size={22} color={THEME.colors.surface} />
         </TouchableOpacity>
       </Animated.View>
 
@@ -1006,7 +1007,7 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
                   borderColor: filtroCatalogo === f ? colors.primary : colors.border,
                 }}
               >
-                <Text style={{ fontSize: 12, fontWeight: '500', color: filtroCatalogo === f ? '#fff' : colors.textSecondary }}>
+                <Text style={{ fontSize: 12, fontWeight: '500', color: filtroCatalogo === f ? THEME.colors.surface : colors.textSecondary }}>
                   {f === 'todos' ? 'Todos' : f === 'esenciales' ? 'Esenciales' : f === 'gastos' ? 'Gastos' : 'Ingresos'}
                 </Text>
               </TouchableOpacity>
@@ -1163,7 +1164,7 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
                 alignItems: 'center',
               }}
             >
-              <Text style={{ fontSize: 15, fontWeight: '500', color: seleccionNueva.size > 0 ? '#fff' : colors.textTertiary }}>
+              <Text style={{ fontSize: 15, fontWeight: '500', color: seleccionNueva.size > 0 ? THEME.colors.surface : colors.textTertiary }}>
                 {seleccionNueva.size > 0
                   ? `Agregar ${seleccionNueva.size} categoría${seleccionNueva.size !== 1 ? 's' : ''}`
                   : 'Selecciona categorías del catálogo'}
@@ -1183,18 +1184,18 @@ const s = StyleSheet.create({
   // Header
   header:       { paddingHorizontal: 20, paddingBottom: 20 },
   headerTop:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle:  { fontSize: 18, fontWeight: '500', color: '#FFFFFF' },
+  headerTitle:  { fontSize: 18, fontWeight: '500', color: THEME.colors.surface },
   headerBtns:   { flexDirection: 'row', gap: 8 },
   headerBtn:         { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   headerBtnCatalog:  { width: 'auto' as any, paddingHorizontal: 10, flexDirection: 'row', gap: 4 },
-  headerBtnCatalogText: { fontSize: 12, fontWeight: '500', color: '#FFFFFF' },
+  headerBtnCatalogText: { fontSize: 12, fontWeight: '500', color: THEME.colors.surface },
   catModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 0.5 },
   catModalTitle:  { fontSize: 17, fontWeight: '500' },
 
   // Search
   searchWrap:  {},
   searchInner: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12, paddingHorizontal: 12, height: 40 },
-  searchInput: { flex: 1, marginLeft: 8, fontSize: 14, color: '#FFFFFF', height: 40 },
+  searchInput: { flex: 1, marginLeft: 8, fontSize: 14, color: THEME.colors.surface, height: 40 },
 
   // Summary cards
   summaryRow:  { flexDirection: 'row', gap: 8 },
@@ -1206,7 +1207,7 @@ const s = StyleSheet.create({
   budgetBarWrap:   { marginTop: 12 },
   budgetBarLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   budgetBarLabel:  { fontSize: 11, color: 'rgba(255,255,255,0.65)' },
-  budgetBarPct:    { fontSize: 11, fontWeight: '500', color: '#FFFFFF' },
+  budgetBarPct:    { fontSize: 11, fontWeight: '500', color: THEME.colors.surface },
   budgetBarTrack:  { height: 4, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 2, overflow: 'hidden' },
   budgetBarFill:   { height: 4, borderRadius: 2 },
   budgetBarSub:    { fontSize: 10, color: 'rgba(255,255,255,0.55)' },
@@ -1217,7 +1218,7 @@ const s = StyleSheet.create({
   filterPill:    { flexDirection: 'row', alignItems: 'center', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, gap: 5 },
   filterPillText:{ fontSize: 12 },
   filterBadge:   { borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1, minWidth: 18, alignItems: 'center' },
-  filterBadgeText: { fontSize: 9, fontWeight: '500', color: '#FFFFFF' },
+  filterBadgeText: { fontSize: 9, fontWeight: '500', color: THEME.colors.surface },
 
   // List
   listContent: { paddingHorizontal: 16 },
@@ -1251,7 +1252,7 @@ const s = StyleSheet.create({
 
   // FAB
   fab:    { position: 'absolute', right: 16 },
-  fabBtn: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 6 },
+  fabBtn: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', ...THEME.shadow.fab },
 
   // Modal
   modalContent: { padding: 20 },
@@ -1285,7 +1286,7 @@ const s = StyleSheet.create({
   payBtnCancel:  { flex: 1, borderRadius: 14, borderWidth: 1, paddingVertical: 14, alignItems: 'center' },
   payBtnCancelText: { fontSize: 15 },
   payBtnConfirm: { flex: 2, borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  payBtnConfirmText: { fontSize: 15, fontWeight: '500', color: '#FFFFFF' },
+  payBtnConfirmText: { fontSize: 15, fontWeight: '500', color: THEME.colors.surface },
 
   // Empty
   emptyWrap:  { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 32, gap: 12 },
@@ -1293,5 +1294,5 @@ const s = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: '500', textAlign: 'center' },
   emptySub:   { fontSize: 13, textAlign: 'center', lineHeight: 20 },
   emptyBtn:   { borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10, marginTop: 4 },
-  emptyBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '500' },
+  emptyBtnText: { color: THEME.colors.surface, fontSize: 14, fontWeight: '500' },
 });

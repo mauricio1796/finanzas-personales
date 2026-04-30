@@ -178,9 +178,16 @@ export default function HomeScreen() {
   // ==================== ONBOARDING STEP MACHINE ====================
   const storedIdx = onboardingState?.step ?? 0;
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>(
-    ONBOARDING_STEPS[Math.min(storedIdx, ONBOARDING_STEPS.length - 1)] ?? 'welcome'
+    ONBOARDING_STEPS[Math.min(storedIdx, ONBOARDING_STEPS.length - 1)] ?? 'profile'
   );
   const onboardingAnim = useRef(new Animated.Value(1)).current;
+
+  // Reset onboarding step to the beginning whenever isOnboarded is cleared (e.g. resetAll)
+  useEffect(() => {
+    if (!isOnboarded) {
+      setOnboardingStep(ONBOARDING_STEPS[0]);
+    }
+  }, [isOnboarded]);
 
   // ==================== ANIMATIONS ====================
   const authAnim = useRef(new Animated.Value(0)).current;
@@ -371,7 +378,7 @@ export default function HomeScreen() {
     setCurrentScreen('dashboard');
     setLoginEmail('');
     setLoginPassword('');
-    setShowSplash(false);
+    setShowSplash(true);
   };
 
   // ==================== FINANCE HANDLERS ====================

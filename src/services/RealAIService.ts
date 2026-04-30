@@ -1,10 +1,12 @@
 import { type Transaction, type Category } from '../types';
+import type { Meta, Deuda, GastoRecurrente, UserLevel } from '../types';
 import {
   calcularMetricasFinancieras,
   buildContextoIA,
   type MetricasFinancieras,
 } from '../utils/ingresoUtils';
 import { procesarMensajeUsuario } from './ai/AIService';
+import { finnMemoryService } from './FinnMemoryService';
 import { CONFIG } from '../constants/config';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -21,6 +23,15 @@ export interface RespuestaIA {
   tokens?: number;
 }
 
+// Contexto extra personalizado por usuario
+export interface ContextoPersonalizado {
+  metas?: Meta[];
+  deudas?: Deuda[];
+  recurrentes?: GastoRecurrente[];
+  userLevel?: UserLevel | null;
+  userId?: string;
+}
+
 // ── System prompt ─────────────────────────────────────────────────────────────
 
 function buildSystemPrompt(contexto: string, nombreUsuario: string): string {
@@ -34,6 +45,7 @@ PERSONALIDAD:
 - Das consejos concretos y accionables, no genéricos
 - Máximo 3 oraciones por respuesta salvo que el usuario pida más detalle
 - Nunca inventas datos — solo usas los que aparecen en el contexto
+- Si conoces patrones del usuario, úsalos para dar consejos más personalizados
 
 CONTEXTO FINANCIERO ACTUAL DEL USUARIO:
 ${contexto}
@@ -42,7 +54,64 @@ REGLAS:
 - Si el usuario pregunta algo que no está en el contexto, dilo honestamente
 - Nunca sugieras productos financieros específicos (bancos, inversiones concretas)
 - Si detectas una situación financiera crítica, sé directo pero constructivo
-- Si el usuario saluda, responde brevemente y ofrece ayuda concreta basada en su situación actual`;
+- Si el usuario saluda, responde brevemente y ofrece ayuda concreta basada en su situación actual
+- Cuando mencionas números, siempre usa el formato colombiano ($1.250.000)`;
+}
+
+// ── Construcción del contexto enriquecido ─────────────────────────────────────
+
+async function buildContextoEnriquecido(
+  transactions: Transaction[],
+  categories: Category[],
+  profile: any,
+  extra: ContextoPersonalizado,
+): Promise<{ contexto: string; metricas: MetricasFinancieras }> {
+  const now = new Date();
+  const metricas = calcularMetricasFinancieras(
+    transactions, categories as any,
+    profile?.monthlySalary ?? 0,
+    now.getMonth(), now.getFullYear(),
+  );
+
+  // Cargar memoria persistente de Finn si hay userId
+  let memoriaFinn = '';
+  if (extra.userId) {
+    try {
+      const memory = await finnMemoryService.getMemory(extra.userId);
+      memoriaFinn = finnMemoryService.buildContextoMemoria(memory);
+    } catch { /* silencioso — la memoria es opcional */ }
+  }
+
+  const contexto = buildContextoIA(
+    metricas, categories as any, transactions, profile,
+    now.getMonth(), now.getFullYear(),
+    {
+      metas: extra.metas?.map(m => ({
+        nombre: m.nombre,
+        objetivo: m.montoObjetivo,
+        actual: m.montoActual,
+        completada: m.completada,
+      })),
+      deudas: extra.deudas?.map(d => ({
+        nombre: d.nombre,
+        saldo: d.saldo,
+        cuota: d.cuotaMensual,
+      })),
+      recurrentes: extra.recurrentes?.map(r => ({
+        nombre: r.nombre,
+        monto: r.monto,
+        activo: r.activo,
+      })),
+      nivel: extra.userLevel ? {
+        level: extra.userLevel.level,
+        experience: extra.userLevel.experience,
+        title: extra.userLevel.title,
+      } : undefined,
+      memoriaFinn,
+    },
+  );
+
+  return { contexto, metricas };
 }
 
 // ── Llamada al Worker ─────────────────────────────────────────────────────────
@@ -89,20 +158,10 @@ export async function enviarMensajeAFinn(
   categories:        Category[],
   profile:           any,
   goal:              any,
+  extra:             ContextoPersonalizado = {},
 ): Promise<RespuestaIA> {
   try {
-    const now      = new Date();
-    const metricas = calcularMetricasFinancieras(
-      transactions, categories as any,
-      profile?.monthlySalary ?? 0,
-      now.getMonth(), now.getFullYear(),
-    );
-
-    const contexto = buildContextoIA(
-      metricas, categories as any, transactions, profile,
-      now.getMonth(), now.getFullYear(),
-    );
-
+    const { contexto } = await buildContextoEnriquecido(transactions, categories, profile, extra);
     const system   = buildSystemPrompt(contexto, profile?.name ?? 'Usuario');
     const mensajes: MensajeChat[] = [
       ...historial.slice(-(CONFIG.MAX_HISTORIAL_MENSAJES - 1)),
@@ -110,6 +169,14 @@ export async function enviarMensajeAFinn(
     ];
 
     const texto = await llamarWorker(mensajes, system, CONFIG.MAX_TOKENS_RESPUESTA);
+
+    // Actualizar patrones en background (sin bloquear la respuesta)
+    if (extra.userId) {
+      finnMemoryService.analizarPatrones(
+        extra.userId, transactions, categories, profile?.monthlySalary ?? 0,
+      ).catch(() => {});
+    }
+
     return { texto, exito: true };
 
   } catch (e: any) {
@@ -229,18 +296,10 @@ export async function enviarMensajeAgenteAFinn(
   categories:     Category[],
   profile:        any,
   goal:           any,
+  extra:          ContextoPersonalizado = {},
 ): Promise<RespuestaAgente> {
   try {
-    const now      = new Date();
-    const metricas = calcularMetricasFinancieras(
-      transactions, categories as any,
-      profile?.monthlySalary ?? 0,
-      now.getMonth(), now.getFullYear(),
-    );
-    const contexto = buildContextoIA(
-      metricas, categories as any, transactions, profile,
-      now.getMonth(), now.getFullYear(),
-    );
+    const { contexto } = await buildContextoEnriquecido(transactions, categories, profile, extra);
     const system  = buildSystemPromptAgente(contexto, profile?.name ?? 'Usuario', transactions, categories);
     const mensajes: MensajeChat[] = [
       ...historial.slice(-(CONFIG.MAX_HISTORIAL_MENSAJES - 1)),
@@ -264,18 +323,19 @@ export async function enviarMensajeAgenteAFinn(
   }
 }
 
-// ── Insight diario ────────────────────────────────────────────────────────────
+// ── Insight diario personalizado ──────────────────────────────────────────────
 
 export async function generarInsightDiario(
   transactions: Transaction[],
   categories:   Category[],
   profile:      any,
+  extra:        ContextoPersonalizado = {},
 ): Promise<string> {
   try {
     const respuesta = await enviarMensajeAFinn(
       'Dame un insight breve y concreto sobre mis finanzas de hoy. Máximo 2 oraciones, sin saludar.',
       [],
-      transactions, categories, profile, null,
+      transactions, categories, profile, null, extra,
     );
     if (respuesta.exito && respuesta.error !== 'fallback') return respuesta.texto;
   } catch { /* cae al fallback */ }

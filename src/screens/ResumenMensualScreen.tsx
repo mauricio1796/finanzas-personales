@@ -10,6 +10,7 @@ import { useFinance } from '../state';
 import { useTheme } from '../state/ThemeContext';
 import { Icon } from '../components/ui/Icon';
 import { useSwipeBack } from '../hooks/useSwipeBack';
+import { THEME } from '../constants/theme';
 import {
   calcularResumenMensual,
   calificacionColor,
@@ -26,7 +27,7 @@ const fmtCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replac
 
 // ── Confetti ──────────────────────────────────────────────────────────────────
 
-const CONFETTI_COLORS = ['#6366F1','#10B981','#F59E0B','#EF4444','#A855F7','#EC4899','#06B6D4'];
+const CONFETTI_COLORS = [THEME.colors.primary, THEME.colors.income, '#F59E0B', THEME.colors.expense, '#A855F7','#EC4899','#06B6D4'];
 
 const ConfettiBurst: React.FC<{ active: boolean }> = ({ active }) => {
   const pieces = useRef(
@@ -136,10 +137,10 @@ const lm = StyleSheet.create({
   iconCircle: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   title:   { fontSize: 22, fontWeight: '800', marginBottom: 8, textAlign: 'center' },
   desc:    { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
-  xpBadge: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, marginBottom: 20 },
+  xpBadge: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: THEME.radius.pill, marginBottom: 20 },
   xpText:  { fontSize: 16, fontWeight: '700' },
   btn:     { borderRadius: 14, paddingVertical: 13, paddingHorizontal: 40 },
-  btnText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+  btnText: { fontSize: 16, fontWeight: '600', color: THEME.colors.surface },
 });
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -258,7 +259,7 @@ export const ResumenMensualScreen: React.FC<Props> = ({ onBack, onNavigate, mesO
         ]}
       >
         <TouchableOpacity onPress={onBack} style={s.backBtn} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Icon name="chevron-left" size={22} color="#FFFFFF" />
+          <Icon name="chevron-left" size={22} color={THEME.colors.surface} />
         </TouchableOpacity>
         <Text style={s.headerSub}>{MESES_LABELS[mes]} {año}</Text>
         <Text style={s.headerEmoji}>{calificacionEmoji(resumen.calificacion)}</Text>
@@ -323,9 +324,9 @@ const TabResumen: React.FC<{ resumen: ResumenMensual; colors: any; calColor: str
             <Text style={[r.compareLabel, { color: colors.textTertiary }]}>{comparativa.mesAnteriorLabel}</Text>
             <Text style={[r.compareAmt, { color: colors.textSecondary }]}>{fmtCOP(comparativa.gastadoAnterior)}</Text>
           </View>
-          <View style={[r.badge, { backgroundColor: mejoro ? '#DCFCE7' : '#FEE2E2' }]}>
-            <Icon name={mejoro ? 'trending-down' : 'trending-up'} size={14} color={mejoro ? '#16A34A' : '#DC2626'} />
-            <Text style={[r.badgeText, { color: mejoro ? '#16A34A' : '#DC2626' }]}>
+          <View style={[r.badge, { backgroundColor: mejoro ? THEME.colors.incomeLight : THEME.colors.expenseLight }]}>
+            <Icon name={mejoro ? 'trending-down' : 'trending-up'} size={14} color={mejoro ? THEME.colors.income : THEME.colors.expense} />
+            <Text style={[r.badgeText, { color: mejoro ? THEME.colors.income : THEME.colors.expense }]}>
               {mejoro ? '' : '+'}{comparativa.cambioPct}%
             </Text>
           </View>
@@ -351,9 +352,9 @@ const TabResumen: React.FC<{ resumen: ResumenMensual; colors: any; calColor: str
       {/* Stats row */}
       <View style={r.statsRow}>
         {[
-          { label: 'Total gastado', value: fmtCOP(metricas.totalGastado), color: '#EF4444' },
+          { label: 'Total gastado', value: fmtCOP(metricas.totalGastado), color: THEME.colors.expense },
           { label: 'Pendiente', value: fmtCOP(metricas.totalPendiente), color: '#F59E0B' },
-          { label: 'Ahorro',     value: fmtCOP(metricas.ahorroProyectado), color: '#10B981' },
+          { label: 'Ahorro',     value: fmtCOP(metricas.ahorroProyectado), color: THEME.colors.income },
         ].map((item, i) => (
           <View key={i} style={[r.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[r.statVal, { color: item.color }]}>{item.value}</Text>
@@ -475,7 +476,7 @@ const TabCategorias: React.FC<{ resumen: ResumenMensual; colors: any; calColor: 
   );
 };
 
-const PALETTE = ['#6366F1','#10B981','#F59E0B','#EF4444','#A855F7'];
+const PALETTE = [THEME.colors.primary, THEME.colors.income, '#F59E0B', THEME.colors.expense, '#A855F7'];
 
 const rc = StyleSheet.create({
   card:        { borderRadius: 16, borderWidth: 1, padding: 16, gap: 12 },
@@ -544,9 +545,9 @@ const TabProyeccion: React.FC<{
         <Text style={[rp.cardTitle, { color: colors.textPrimary }]}>Regla 50-30-20</Text>
         <Text style={[rp.cardSub, { color: colors.textTertiary }]}>Distribución recomendada de {fmtCOP(ingreso)}</Text>
         {[
-          { label: 'Necesidades', pct: 50, amt: necesidades, color: '#6366F1' },
+          { label: 'Necesidades', pct: 50, amt: necesidades, color: THEME.colors.primary },
           { label: 'Deseos',      pct: 30, amt: deseos,      color: '#F59E0B' },
-          { label: 'Ahorro',      pct: 20, amt: ahorros,     color: '#10B981' },
+          { label: 'Ahorro',      pct: 20, amt: ahorros,     color: THEME.colors.income },
         ].map((item, i) => (
           <View key={i} style={rp.ruleRow}>
             <View style={[rp.ruleDot, { backgroundColor: item.color }]} />
@@ -564,7 +565,7 @@ const TabProyeccion: React.FC<{
           onPress={() => onNavigate?.('bot')}
           activeOpacity={0.85}
         >
-          <Icon name="message-circle" size={18} color="#FFFFFF" />
+          <Icon name="message-circle" size={18} color={THEME.colors.surface} />
           <Text style={rp.actionBtnText}>Hablar con Finn IA</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -591,7 +592,7 @@ const TabProyeccion: React.FC<{
 const rp = StyleSheet.create({
   finnRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   finnAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
-  finnLetter: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  finnLetter: { fontSize: 16, fontWeight: '700', color: THEME.colors.surface },
   bubble:     { flex: 1, borderRadius: 14, borderTopLeftRadius: 4, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
   bubbleText: { fontSize: 14, lineHeight: 20 },
   card:       { borderRadius: 16, borderWidth: 1, padding: 16, gap: 10 },
@@ -607,7 +608,7 @@ const rp = StyleSheet.create({
   rulePct:    { fontSize: 12, fontWeight: '600', width: 32, textAlign: 'right' },
   ruleAmt:    { fontSize: 14, fontWeight: '700', width: 90, textAlign: 'right' },
   actionBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 14 },
-  actionBtnText: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
+  actionBtnText: { fontSize: 15, fontWeight: '600', color: THEME.colors.surface },
   actionBtnOutline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 13, borderWidth: 1.5 },
   actionBtnOutlineText: { fontSize: 15, fontWeight: '600' },
 });
@@ -620,7 +621,7 @@ const s = StyleSheet.create({
   backBtn:     { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   headerSub:   { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500' },
   headerEmoji: { fontSize: 36 },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: '#FFFFFF' },
+  headerTitle: { fontSize: 26, fontWeight: '800', color: THEME.colors.surface },
   segRow:      { flexDirection: 'row', height: 6, borderRadius: 3, overflow: 'hidden', marginTop: 8, gap: 1 },
   seg:         { height: '100%', borderRadius: 2 },
   segLabels:   { flexDirection: 'row', justifyContent: 'space-between' },

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../../state/ThemeContext';
 import { SPACING } from '../../constants';
+import { THEME } from '../../constants/theme';
 
 interface BudgetItem {
   category: string;
@@ -64,14 +65,11 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 16,
+    borderRadius: THEME.radius.lg,
     padding: SPACING.lg,
     gap: SPACING.md,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
+    ...THEME.shadow.card,
   },
   title: {
     fontSize: 15,

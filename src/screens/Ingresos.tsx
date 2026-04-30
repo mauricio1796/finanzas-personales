@@ -13,6 +13,7 @@ import {
 import { useFinance, Transaction } from '@/src/core/context/FinanceContext';
 import { SwipeableRow } from '@/src/components/ui/SwipeableRow';
 import { Icon, getCategoryIcon } from '@/src/components/ui/Icon';
+import { THEME } from '@/src/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const formatCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
@@ -70,7 +71,7 @@ export function Ingresos({ transactions, onAddIncome, onDeleteTransaction }: Ing
       <View style={[styles.txItem, index < incomeTransactions.length - 1 && styles.txItemBorder]}>
         <View style={styles.txLeft}>
           <View style={styles.txIconCircle}>
-              <Icon name={getCategoryIcon(item.category)} size={16} color="#10B981" />
+              <Icon name={getCategoryIcon(item.category)} size={16} color={THEME.colors.income} />
           </View>
           <View>
             <Text style={styles.txCategory}>{item.category}</Text>
@@ -108,7 +109,7 @@ export function Ingresos({ transactions, onAddIncome, onDeleteTransaction }: Ing
           <TextInput
             style={[styles.input, salaryFocused && styles.inputFocused, { flex: 1 }]}
             placeholder="Ej: 3.000.000"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={THEME.colors.textTertiary}
             keyboardType="numeric"
             value={monthlySalary}
             onChangeText={(txt) => { const d = txt.replace(/\./g, '').replace(/[^0-9]/g, ''); const n = parseInt(d, 10); setMonthlySalary(isNaN(n) ? '' : n.toLocaleString('es-CO').replace(/,/g, '.')); }}
@@ -140,7 +141,7 @@ export function Ingresos({ transactions, onAddIncome, onDeleteTransaction }: Ing
         <TextInput
           style={[styles.input, amountFocused && styles.inputFocused]}
           placeholder="Ej: 500.000"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={THEME.colors.textTertiary}
           keyboardType="numeric"
           value={amount}
           onChangeText={(txt) => { const d = txt.replace(/\./g, '').replace(/[^0-9]/g, ''); const n = parseInt(d, 10); setAmount(isNaN(n) ? '' : n.toLocaleString('es-CO').replace(/,/g, '.')); }}
@@ -152,7 +153,7 @@ export function Ingresos({ transactions, onAddIncome, onDeleteTransaction }: Ing
         <TextInput
           style={[styles.input, descFocused && styles.inputFocused]}
           placeholder="Ej: Pago quincena, Proyecto cliente..."
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={THEME.colors.textTertiary}
           value={description}
           onChangeText={setDescription}
           onFocus={() => setDescFocused(true)}
@@ -203,7 +204,7 @@ export function Ingresos({ transactions, onAddIncome, onDeleteTransaction }: Ing
 const styles = StyleSheet.create({
   scroll: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: THEME.colors.background,
   },
   content: {
     paddingTop: 20,
@@ -216,35 +217,29 @@ const styles = StyleSheet.create({
   },
   headerLabel: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '700',
     letterSpacing: 1.2,
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
   },
 
   // Card
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: THEME.colors.surface,
+    borderRadius: THEME.radius.lg,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: THEME.colors.border,
     padding: 20,
-    ...(Platform.OS !== 'web' ? {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 6,
-      elevation: 2,
-    } : {}),
+    ...(Platform.OS !== 'web' ? { ...THEME.shadow.card } : {}),
   },
   cardTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
     marginBottom: 16,
   },
 
@@ -254,19 +249,19 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   saveBtn: {
-    backgroundColor: '#6366F1',
+    backgroundColor: THEME.colors.primary,
     paddingHorizontal: 18,
-    borderRadius: 10,
+    borderRadius: THEME.radius.sm,
     justifyContent: 'center',
   },
   saveBtnText: {
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
     fontSize: 14,
     fontWeight: '700',
   },
   currentSalary: {
     fontSize: 13,
-    color: '#10B981',
+    color: THEME.colors.income,
     fontWeight: '600',
     marginTop: 10,
   },
@@ -274,23 +269,23 @@ const styles = StyleSheet.create({
   // Fields
   fieldLabel: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '700',
     letterSpacing: 0.8,
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderColor: THEME.colors.border,
+    backgroundColor: THEME.colors.surface,
     padding: 14,
-    borderRadius: 10,
+    borderRadius: THEME.radius.sm,
     fontSize: 16,
-    color: '#111827',
+    color: THEME.colors.textPrimary,
     fontWeight: '600',
   },
   inputFocused: {
-    borderColor: '#6366F1',
+    borderColor: THEME.colors.primary,
     borderWidth: 2,
   },
 
@@ -301,35 +296,35 @@ const styles = StyleSheet.create({
   catPill: {
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 100,
+    borderRadius: THEME.radius.pill,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderColor: THEME.colors.border,
+    backgroundColor: THEME.colors.surface,
   },
   catPillActive: {
-    backgroundColor: '#10B981',
-    borderColor: '#10B981',
+    backgroundColor: THEME.colors.income,
+    borderColor: THEME.colors.income,
   },
   catPillText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#6B7280',
+    color: THEME.colors.textSecondary,
   },
   catPillTextActive: {
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
     fontWeight: '700',
   },
 
   // Add button
   addBtn: {
-    backgroundColor: '#10B981',
+    backgroundColor: THEME.colors.income,
     padding: 15,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     alignItems: 'center',
     marginTop: 16,
     ...(Platform.OS !== 'web' ? {
-      shadowColor: '#10B981',
+      shadowColor: THEME.colors.income,
       shadowOffset: { width: 0, height: 3 },
       shadowOpacity: 0.25,
       shadowRadius: 8,
@@ -337,22 +332,22 @@ const styles = StyleSheet.create({
     } : {}),
   },
   addBtnText: {
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
     fontSize: 15,
     fontWeight: '800',
   },
 
   // Error
   errorBox: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: THEME.colors.expenseLight,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     borderLeftWidth: 3,
-    borderLeftColor: '#EF4444',
+    borderLeftColor: THEME.colors.expense,
     marginBottom: 12,
   },
   errorText: {
-    color: '#EF4444',
+    color: THEME.colors.expense,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -366,7 +361,7 @@ const styles = StyleSheet.create({
   },
   txItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: THEME.colors.surfaceSecondary,
   },
   txLeft: {
     flexDirection: 'row',
@@ -377,25 +372,25 @@ const styles = StyleSheet.create({
   txIconCircle: {
     width: 36,
     height: 36,
-    borderRadius: 18,
-    backgroundColor: '#ECFDF5',
+    borderRadius: THEME.radius.pill,
+    backgroundColor: THEME.colors.incomeLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   txCategory: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
   },
   txDesc: {
     fontSize: 12,
-    color: '#6B7280',
+    color: THEME.colors.textSecondary,
     fontWeight: '500',
     marginTop: 1,
   },
   txDate: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     marginTop: 2,
   },
   txRight: {
@@ -405,16 +400,16 @@ const styles = StyleSheet.create({
   incomeAmount: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#10B981',
+    color: THEME.colors.income,
   },
   deleteBtn: {
     fontSize: 12,
-    color: '#EF4444',
+    color: THEME.colors.expense,
     fontWeight: '600',
   },
   emptyText: {
     textAlign: 'center',
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontSize: 14,
     paddingVertical: 20,
   },

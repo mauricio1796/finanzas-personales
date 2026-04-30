@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
+import { THEME } from '../../constants/theme';
 
 export const StatusBarSim: React.FC = () => {
   const [time, setTime] = useState('');
@@ -63,7 +64,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 22,
     paddingTop: 6,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: THEME.colors.surface,
   },
   time: {
     fontSize: 15,
@@ -74,8 +75,8 @@ const styles = StyleSheet.create({
   island: {
     width: 100,
     height: 28,
-    borderRadius: 20,
-    backgroundColor: '#111827',
+    borderRadius: THEME.radius.lg,
+    backgroundColor: THEME.colors.textPrimary,
   },
   icons: {
     flexDirection: 'row',

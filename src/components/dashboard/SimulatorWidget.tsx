@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { COLORS, SPACING } from '../../constants';
+import { THEME } from '../../constants/theme';
 
 interface SimulatorWidgetProps {
   currentBudget: number;
@@ -86,12 +87,12 @@ export const SimulatorWidget: React.FC<SimulatorWidgetProps> = ({
           <StatCard
             label="Gastado"
             value={`$${currentSpent.toFixed(2)}`}
-            color="#FF6B6B"
+            color={THEME.colors.expense}
           />
           <StatCard
             label="Disponible"
             value={`$${remaining.toFixed(2)}`}
-            color={remaining > 0 ? '#10B981' : '#EF4444'}
+            color={remaining > 0 ? THEME.colors.income : THEME.colors.expense}
           />
         </View>
 
@@ -159,7 +160,7 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, color }) => (
 const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.cardSecondary,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     padding: SPACING.lg,
     gap: SPACING.md,
   },
@@ -182,7 +183,7 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     backgroundColor: COLORS.background,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     padding: SPACING.md,
     alignItems: 'center',
     gap: SPACING.xs,
@@ -207,14 +208,14 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
     color: COLORS.textPrimary,
     fontSize: 14,
   },
   resultContainer: {
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     backgroundColor: '#ECFDF5',
@@ -239,7 +240,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     paddingVertical: SPACING.sm,
     alignItems: 'center',
   },
@@ -251,7 +252,7 @@ const styles = StyleSheet.create({
   simulateButton: {
     flex: 1,
     backgroundColor: COLORS.primary,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     paddingVertical: SPACING.sm,
     alignItems: 'center',
   },

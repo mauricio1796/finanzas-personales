@@ -9,6 +9,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { TourRegistry, TourMeasure } from '../../utils/TourRegistry';
+import { THEME } from '../../constants/theme';
 
 // ─── Step definition ──────────────────────────────────────────────────
 export interface TourStep {
@@ -317,8 +318,8 @@ const s = StyleSheet.create({
   spotBorder: {
     position: 'absolute',
     borderWidth: 2.5,
-    borderColor: '#6366F1',
-    shadowColor: '#6366F1',
+    borderColor: THEME.colors.primary,
+    shadowColor: THEME.colors.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 10,
@@ -329,17 +330,14 @@ const s = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#6366F1',
+    backgroundColor: THEME.colors.primary,
   },
   tooltip: {
     position: 'absolute',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    backgroundColor: THEME.colors.surface,
+    borderRadius: THEME.radius.lg,
     padding: 22,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 30,
+    ...THEME.shadow.card,
     elevation: 24,
   },
   tipHeader: {
@@ -356,21 +354,21 @@ const s = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: THEME.colors.border,
   },
   dotActive: {
     width: 20,
-    backgroundColor: '#6366F1',
+    backgroundColor: THEME.colors.primary,
     borderRadius: 3,
   },
   skipText: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '600',
   },
   counter: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: THEME.colors.textTertiary,
     fontWeight: '700',
     letterSpacing: 0.5,
     marginBottom: 6,
@@ -378,13 +376,13 @@ const s = StyleSheet.create({
   tipTitle: {
     fontSize: 19,
     fontWeight: '800',
-    color: '#111827',
+    color: THEME.colors.textPrimary,
     marginBottom: 8,
     lineHeight: 24,
   },
   tipDesc: {
     fontSize: 14,
-    color: '#6B7280',
+    color: THEME.colors.textSecondary,
     lineHeight: 21,
     marginBottom: 22,
   },
@@ -398,26 +396,26 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 10,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: THEME.colors.surfaceSecondary,
   },
   prevBtnText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6B7280',
+    color: THEME.colors.textSecondary,
   },
   nextBtn: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#6366F1',
+    borderRadius: THEME.radius.md,
+    backgroundColor: THEME.colors.primary,
     alignItems: 'center',
   },
   nextBtnFinish: {
-    backgroundColor: '#10B981',
+    backgroundColor: THEME.colors.income,
   },
   nextBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
   },
 });

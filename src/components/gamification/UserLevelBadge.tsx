@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS, SPACING } from '../../constants';
+import { THEME } from '../../constants/theme';
 
 interface UserLevelBadgeProps {
   level: number;
@@ -20,9 +21,9 @@ const LEVEL_TITLES = [
 const LEVEL_COLORS = [
   '#8B5CF6',
   '#3B82F6',
-  '#10B981',
+  THEME.colors.income,
   '#F59E0B',
-  '#EF4444',
+  THEME.colors.expense,
 ];
 
 export const UserLevelBadge: React.FC<UserLevelBadgeProps> = ({
@@ -104,7 +105,7 @@ export const UserLevelBadge: React.FC<UserLevelBadgeProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.cardSecondary,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     padding: SPACING.lg,
     gap: SPACING.lg,
   },
@@ -119,11 +120,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    ...THEME.shadow.card,
   },
   levelNumber: {
     fontSize: 28,
@@ -179,7 +176,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING.sm,
     backgroundColor: COLORS.background,
-    borderRadius: 8,
+    borderRadius: THEME.radius.sm,
     padding: SPACING.md,
   },
   milestoneIcon: {

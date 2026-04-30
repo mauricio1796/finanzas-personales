@@ -8,6 +8,7 @@ import { useFinance } from '../../state';
 import { useTheme } from '../../state/ThemeContext';
 import { Icon, FeatherName } from '../../components/ui/Icon';
 import { OnboardingShell } from '../../components/onboarding/OnboardingShell';
+import { THEME } from '../../constants/theme';
 
 interface Props { onNext: () => void; onBack: () => void; }
 
@@ -193,13 +194,13 @@ const s = StyleSheet.create({
   inner:      { flex: 1, paddingTop: 8, paddingBottom: 24, gap: 8 },
   finnRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   finnAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
-  finnLetter: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+  finnLetter: { fontSize: 16, fontWeight: '600', color: THEME.colors.surface },
   bubble:     { flex: 1, borderRadius: 14, borderTopLeftRadius: 4, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
   bubbleText: { fontSize: 15, lineHeight: 22 },
   nameInput:  { fontSize: 24, fontWeight: '500', paddingVertical: 12, marginTop: 8 },
   empGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   empCard:    { borderRadius: 14, padding: 14, alignItems: 'center', gap: 8 },
   empLabel:   { fontSize: 13, fontWeight: '600', textAlign: 'center' },
-  btn:        { borderRadius: 16, padding: 16, alignItems: 'center', marginTop: 8 },
-  btnText:    { fontSize: 16, fontWeight: '500', color: '#FFFFFF' },
+  btn:        { borderRadius: THEME.radius.lg, padding: 16, alignItems: 'center', marginTop: 8 },
+  btnText:    { fontSize: 16, fontWeight: '500', color: THEME.colors.surface },
 });

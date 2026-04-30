@@ -32,6 +32,7 @@ import {
 import { ejecutarHerramienta, previewEliminar, type FinnToolCall, type FinnToolResult } from '../services/AgentService';
 import { VoiceButton } from '../components/ui/VoiceButton';
 import { catalogoItemToCategory, CATALOGO_CATEGORIAS, getPaletaItem } from '../constants/catalogoCategorias';
+import { THEME } from '../constants/theme';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -101,13 +102,13 @@ const TypingIndicator: React.FC<{ colors: any }> = ({ colors }) => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <View style={[st.typingBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <Text style={[st.typingLabel, { color: colors.textTertiary }]}>Finn está escribiendo</Text>
+    <View style={st.typingBubble}>
+      <Text style={st.typingLabel}>Finn está escribiendo</Text>
       <View style={st.dotsRow}>
         {[dot1, dot2, dot3].map((dot, i) => (
           <Animated.View
             key={i}
-            style={[st.dot, { backgroundColor: colors.primary, transform: [{ translateY: dot }] }]}
+            style={[st.dot, { transform: [{ translateY: dot }] }]}
           />
         ))}
       </View>
@@ -382,8 +383,8 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
     if (item.accionFinn) {
       return (
         <View style={[st.msgRow, st.msgBot]}>
-          <View style={[st.botAvatar, { backgroundColor: '#8B5CF620' }]}>
-            <Text style={[st.botAvatarText, { color: '#8B5CF6' }]}>✦</Text>
+          <View style={st.botAvatar}>
+            <Text style={st.botAvatarText}>FI</Text>
           </View>
           <View style={[st.accionBubble, { borderColor: '#8B5CF6' }]}>
             <View style={st.accionHeader}>
@@ -405,24 +406,21 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
     return (
       <View style={[st.msgRow, isUser ? st.msgUser : st.msgBot]}>
         {!isUser && (
-          <View style={[st.botAvatar, { backgroundColor: colors.primaryLight }]}>
-            <Text style={[st.botAvatarText, { color: colors.primary }]}>✦</Text>
+          <View style={st.botAvatar}>
+            <Text style={st.botAvatarText}>FI</Text>
           </View>
         )}
-        <View style={{ flex: isUser ? undefined : 1, maxWidth: isUser ? '80%' : undefined }}>
+        <View style={{ flex: isUser ? undefined : 1, maxWidth: isUser ? '78%' : '78%' }}>
           <View style={[
             st.bubble,
             isUser
-              ? [st.bubbleUser, { backgroundColor: colors.primary }]
-              : [st.bubbleBot, {
-                  backgroundColor: item.esError ? colors.expenseLight : colors.card,
-                  borderColor: item.esError ? colors.expense : colors.border,
-                }],
+              ? st.bubbleUser
+              : [st.bubbleBot, item.esError && { backgroundColor: THEME.colors.expenseLight, borderColor: THEME.colors.expense }],
           ]}>
-            <Text style={[st.bubbleText, isUser ? { color: '#FFFFFF' } : { color: colors.textPrimary }]}>
+            <Text style={[st.bubbleText, isUser ? { color: '#FFFFFF' } : { color: '#111827' }]}>
               {item.text}
             </Text>
-            <Text style={[st.bubbleTime, isUser ? { color: 'rgba(255,255,255,0.65)', textAlign: 'right' } : { color: colors.textTertiary }]}>
+            <Text style={[st.bubbleTime, isUser ? { color: 'rgba(255,255,255,0.65)', textAlign: 'right' } : { color: '#9CA3AF' }]}>
               {new Date(item.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
             </Text>
           </View>
@@ -446,36 +444,37 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
   }, [colors, confirmacionId, catsPendientes, catsSeleccionadas, confirmarCategorias]);
 
   // ── Status dot ────────────────────────────────────────────────────────────
-  const statusColor = workerStatus === 'online' ? colors.income
-    : workerStatus === 'offline' ? colors.expense
-    : colors.warning;
-  const statusLabel = workerStatus === 'online'   ? 'IA en línea'
-    : workerStatus === 'offline'  ? 'Modo básico'
+  const statusColor = workerStatus === 'online'  ? '#1D9E75'
+    : workerStatus === 'offline' ? '#F55B5B'
+    : '#9CA3AF';
+  const statusLabel = workerStatus === 'online'  ? 'IA en línea'
+    : workerStatus === 'offline' ? 'Modo básico'
     : 'Conectando…';
 
   // ── JSX ──────────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={[st.root, { paddingTop: insets.top, backgroundColor: colors.background }]}
+      style={[st.root, { paddingTop: insets.top, backgroundColor: '#F8F7FF' }]}
     >
       {/* Header */}
-      <View style={[st.header, { borderBottomColor: colors.border, backgroundColor: colors.card }]}>
+      <View style={st.header}>
         {onBack && (
           <Pressable onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ paddingRight: 8 }}>
-            <Icon name="arrow-left" size={20} color={colors.textPrimary} />
+            <Icon name="arrow-left" size={20} color="#111827" />
           </Pressable>
         )}
         <View style={st.headerLeft}>
-          <View style={[st.headerAvatar, { backgroundColor: colors.primaryLight }]}>
-            <Text style={[st.headerAvatarText, { color: colors.primary }]}>✦</Text>
+          {/* Avatar + badge */}
+          <View>
+            <View style={st.headerAvatar}>
+              <Text style={st.headerAvatarText}>FI</Text>
+            </View>
+            <View style={[st.statusBadge, { backgroundColor: statusColor }]} />
           </View>
           <View>
-            <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Finn</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <View style={[st.statusDot, { backgroundColor: statusColor }]} />
-              <Text style={[st.statusLabel, { color: colors.textTertiary }]}>{statusLabel}</Text>
-            </View>
+            <Text style={st.headerTitle}>Finn</Text>
+            <Text style={st.statusLabel}>{statusLabel}</Text>
           </View>
         </View>
       </View>
@@ -487,12 +486,13 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
         renderItem={renderMessage}
         keyExtractor={item => item.id}
         contentContainerStyle={st.list}
+        style={{ backgroundColor: '#F8F7FF' }}
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         ListFooterComponent={
           isTyping ? (
             <View style={[st.msgRow, st.msgBot]}>
-              <View style={[st.botAvatar, { backgroundColor: colors.primaryLight }]}>
-                <Text style={[st.botAvatarText, { color: colors.primary }]}>✦</Text>
+              <View style={st.botAvatar}>
+                <Text style={st.botAvatarText}>FI</Text>
               </View>
               <TypingIndicator colors={colors} />
             </View>
@@ -504,17 +504,17 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={[st.suggestionsScroll, { backgroundColor: colors.card, borderTopColor: colors.borderSubtle }]}
+        style={st.suggestionsScroll}
         contentContainerStyle={st.suggestionsContent}
       >
         {QUICK_SUGGESTIONS.map(s => (
           <Pressable
             key={s}
-            style={[st.pill, { backgroundColor: colors.inputBg }]}
+            style={st.pill}
             onPress={() => handleSend(s)}
             disabled={isTyping}
           >
-            <Text style={[st.pillText, { color: colors.textSecondary }]}>{s}</Text>
+            <Text style={st.pillText}>{s}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -527,21 +527,21 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
         onRequestClose={() => setPendingAction(null)}
       >
         <View style={st.modalOverlay}>
-          <View style={[st.modalCard, { backgroundColor: colors.card }]}>
+          <View style={st.modalCard}>
             <View style={[st.modalIconWrap, { backgroundColor: '#8B5CF620' }]}>
               <Text style={{ fontSize: 24 }}>🗑️</Text>
             </View>
-            <Text style={[st.modalTitle, { color: colors.textPrimary }]}>Confirmar eliminación</Text>
-            <Text style={[st.modalBody, { color: colors.textSecondary }]}>{pendingAction?.preview}</Text>
+            <Text style={st.modalTitle}>Confirmar eliminación</Text>
+            <Text style={st.modalBody}>{pendingAction?.preview}</Text>
             <View style={st.modalBtns}>
               <TouchableOpacity
-                style={[st.modalBtn, { borderColor: colors.border, borderWidth: 1 }]}
+                style={[st.modalBtn, { borderColor: '#E5E7EB', borderWidth: 1 }]}
                 onPress={() => setPendingAction(null)}
               >
-                <Text style={[st.modalBtnText, { color: colors.textSecondary }]}>Cancelar</Text>
+                <Text style={[st.modalBtnText, { color: '#6B7280' }]}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[st.modalBtn, { backgroundColor: colors.expense }]}
+                style={[st.modalBtn, { backgroundColor: THEME.colors.expense }]}
                 onPress={() => pendingAction && ejecutarAccionConfirmada(pendingAction)}
               >
                 <Text style={[st.modalBtnText, { color: '#FFFFFF' }]}>Eliminar</Text>
@@ -552,12 +552,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
       </Modal>
 
       {/* Input */}
-      <View style={[st.inputWrap, {
-        paddingHorizontal: 16,
-        paddingBottom: insets.bottom + 10,
-        backgroundColor: colors.card,
-        borderTopColor: colors.border,
-      }]}>
+      <View style={[st.inputWrap, { paddingBottom: insets.bottom + 10 }]}>
         <VoiceButton
           size="small"
           onParsed={(tx) => {
@@ -568,13 +563,9 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
           }}
         />
         <TextInput
-          style={[
-            st.input,
-            { backgroundColor: colors.cardSecondary, borderColor: colors.border, color: colors.textPrimary },
-            inputFocused && { borderColor: colors.primary, borderWidth: 2 },
-          ]}
+          style={[st.input, { color: '#111827' }]}
           placeholder="Escribe a Finn…"
-          placeholderTextColor={colors.textTertiary}
+          placeholderTextColor="#9CA3AF"
           value={inputText}
           onChangeText={setInputText}
           onFocus={() => setInputFocused(true)}
@@ -584,11 +575,11 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
           editable={!isTyping}
         />
         <Pressable
-          style={[st.sendBtn, { backgroundColor: colors.primary }, (isTyping || !inputText.trim()) && { opacity: 0.4 }]}
+          style={[st.sendBtn, (isTyping || !inputText.trim()) && { opacity: 0.4 }]}
           onPress={() => handleSend()}
           disabled={isTyping || !inputText.trim()}
         >
-          <Icon name="arrow-up" size={20} color="#FFFFFF" />
+          <Icon name="arrow-up" size={18} color="#FFFFFF" />
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -600,69 +591,167 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
 const st = StyleSheet.create({
   root: { flex: 1 },
 
+  // Header — white, light shadow
   header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 20, paddingVertical: 14, paddingTop: 20, borderBottomWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingTop: 20,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#E5E7EB',
     ...(Platform.OS !== 'web' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 } : {}),
   },
   headerLeft:      { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  headerAvatar:    { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  headerAvatarText:{ fontSize: 16 },
-  headerTitle:     { fontSize: 16, fontWeight: '700' },
-  statusDot:       { width: 6, height: 6, borderRadius: 3 },
-  statusLabel:     { fontSize: 11 },
+  headerAvatar:    {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#6156E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  statusBadge:      {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  headerTitle:  { fontSize: 17, fontWeight: '700', color: '#111827' },
+  statusLabel:  { fontSize: 12, color: '#9CA3AF', marginTop: 1 },
 
-  list: { paddingTop: 16, paddingBottom: 8, gap: 4, paddingHorizontal: 16 },
-  msgRow: { flexDirection: 'row', marginVertical: 4, alignItems: 'flex-end', gap: 8 },
+  // Message list
+  list:    { paddingTop: 16, paddingBottom: 8, gap: 4, paddingHorizontal: 16 },
+  msgRow:  { flexDirection: 'row', marginVertical: 4, alignItems: 'flex-end', gap: 8 },
   msgUser: { justifyContent: 'flex-end' },
   msgBot:  { justifyContent: 'flex-start' },
 
-  botAvatar:     { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 2, flexShrink: 0 },
-  botAvatarText: { fontSize: 12 },
+  // Finn mini avatar in messages
+  botAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#6156E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+    flexShrink: 0,
+  },
+  botAvatarText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
 
-  bubble:     { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16 },
-  bubbleUser: { borderBottomRightRadius: 4 },
-  bubbleBot:  {
-    borderBottomLeftRadius: 4, borderWidth: 1,
-    ...(Platform.OS !== 'web' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 } : {}),
+  // Bubbles
+  bubble:     { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20 },
+  bubbleUser: {
+    borderBottomRightRadius: 4,
+    backgroundColor: '#6156E8',
+    alignSelf: 'flex-end',
+  },
+  bubbleBot: {
+    borderBottomLeftRadius: 4,
+    backgroundColor: '#FFFFFF',
+    ...(Platform.OS !== 'web' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 2,
+    } : {}),
   },
   bubbleText: { fontSize: 14, lineHeight: 21, fontWeight: '500' },
-  bubbleTime: { fontSize: 11, marginTop: 5, fontWeight: '400' },
+  bubbleTime: { fontSize: 10, marginTop: 3, fontWeight: '400' },
 
+  // Typing indicator — Finn bubble style
   typingBubble: {
-    borderWidth: 1, borderRadius: 16, borderBottomLeftRadius: 4,
-    paddingHorizontal: 14, paddingVertical: 10, gap: 4,
+    borderRadius: 20,
+    borderBottomLeftRadius: 4,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 4,
+    ...(Platform.OS !== 'web' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 2,
+    } : {}),
   },
-  typingLabel:  { fontSize: 11 },
-  dotsRow:      { flexDirection: 'row', gap: 4, alignItems: 'center' },
-  dot:          { width: 6, height: 6, borderRadius: 3 },
+  typingLabel:  { fontSize: 11, color: '#9CA3AF' },
+  dotsRow:      { flexDirection: 'row', gap: 5, alignItems: 'center' },
+  dot:          { width: 8, height: 8, borderRadius: 4, backgroundColor: '#9CA3AF' },
 
-  suggestionsScroll:   { flexGrow: 0, borderTopWidth: 1 },
-  suggestionsContent:  { flexDirection: 'row', gap: 8, paddingVertical: 10, paddingHorizontal: 16 },
-  pill:                { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
-  pillText:            { fontSize: 13, fontWeight: '600' },
+  // Suggestion chips
+  suggestionsScroll:  { flexGrow: 0, backgroundColor: '#FFFFFF', borderTopWidth: 0.5, borderTopColor: '#E5E7EB' },
+  suggestionsContent: { flexDirection: 'row', gap: 8, paddingVertical: 10, paddingHorizontal: 16 },
+  pill: {
+    borderRadius: 100,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    backgroundColor: '#EEF0FF',
+    borderWidth: 0.5,
+    borderColor: '#6156E8',
+  },
+  pillText: { fontSize: 12, fontWeight: '600', color: '#6156E8' },
 
-  inputWrap: { borderTopWidth: 1, flexDirection: 'row', alignItems: 'flex-end', gap: 10, paddingTop: 10 },
-  input:     { flex: 1, borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 100 },
-  sendBtn:   { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  // Input bar
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 0.5,
+    borderTopColor: '#E5E7EB',
+  },
+  input: {
+    flex: 1,
+    height: 42,
+    borderRadius: 100,
+    paddingHorizontal: 16,
+    fontSize: 15,
+    backgroundColor: '#F4F3F8',
+    maxHeight: 100,
+  },
+  sendBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#6156E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
 
-  // Action bubble
+  // Action bubble — Finn actuó
   accionBubble: {
-    flex: 1, borderWidth: 1.5, borderRadius: 16, borderBottomLeftRadius: 4,
-    paddingHorizontal: 14, paddingVertical: 10, gap: 6,
-    backgroundColor: '#8B5CF608',
+    flex: 1,
+    borderWidth: 1.5,
+    borderRadius: 20,
+    borderBottomLeftRadius: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 6,
+    backgroundColor: '#F3F0FF',
+    borderColor: '#8B5CF6',
   },
-  accionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  accionBadge:  { backgroundColor: '#8B5CF6', borderRadius: 100, paddingHorizontal: 8, paddingVertical: 3 },
+  accionHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  accionBadge:     { backgroundColor: '#8B5CF6', borderRadius: 100, paddingHorizontal: 8, paddingVertical: 3 },
   accionBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
-  accionText: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  accionText:      { fontSize: 14, fontWeight: '600', lineHeight: 20 },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  modalCard:    { width: '100%', borderRadius: 20, padding: 24, alignItems: 'center', gap: 12 },
+  modalCard:    { width: '100%', borderRadius: 24, padding: 24, alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF' },
   modalIconWrap: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  modalTitle:   { fontSize: 17, fontWeight: '700' },
-  modalBody:    { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  modalTitle:   { fontSize: 17, fontWeight: '700', color: '#111827' },
+  modalBody:    { fontSize: 14, textAlign: 'center', lineHeight: 20, color: '#6B7280' },
   modalBtns:    { flexDirection: 'row', gap: 12, marginTop: 8, width: '100%' },
   modalBtn:     { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   modalBtnText: { fontSize: 15, fontWeight: '700' },

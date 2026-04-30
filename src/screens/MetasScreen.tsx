@@ -8,6 +8,7 @@ import { useFinance } from '../state';
 import { useTheme } from '../state/ThemeContext';
 import { Icon } from '../components/ui/Icon';
 import type { Meta } from '../types';
+import { THEME } from '../constants/theme';
 
 const EMOJIS = ['🎯','🏠','✈️','🚗','💍','📚','💻','🏋️','🌴','💰','🎓','🎮'];
 const COLORS  = ['#6366F1','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#14B8A6','#F97316'];
@@ -222,12 +223,12 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack }) => {
             {completadas.map(meta => (
               <View key={meta.id} style={[st.card, { backgroundColor: colors.card, opacity: 0.7 }]}>
                 <View style={st.cardTop}>
-                  <View style={[st.cardEmoji, { backgroundColor: '#10B98120' }]}>
+                  <View style={[st.cardEmoji, { backgroundColor: THEME.colors.incomeLight }]}>
                     <Text style={{ fontSize: 24 }}>{meta.emoji}</Text>
                   </View>
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={[st.cardNombre, { color: colors.textPrimary }]}>{meta.nombre} ✓</Text>
-                    <Text style={[st.cardMonto, { color: '#10B981' }]}>{fmt(meta.montoObjetivo)} alcanzado</Text>
+                    <Text style={[st.cardMonto, { color: THEME.colors.income }]}>{fmt(meta.montoObjetivo)} alcanzado</Text>
                   </View>
                   <TouchableOpacity onPress={() => deleteMeta(meta.id)} style={st.deleteBtn}>
                     <Icon name="trash-2" size={16} color={colors.textTertiary} />
@@ -268,7 +269,7 @@ const st = StyleSheet.create({
   cardBottom:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   pctText:      { fontSize: 13, fontWeight: '700' },
   abonoBtn:     { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20 },
-  abonoBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  abonoBtnText: { color: THEME.colors.surface, fontSize: 13, fontWeight: '700' },
   // Sheet
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
@@ -277,10 +278,10 @@ const st = StyleSheet.create({
   label:        { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 8 },
   emojiBtn:     { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 8, borderWidth: 1, borderColor: 'transparent' },
   colorDot:     { width: 32, height: 32, borderRadius: 16, marginRight: 10 },
-  colorDotActive: { borderWidth: 3, borderColor: '#FFFFFF', transform: [{ scale: 1.15 }] },
+  colorDotActive: { borderWidth: 3, borderColor: THEME.colors.surface, transform: [{ scale: 1.15 }] },
   input:        { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, marginBottom: 12 },
   saveBtn:      { paddingVertical: 15, borderRadius: 14, alignItems: 'center', marginTop: 4 },
-  saveBtnText:  { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  saveBtnText:  { color: THEME.colors.surface, fontSize: 16, fontWeight: '800' },
   // Abono
   abonoCard:    { margin: 24, borderRadius: 20, padding: 24 },
   abonoTitle:   { fontSize: 17, fontWeight: '700', textAlign: 'center', marginBottom: 4 },

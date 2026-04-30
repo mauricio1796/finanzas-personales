@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useFinance } from '../../state';
 import { COLORS, SPACING } from '../../constants';
+import { THEME } from '../../constants/theme';
 import { useTheme } from '../../state/ThemeContext';
 import { ChatBubble, OptionButton, ProgressIndicator } from '../../components/onboarding';
 
@@ -239,7 +240,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.cardSecondary,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     padding: SPACING.md,
     borderWidth: 2,
     borderColor: COLORS.border,
@@ -285,7 +286,7 @@ const styles = StyleSheet.create({
   continueButton: {
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },

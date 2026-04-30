@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { storageService } from '../services/storage/StorageService';
 import { supabaseService } from '../services/supabase/SupabaseService';
 import type { ServerData } from '../services/supabase/SupabaseService';
+import { syncQueue, type SyncStatus } from '../services/SyncQueueService';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
 import {
   User,
@@ -70,6 +71,10 @@ interface FinanceContextType {
 
   // Sync: importa datos del servidor al contexto local (usado en login/registro)
   importServerData: (data: Partial<ServerData>) => Promise<void>;
+
+  // Estado de sincronización visible al usuario
+  syncStatus: SyncStatus;
+  syncPendingCount: number;
 
   // Phase 3 methods
   completarLeccion: (leccionId: string, xp: number) => void;
@@ -157,6 +162,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [retosCompletados, setRetosCompletados] = useState<string[]>([]);
   const [premium, setPremiumState] = useState<PremiumState>(DEFAULT_PREMIUM);
 
+  // Sync status
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+  const [syncPendingCount, setSyncPendingCount] = useState(0);
+
   // ─── Hydration (AsyncStorage → estado local) ──────────────────────────────
   const hydrate = useCallback(async () => {
     try {
@@ -229,6 +238,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => { hydrate(); }, [hydrate]);
 
+  // Suscribirse al estado del sync queue
+  useEffect(() => {
+    const unsub = syncQueue.onStatusChange((status, count) => {
+      setSyncStatus(status);
+      setSyncPendingCount(count);
+    });
+    return unsub;
+  }, []);
+
   // ─── Auto-persist (AsyncStorage) ──────────────────────────────────────────
   // Nota: el sync a Supabase se hace en cada método de acción (fire-and-forget),
   // NO en estos effects, para evitar syncs completos en cada cambio.
@@ -276,8 +294,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!value) {
       setOnboardingState(DEFAULT_ONBOARDING);
     } else if (user) {
-      // Marcar onboarded en servidor
-      supabaseService.upsertUserData(user.id, { isOnboarded: value }).catch(() => {});
+      const uid = user.id;
+      syncQueue.enqueue('marcar onboarded', () => supabaseService.upsertUserData(uid, { isOnboarded: value }));
     }
   };
 
@@ -294,35 +312,40 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const setProfile = (p: FinancialProfile) => {
     setProfileState(p);
     if (user) {
-      supabaseService.upsertFinancialProfile(user.id, p).catch(() => {});
+      const uid = user.id;
+      syncQueue.enqueue('actualizar perfil', () => supabaseService.upsertFinancialProfile(uid, p));
     }
   };
 
   const setGoal = (g: FinancialGoal) => {
     setGoalState(g);
     if (user) {
-      supabaseService.upsertGoal(user.id, g).catch(() => {});
+      const uid = user.id;
+      syncQueue.enqueue('actualizar meta', () => supabaseService.upsertGoal(uid, g));
     }
   };
 
   const setUserLevel = (l: UserLevel) => {
     setUserLevelState(l);
     if (user) {
-      supabaseService.upsertUserLevel(user.id, l).catch(() => {});
+      const uid = user.id;
+      syncQueue.enqueue('actualizar nivel', () => supabaseService.upsertUserLevel(uid, l));
     }
   };
 
   const addTransaction = (tx: Transaction) => {
     setTransactions(prev => [tx, ...prev]);
     if (user) {
-      supabaseService.upsertTransaction(user.id, tx).catch(() => {});
+      const uid = user.id;
+      syncQueue.enqueue('agregar transacción', () => supabaseService.upsertTransaction(uid, tx));
     }
   };
 
   const deleteTransaction = (id: string) => {
     setTransactions(prev => prev.filter(tx => tx.id !== id));
     if (user) {
-      supabaseService.deleteTransaction(id).catch(() => {});
+      const uid = user.id;
+      syncQueue.enqueue('eliminar transacción', () => supabaseService.deleteTransaction(id, uid));
     }
   };
 
@@ -330,7 +353,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setTransactions(prev => prev.map(tx => {
       if (tx.id !== id) return tx;
       const updated = { ...tx, ...update };
-      if (user) supabaseService.upsertTransaction(user.id, updated).catch(() => {});
+      if (user) {
+        const uid = user.id;
+        syncQueue.enqueue('actualizar transacción', () => supabaseService.upsertTransaction(uid, updated));
+      }
       return updated;
     }));
   };
@@ -361,9 +387,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setUserState(prev => prev ? { ...prev, monthlySalary: salary } : prev);
     setProfileState(prev => prev ? { ...prev, monthlySalary: salary } : prev);
     if (user) {
-      supabaseService.upsertUserData(user.id, { monthlySalary: salary }).catch(() => {});
+      const uid = user.id;
+      syncQueue.enqueue('actualizar salario', () => supabaseService.upsertUserData(uid, { monthlySalary: salary }));
       if (profile) {
-        supabaseService.upsertFinancialProfile(user.id, { ...profile, monthlySalary: salary }).catch(() => {});
+        const updatedProfile = { ...profile, monthlySalary: salary };
+        syncQueue.enqueue('actualizar perfil financiero', () => supabaseService.upsertFinancialProfile(uid, updatedProfile));
       }
     }
   };
@@ -373,46 +401,70 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setLeccionesCompletadas(prev => {
       if (prev.includes(leccionId)) return prev;
       const next = [...prev, leccionId];
-      if (user) supabaseService.upsertUserData(user.id, { leccionesCompletadas: next }).catch(() => {});
+      if (user) {
+        const uid = user.id;
+        syncQueue.enqueue('completar lección', () => supabaseService.upsertUserData(uid, { leccionesCompletadas: next }));
+      }
       return next;
     });
     if (xp > 0 && userLevel) {
       const next = { ...userLevel, experience: userLevel.experience + xp };
       setUserLevelState(next);
-      if (user) supabaseService.upsertUserLevel(user.id, next).catch(() => {});
+      if (user) {
+        const uid = user.id;
+        syncQueue.enqueue('actualizar XP lección', () => supabaseService.upsertUserLevel(uid, next));
+      }
     }
   };
 
   const iniciarReto = (retoId: string) => {
     const nuevo: RetoActivo = { retoId, fechaInicio: new Date().toISOString() };
     setRetoActivo(nuevo);
-    if (user) supabaseService.upsertUserData(user.id, { retoActivo: nuevo }).catch(() => {});
+    if (user) {
+      const uid = user.id;
+      syncQueue.enqueue('iniciar reto', () => supabaseService.upsertUserData(uid, { retoActivo: nuevo }));
+    }
   };
 
   const completarReto = (retoId: string, xp?: number) => {
     setRetosCompletados(prev => {
       if (prev.includes(retoId)) return prev;
       const next = [...prev, retoId];
-      if (user) supabaseService.upsertUserData(user.id, { retosCompletados: next }).catch(() => {});
+      if (user) {
+        const uid = user.id;
+        syncQueue.enqueue('completar reto', () => supabaseService.upsertUserData(uid, { retosCompletados: next }));
+      }
       return next;
     });
     setRetoActivo(null);
-    if (user) supabaseService.upsertUserData(user.id, { retoActivo: null }).catch(() => {});
+    if (user) {
+      const uid = user.id;
+      syncQueue.enqueue('limpiar reto activo', () => supabaseService.upsertUserData(uid, { retoActivo: null }));
+    }
     if (xp && xp > 0 && userLevel) {
       const next = { ...userLevel, experience: userLevel.experience + xp };
       setUserLevelState(next);
-      if (user) supabaseService.upsertUserLevel(user.id, next).catch(() => {});
+      if (user) {
+        const uid = user.id;
+        syncQueue.enqueue('actualizar XP reto', () => supabaseService.upsertUserLevel(uid, next));
+      }
     }
   };
 
   const abandonarReto = () => {
     setRetoActivo(null);
-    if (user) supabaseService.upsertUserData(user.id, { retoActivo: null }).catch(() => {});
+    if (user) {
+      const uid = user.id;
+      syncQueue.enqueue('abandonar reto', () => supabaseService.upsertUserData(uid, { retoActivo: null }));
+    }
   };
 
   const setPremium = (state: PremiumState) => {
     setPremiumState(state);
-    if (user) supabaseService.upsertUserData(user.id, { premium: state }).catch(() => {});
+    if (user) {
+      const uid = user.id;
+      syncQueue.enqueue('actualizar premium', () => supabaseService.upsertUserData(uid, { premium: state }));
+    }
   };
 
   // ─── Category management ──────────────────────────────────────────────────
@@ -421,28 +473,43 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (userLevel) {
       const next = { ...userLevel, experience: userLevel.experience + 20 };
       setUserLevelState(next);
-      if (user) supabaseService.upsertUserLevel(user.id, next).catch(() => {});
+      if (user) {
+        const uid = user.id;
+        syncQueue.enqueue('XP nueva categoría', () => supabaseService.upsertUserLevel(uid, next));
+      }
     }
-    if (user) supabaseService.upsertCategory(user.id, cat).catch(() => {});
+    if (user) {
+      const uid = user.id;
+      syncQueue.enqueue('agregar categoría', () => supabaseService.upsertCategory(uid, cat));
+    }
   };
 
   const updateCategory = (id: string, update: CategoryUpdate) => {
     setCategoriesState(prev => prev.map(c => {
       if (c.id !== id) return c;
       const updated = { ...c, ...update };
-      if (user) supabaseService.upsertCategory(user.id, updated).catch(() => {});
+      if (user) {
+        const uid = user.id;
+        syncQueue.enqueue('actualizar categoría', () => supabaseService.upsertCategory(uid, updated));
+      }
       return updated;
     }));
     if (userLevel) {
       const next = { ...userLevel, experience: userLevel.experience + 10 };
       setUserLevelState(next);
-      if (user) supabaseService.upsertUserLevel(user.id, next).catch(() => {});
+      if (user) {
+        const uid = user.id;
+        syncQueue.enqueue('XP actualizar categoría', () => supabaseService.upsertUserLevel(uid, next));
+      }
     }
   };
 
   const deleteCategory = (id: string) => {
     setCategoriesState(prev => prev.filter(c => c.id !== id));
-    if (user) supabaseService.deleteCategory(id).catch(() => {});
+    if (user) {
+      const uid = user.id;
+      syncQueue.enqueue('eliminar categoría', () => supabaseService.deleteCategory(id, uid));
+    }
   };
 
   const markCategoryPaid = (id: string) => {
@@ -460,32 +527,47 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             type: 'expense',
             description: cat.tipo === 'fijo' ? 'Gasto fijo pagado' : 'Presupuesto pagado',
           };
-          if (user) supabaseService.upsertTransaction(user.id, newTx).catch(() => {});
+          if (user) {
+            const uid = user.id;
+            syncQueue.enqueue('registrar pago categoría', () => supabaseService.upsertTransaction(uid, newTx));
+          }
           return [newTx, ...prev2];
         });
       }
       return prev.map(c => {
         if (c.id !== id) return c;
         const updated = { ...c, pagado: true };
-        if (user) supabaseService.upsertCategory(user.id, updated).catch(() => {});
+        if (user) {
+          const uid = user.id;
+          syncQueue.enqueue('marcar categoría pagada', () => supabaseService.upsertCategory(uid, updated));
+        }
         return updated;
       });
     });
     if (userLevel) {
       const next = { ...userLevel, experience: userLevel.experience + 50 };
       setUserLevelState(next);
-      if (user) supabaseService.upsertUserLevel(user.id, next).catch(() => {});
+      if (user) {
+        const uid = user.id;
+        syncQueue.enqueue('XP pago categoría', () => supabaseService.upsertUserLevel(uid, next));
+      }
     }
   };
 
   const unmarkCategoryPaid = (id: string) => {
     const txId = 'budget_payment_' + id;
     setTransactions(prev => prev.filter(t => t.id !== txId));
-    if (user) supabaseService.deleteTransaction(txId).catch(() => {});
+    if (user) {
+      const uid = user.id;
+      syncQueue.enqueue('desmarcar pago', () => supabaseService.deleteTransaction(txId, uid));
+    }
     setCategoriesState(prev => prev.map(c => {
       if (c.id !== id) return c;
       const updated = { ...c, pagado: false };
-      if (user) supabaseService.upsertCategory(user.id, updated).catch(() => {});
+      if (user) {
+        const uid = user.id;
+        syncQueue.enqueue('desmarcar categoría pagada', () => supabaseService.upsertCategory(uid, updated));
+      }
       return updated;
     }));
   };
@@ -551,6 +633,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const value: FinanceContextType = {
     user,
+    syncStatus,
+    syncPendingCount,
     transactions,
     categories,
     metas,

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS, SPACING } from '../../constants';
+import { THEME } from '../../constants/theme';
 
 interface EmotionalIndicatorProps {
   status: 'healthy' | 'warning' | 'critical';
@@ -11,7 +12,7 @@ const STATUS_CONFIG = {
   healthy: {
     icon: '🟢',
     label: 'Saludable',
-    color: '#10B981',
+    color: THEME.colors.income,
     bgColor: '#ECFDF5',
     message: 'Vas muy bien con tus finanzas',
   },
@@ -25,7 +26,7 @@ const STATUS_CONFIG = {
   critical: {
     icon: '🔴',
     label: 'Crítico',
-    color: '#EF4444',
+    color: THEME.colors.expense,
     bgColor: '#FEF2F2',
     message: 'Necesitas actuar pronto',
   },
@@ -56,7 +57,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     padding: SPACING.md,
     gap: SPACING.md,
   },

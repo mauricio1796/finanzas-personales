@@ -9,6 +9,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
+import { THEME } from '../constants/theme';
 
 const { height } = Dimensions.get('window');
 
@@ -286,14 +287,14 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   content: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 20,
     paddingBottom: 30,
     maxHeight: height * 0.85,
     elevation: 10,
-    shadowColor: '#000',
+    shadowColor: THEME.colors.textPrimary,
     shadowOffset: { width: 0, height: -3 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -307,23 +308,23 @@ const styles = StyleSheet.create({
   },
   stepCounter: {
     fontSize: 13,
-    color: '#666',
+    color: THEME.colors.textSecondary,
     fontWeight: '600',
   },
   skipButton: {
     fontSize: 14,
-    color: '#007AFF',
+    color: THEME.colors.primary,
     fontWeight: '600',
   },
   progressContainer: {
     height: 6,
-    backgroundColor: '#E5E5EA',
+    backgroundColor: THEME.colors.border,
     marginHorizontal: 0,
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#34C759',
+    backgroundColor: THEME.colors.income,
   },
   mainContent: {
     paddingHorizontal: 24,
@@ -346,7 +347,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     textAlign: 'center',
-    color: '#666',
+    color: THEME.colors.textSecondary,
     marginBottom: 24,
   },
   visualHint: {
@@ -356,10 +357,10 @@ const styles = StyleSheet.create({
   hintBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F9FF',
+    backgroundColor: THEME.colors.primaryLight,
     borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
-    borderRadius: 8,
+    borderLeftColor: THEME.colors.primary,
+    borderRadius: THEME.radius.sm,
     padding: 12,
     gap: 12,
   },
@@ -369,7 +370,7 @@ const styles = StyleSheet.create({
   hintText: {
     flex: 1,
     fontSize: 14,
-    color: '#333',
+    color: THEME.colors.textPrimary,
     fontWeight: '500',
   },
   buttonContainer: {
@@ -381,23 +382,23 @@ const styles = StyleSheet.create({
   button: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
   buttonPrimary: {
-    backgroundColor: '#34C759',
+    backgroundColor: THEME.colors.income,
   },
   buttonPrimaryText: {
-    color: '#fff',
+    color: THEME.colors.surface,
     fontSize: 16,
     fontWeight: '700',
   },
   buttonSecondary: {
-    backgroundColor: '#F2F2F7',
+    backgroundColor: THEME.colors.surfaceSecondary,
   },
   buttonSecondaryText: {
-    color: '#007AFF',
+    color: THEME.colors.primary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -411,13 +412,13 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#D1D1D6',
+    backgroundColor: THEME.colors.border,
   },
   indicatorActive: {
-    backgroundColor: '#34C759',
+    backgroundColor: THEME.colors.income,
     width: 24,
   },
   indicatorCompleted: {
-    backgroundColor: '#34C759',
+    backgroundColor: THEME.colors.income,
   },
 });

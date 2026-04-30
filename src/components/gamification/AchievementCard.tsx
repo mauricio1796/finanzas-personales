@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { COLORS, SPACING } from '../../constants';
+import { THEME } from '../../constants/theme';
 
 interface AchievementCardProps {
   icon: string;
@@ -14,9 +15,9 @@ interface AchievementCardProps {
 
 const RARITY_CONFIG = {
   common: {
-    color: '#6B7280',
+    color: THEME.colors.textSecondary,
     borderColor: '#D1D5DB',
-    bgColor: '#F3F4F6',
+    bgColor: THEME.colors.surfaceSecondary,
   },
   rare: {
     color: '#3B82F6',
@@ -131,7 +132,7 @@ export const AchievementCard: React.FC<AchievementCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     borderWidth: 2,
     padding: SPACING.md,
     gap: SPACING.md,
@@ -144,7 +145,7 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 56,
     height: 56,
-    borderRadius: 12,
+    borderRadius: THEME.radius.md,
     backgroundColor: COLORS.background,
     justifyContent: 'center',
     alignItems: 'center',
@@ -159,7 +160,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#10B981',
+    backgroundColor: THEME.colors.income,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
@@ -207,7 +208,7 @@ const styles = StyleSheet.create({
   },
   unlockedDate: {
     fontSize: 10,
-    color: '#10B981',
+    color: THEME.colors.income,
     fontWeight: '500',
     marginTop: SPACING.xs,
   },

@@ -16,6 +16,7 @@ import {
 import { useFinance } from '../../state';
 import { Icon, getCategoryIcon } from './Icon';
 import { useTheme } from '../../state/ThemeContext';
+import { THEME } from '../../constants/theme';
 import { verificarGastoInusual } from '../../services/NotificacionesService';
 import { type Transaction } from '../../types';
 
@@ -204,7 +205,7 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
                   onPress={() => setSelectedCat(cat.id)}
                   activeOpacity={0.7}
                 >
-                  <Icon name={getCategoryIcon(cat.id)} size={15} color={active ? '#FFFFFF' : colors.textSecondary} />
+                  <Icon name={getCategoryIcon(cat.id)} size={15} color={active ? THEME.colors.surface : colors.textSecondary} />
                   <Text style={[styles.catChipLabel, { color: colors.textPrimary }, active && styles.catChipLabelActive]}>
                     {cat.label}
                   </Text>
@@ -345,7 +346,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   catChipLabelActive: {
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
   },
 
   // Description
@@ -367,6 +368,6 @@ const styles = StyleSheet.create({
   confirmBtnText: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: THEME.colors.surface,
   },
 });
