@@ -112,11 +112,18 @@ export default function HomeScreen() {
   const [authLoading, setAuthLoading] = useState(false);
 
   // ── OTP flow ──
-  const [otpEmail, setOtpEmail]   = useState('');
-  const [otpCode, setOtpCode]     = useState(['', '', '', '', '', '', '', '']);
-  const [otpSent, setOtpSent]     = useState(false);
+  const [otpEmail, setOtpEmail]       = useState('');
+  const [otpName, setOtpName]         = useState('');
+  const [otpPassword, setOtpPassword] = useState('');
+  const [otpConfirm, setOtpConfirm]   = useState('');
+  const [otpShowPwd, setOtpShowPwd]   = useState(false);
+  const [otpCode, setOtpCode]         = useState(['', '', '', '', '', '', '', '']);
+  const [otpStep, setOtpStep]         = useState<'email' | 'register' | 'code'>('email');
   const [otpResendSecs, setOtpResendSecs] = useState(0);
-  const otpRefs = useRef<(TextInput | null)[]>([]);
+  const otpRefs    = useRef<(TextInput | null)[]>([]);
+  const otpNameRef = useRef<TextInput | null>(null);
+  const otpPwdRef  = useRef<TextInput | null>(null);
+  const otpCfmRef  = useRef<TextInput | null>(null);
   const resendTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ==================== APP STATE ====================
@@ -281,7 +288,7 @@ export default function HomeScreen() {
     }, 1000);
   };
 
-  // ── OTP: enviar código ────────────────────────────────────────────────────
+  // ── OTP: enviar código (usuario existente) ───────────────────────────────
   const handleSendOtp = async () => {
     setAuthError('');
     const email = otpEmail.trim().toLowerCase();
@@ -291,10 +298,36 @@ export default function HomeScreen() {
     }
     setAuthLoading(true);
     try {
-      const { error } = await authService.sendOtp(email);
+      const { error, userNotFound } = await authService.sendOtp(email);
+      if (userNotFound) {
+        // Correo no registrado → pantalla de registro
+        setOtpStep('register');
+        setTimeout(() => otpNameRef.current?.focus(), 300);
+        return;
+      }
       if (error) { setAuthError(error); return; }
-      setOtpSent(true);
-      setOtpCode(['', '', '', '', '', '']);
+      setOtpStep('code');
+      setOtpCode(['', '', '', '', '', '', '', '']);
+      startResendTimer();
+      setTimeout(() => otpRefs.current[0]?.focus(), 300);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // ── OTP: registrar nuevo usuario y enviar código ─────────────────────────
+  const handleRegisterOtp = async () => {
+    setAuthError('');
+    const name = otpName.trim();
+    if (!name) { setAuthError('Ingresa tu nombre'); return; }
+    if (otpPassword.length < 6) { setAuthError('La contraseña debe tener al menos 6 caracteres'); return; }
+    if (otpPassword !== otpConfirm) { setAuthError('Las contraseñas no coinciden'); return; }
+    setAuthLoading(true);
+    try {
+      const { error } = await authService.sendOtpNewUser(otpEmail.trim().toLowerCase(), name, otpPassword);
+      if (error) { setAuthError(error); return; }
+      setOtpStep('code');
+      setOtpCode(['', '', '', '', '', '', '', '']);
       startResendTimer();
       setTimeout(() => otpRefs.current[0]?.focus(), 300);
     } finally {
@@ -315,11 +348,19 @@ export default function HomeScreen() {
       const serverData = await supabaseService.pullFromServer(sbUser.id);
       if (serverData) {
         await importServerData(serverData);
+        const finalUser = { ...sbUser };
         if (serverData.name && serverData.name !== sbUser.name) {
-          setUser({ ...sbUser, name: serverData.name, monthlySalary: serverData.monthlySalary || sbUser.monthlySalary });
+          finalUser.name = serverData.name;
+          finalUser.monthlySalary = serverData.monthlySalary || sbUser.monthlySalary;
+          setUser(finalUser);
+        }
+        // Usuario ya completó el onboarding antes — ir directo al dashboard
+        if (serverData.isOnboarded) {
+          await setIsOnboarded(true);
+          setShowSplash(false);
         }
       }
-      setOtpEmail(''); setOtpCode(['','','','','','','','']); setOtpSent(false);
+      setOtpEmail(''); setOtpName(''); setOtpCode(['','','','','','','','']); setOtpStep('email');
     } finally {
       setAuthLoading(false);
     }
@@ -445,8 +486,11 @@ export default function HomeScreen() {
     setCurrentScreen('dashboard');
     // Limpiar estado OTP para volver a la pantalla de correo
     setOtpEmail('');
-    setOtpCode(['', '', '', '', '', '']);
-    setOtpSent(false);
+    setOtpName('');
+    setOtpPassword('');
+    setOtpConfirm('');
+    setOtpCode(['', '', '', '', '', '', '', '']);
+    setOtpStep('email');
     setOtpResendSecs(0);
     if (resendTimer.current) clearInterval(resendTimer.current);
     setAuthError('');
@@ -520,46 +564,7 @@ export default function HomeScreen() {
     return <MobileShell><DashboardSkeleton /></MobileShell>;
   }
 
-  // ==================== 1. ONBOARDING AI (PRIMERO) ====================
-
-  const goNext = () => {
-    const idx = ONBOARDING_STEPS.indexOf(onboardingStep);
-    if (idx < ONBOARDING_STEPS.length - 1) {
-      const nextStep = ONBOARDING_STEPS[idx + 1];
-      updateOnboardingStep(idx + 1);
-      onboardingAnim.setValue(0);
-      setOnboardingStep(nextStep);
-      Animated.timing(onboardingAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
-    }
-  };
-
-  const goBack = () => {
-    const idx = ONBOARDING_STEPS.indexOf(onboardingStep);
-    if (idx > 0) {
-      onboardingAnim.setValue(0);
-      setOnboardingStep(ONBOARDING_STEPS[idx - 1]);
-      Animated.timing(onboardingAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
-    }
-  };
-
-  if (!isOnboarded) {
-    const slideX = onboardingAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
-    const wrapStyle = { flex: 1, opacity: onboardingAnim, transform: [{ translateX: slideX }] };
-    return (
-      <MobileShell>
-        <Animated.View style={wrapStyle}>
-          {onboardingStep === 'welcome'    && <OnboardingWelcome    onNext={goNext} />}
-          {onboardingStep === 'profile'    && <OnboardingProfile    onNext={goNext} onBack={goBack} />}
-          {onboardingStep === 'salario'    && <OnboardingSalario    onNext={goNext} onBack={goBack} />}
-          {onboardingStep === 'categories' && <OnboardingCategories onNext={goNext} onBack={goBack} />}
-          {onboardingStep === 'montos'     && <OnboardingMontos     onNext={goNext} onBack={goBack} />}
-          {onboardingStep === 'confirm'    && <OnboardingConfirm    onDone={goNext} />}
-        </Animated.View>
-      </MobileShell>
-    );
-  }
-
-  // ==================== 2. AUTH — flujo OTP por correo ====================
+  // ==================== 1. AUTH — flujo OTP por correo ====================
   if (!user) {
     return (
       <MobileShell>
@@ -587,12 +592,12 @@ export default function HomeScreen() {
                   <Text style={styles.otpLogoName}>FinancyAI</Text>
                 </View>
 
-                {!otpSent ? (
+                {otpStep === 'email' && (
                   /* ── Pantalla 1: ingresar correo ── */
                   <>
-                    <Text style={styles.authBigTitle}>Ingresa tu{'\n'}correo</Text>
+                    <Text style={styles.authBigTitle}>Bienvenido{'\n'}a FinancyAI</Text>
                     <Text style={styles.otpSubtitle}>
-                      Te enviaremos un código de 6 dígitos para acceder
+                      Ingresa tu correo para continuar
                     </Text>
 
                     <View style={styles.authFieldRow}>
@@ -623,11 +628,95 @@ export default function HomeScreen() {
                     {authError ? <Text style={styles.authError}>{authError}</Text> : null}
 
                     <Text style={styles.otpDisclaimer}>
-                      Si no tienes cuenta, la crearemos automáticamente
+                      Si ya tienes cuenta recibirás un código.{'\n'}Si eres nuevo, te registraremos.
                     </Text>
                   </>
-                ) : (
-                  /* ── Pantalla 2: ingresar código ── */
+                )}
+
+                {otpStep === 'register' && (
+                  /* ── Pantalla 2: nuevo usuario — pedir nombre ── */
+                  <>
+                    <Text style={styles.authBigTitle}>Crear{'\n'}cuenta</Text>
+                    <Text style={styles.otpSubtitle}>
+                      <Text style={{ fontWeight: '700', color: '#111827' }}>{otpEmail}</Text>
+                    </Text>
+
+                    {/* Nombre */}
+                    <View style={[styles.authFieldPill, { marginBottom: 12 }]}>
+                      <Text style={styles.authFieldIcon}>👤</Text>
+                      <TextInput
+                        ref={otpNameRef}
+                        style={styles.authFieldInput}
+                        placeholder="Tu nombre"
+                        placeholderTextColor="#BBBBC8"
+                        value={otpName}
+                        onChangeText={setOtpName}
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                        returnKeyType="next"
+                        onSubmitEditing={() => otpPwdRef.current?.focus()}
+                      />
+                    </View>
+
+                    {/* Contraseña */}
+                    <View style={[styles.authFieldPill, { marginBottom: 12 }]}>
+                      <Text style={styles.authFieldIcon}>🔒</Text>
+                      <TextInput
+                        ref={otpPwdRef}
+                        style={styles.authFieldInput}
+                        placeholder="Contraseña (mín. 6 caracteres)"
+                        placeholderTextColor="#BBBBC8"
+                        value={otpPassword}
+                        onChangeText={setOtpPassword}
+                        secureTextEntry={!otpShowPwd}
+                        autoCapitalize="none"
+                        returnKeyType="next"
+                        onSubmitEditing={() => otpCfmRef.current?.focus()}
+                      />
+                      <Pressable onPress={() => setOtpShowPwd(v => !v)} style={{ paddingHorizontal: 8 }}>
+                        <Text style={{ color: '#9CA3AF', fontSize: 13 }}>{otpShowPwd ? 'Ocultar' : 'Ver'}</Text>
+                      </Pressable>
+                    </View>
+
+                    {/* Confirmar contraseña */}
+                    <View style={styles.authFieldRow}>
+                      <View style={[styles.authFieldPill, { flex: 1 }]}>
+                        <Text style={styles.authFieldIcon}>🔒</Text>
+                        <TextInput
+                          ref={otpCfmRef}
+                          style={styles.authFieldInput}
+                          placeholder="Confirmar contraseña"
+                          placeholderTextColor="#BBBBC8"
+                          value={otpConfirm}
+                          onChangeText={setOtpConfirm}
+                          secureTextEntry={!otpShowPwd}
+                          autoCapitalize="none"
+                          returnKeyType="send"
+                          onSubmitEditing={handleRegisterOtp}
+                        />
+                      </View>
+                      <Pressable
+                        style={[styles.authFab, authLoading && { opacity: 0.6 }]}
+                        onPress={handleRegisterOtp}
+                        disabled={authLoading}
+                      >
+                        <Text style={styles.authFabIcon}>{authLoading ? '…' : '→'}</Text>
+                      </Pressable>
+                    </View>
+
+                    {authError ? <Text style={styles.authError}>{authError}</Text> : null}
+
+                    <Pressable
+                      onPress={() => { setOtpStep('email'); setOtpName(''); setOtpPassword(''); setOtpConfirm(''); setAuthError(''); }}
+                      style={{ marginTop: 12 }}
+                    >
+                      <Text style={styles.otpChangeEmail}>Cambiar correo</Text>
+                    </Pressable>
+                  </>
+                )}
+
+                {otpStep === 'code' && (
+                  /* ── Pantalla 3: ingresar código ── */
                   <>
                     <Text style={styles.authBigTitle}>Código{'\n'}enviado</Text>
                     <Text style={styles.otpSubtitle}>
@@ -662,25 +751,18 @@ export default function HomeScreen() {
                     )}
                     {authError ? <Text style={styles.authError}>{authError}</Text> : null}
 
-                    {/* Reenviar código */}
                     <Pressable
                       onPress={otpResendSecs === 0 ? handleSendOtp : undefined}
                       style={styles.otpResendBtn}
                       disabled={otpResendSecs > 0 || authLoading}
                     >
-                      <Text style={[
-                        styles.otpResendText,
-                        otpResendSecs > 0 && { color: '#9CA3AF' },
-                      ]}>
-                        {otpResendSecs > 0
-                          ? `Reenviar código en ${otpResendSecs}s`
-                          : 'Reenviar código'}
+                      <Text style={[styles.otpResendText, otpResendSecs > 0 && { color: '#9CA3AF' }]}>
+                        {otpResendSecs > 0 ? `Reenviar código en ${otpResendSecs}s` : 'Reenviar código'}
                       </Text>
                     </Pressable>
 
-                    {/* Cambiar correo */}
                     <Pressable
-                      onPress={() => { setOtpSent(false); setOtpCode(['','','','','','','','']); setAuthError(''); }}
+                      onPress={() => { setOtpStep('email'); setOtpCode(['','','','','','','','']); setAuthError(''); }}
                       style={{ marginTop: 8 }}
                     >
                       <Text style={styles.otpChangeEmail}>Cambiar correo</Text>
@@ -691,6 +773,44 @@ export default function HomeScreen() {
             </View>
           </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
+      </MobileShell>
+    );
+  }
+
+  // ==================== 2. ONBOARDING (solo usuarios nuevos, ya autenticados) ====================
+  const goNext = () => {
+    const idx = ONBOARDING_STEPS.indexOf(onboardingStep);
+    if (idx < ONBOARDING_STEPS.length - 1) {
+      const nextStep = ONBOARDING_STEPS[idx + 1];
+      updateOnboardingStep(idx + 1);
+      onboardingAnim.setValue(0);
+      setOnboardingStep(nextStep);
+      Animated.timing(onboardingAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
+    }
+  };
+
+  const goBack = () => {
+    const idx = ONBOARDING_STEPS.indexOf(onboardingStep);
+    if (idx > 0) {
+      onboardingAnim.setValue(0);
+      setOnboardingStep(ONBOARDING_STEPS[idx - 1]);
+      Animated.timing(onboardingAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+    }
+  };
+
+  if (!isOnboarded) {
+    const slideX = onboardingAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
+    const wrapStyle = { flex: 1, opacity: onboardingAnim, transform: [{ translateX: slideX }] };
+    return (
+      <MobileShell>
+        <Animated.View style={wrapStyle}>
+          {onboardingStep === 'welcome'    && <OnboardingWelcome    onNext={goNext} />}
+          {onboardingStep === 'profile'    && <OnboardingProfile    onNext={goNext} onBack={goBack} />}
+          {onboardingStep === 'salario'    && <OnboardingSalario    onNext={goNext} onBack={goBack} />}
+          {onboardingStep === 'categories' && <OnboardingCategories onNext={goNext} onBack={goBack} />}
+          {onboardingStep === 'montos'     && <OnboardingMontos     onNext={goNext} onBack={goBack} />}
+          {onboardingStep === 'confirm'    && <OnboardingConfirm    onDone={goNext} />}
+        </Animated.View>
       </MobileShell>
     );
   }

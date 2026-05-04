@@ -84,16 +84,44 @@ class AuthService {
     };
   }
 
-  // ─── OTP: enviar código al correo ────────────────────────────────────────
-  async sendOtp(email: string): Promise<{ error: string | null }> {
+  // ─── OTP: enviar código (solo usuarios existentes) ───────────────────────
+  async sendOtp(email: string): Promise<{ error: string | null; userNotFound?: boolean }> {
     if (!supabase) return { error: 'Supabase no configurado' };
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: true },
+      options: { shouldCreateUser: false },
     });
     if (error) {
       if (error.message.includes('rate limit')) return { error: 'Demasiados intentos. Espera un momento.' };
+      if (
+        error.message.includes('Signups not allowed') ||
+        error.message.includes('not found') ||
+        error.message.includes('No user found') ||
+        error.status === 422
+      ) return { error: null, userNotFound: true };
       return { error: 'No se pudo enviar el código. Verifica el correo.' };
+    }
+    return { error: null };
+  }
+
+  // ─── OTP: registrar nuevo usuario y enviar código ────────────────────────
+  async sendOtpNewUser(email: string, name: string, password: string): Promise<{ error: string | null }> {
+    if (!supabase) return { error: 'Supabase no configurado' };
+    const { error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name } },
+    });
+    if (signUpError && !signUpError.message.includes('already registered')) {
+      return { error: signUpError.message };
+    }
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false },
+    });
+    if (error) {
+      if (error.message.includes('rate limit')) return { error: 'Demasiados intentos. Espera un momento.' };
+      return { error: 'No se pudo enviar el código.' };
     }
     return { error: null };
   }
