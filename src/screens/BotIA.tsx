@@ -12,6 +12,7 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,6 +36,12 @@ import { catalogoItemToCategory, CATALOGO_CATEGORIAS, getPaletaItem } from '../c
 import { THEME } from '../constants/theme';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
 
+const { width: SCREEN_W } = Dimensions.get('window');
+
+const PRIMARY      = '#6156E8';
+const PRIMARY_SOFT = '#EEF0FF';
+const BG           = '#F8F7FF';
+
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
 interface FinnAction {
@@ -54,8 +61,8 @@ interface Message {
 }
 
 interface PendingAction {
-  toolCall:   FinnToolCall;
-  preview:    string;
+  toolCall: FinnToolCall;
+  preview:  string;
 }
 
 interface BotIAProps {
@@ -67,18 +74,26 @@ interface BotIAProps {
 // ── Quick suggestions ─────────────────────────────────────────────────────────
 
 const QUICK_SUGGESTIONS = [
-  '📋 Mis pagos',
-  '📅 Esta semana',
-  '📊 Mi mes',
-  '🚨 Alertas',
-  '🏆 Mi nivel',
-  '💡 Cómo ahorrar',
-  '➕ Agregar categoría',
+  { label: 'Mis pagos',        emoji: '📋' },
+  { label: 'Esta semana',      emoji: '📅' },
+  { label: 'Mi mes',           emoji: '📊' },
+  { label: 'Alertas',          emoji: '🚨' },
+  { label: 'Mi nivel',         emoji: '🏆' },
+  { label: 'Cómo ahorrar',     emoji: '💡' },
+  { label: 'Agregar categoría',emoji: '➕' },
 ];
+
+// ── FinnAvatar ────────────────────────────────────────────────────────────────
+
+const FinnAvatar: React.FC<{ size?: number }> = ({ size = 36 }) => (
+  <View style={[st.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
+    <Text style={[st.avatarText, { fontSize: size * 0.38 }]}>FI</Text>
+  </View>
+);
 
 // ── TypingIndicator ───────────────────────────────────────────────────────────
 
-const TypingIndicator: React.FC<{ colors: any }> = ({ colors }) => {
+const TypingIndicator: React.FC = () => {
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
@@ -88,15 +103,14 @@ const TypingIndicator: React.FC<{ colors: any }> = ({ colors }) => {
       Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(dot, { toValue: -5, duration: 300, useNativeDriver: true }),
-          Animated.timing(dot, { toValue:  0, duration: 300, useNativeDriver: true }),
-          Animated.delay(500),
+          Animated.timing(dot, { toValue: -6, duration: 280, useNativeDriver: true }),
+          Animated.timing(dot, { toValue:  0, duration: 280, useNativeDriver: true }),
+          Animated.delay(400),
         ]),
       );
-
     const a1 = anim(dot1, 0);
-    const a2 = anim(dot2, 150);
-    const a3 = anim(dot3, 300);
+    const a2 = anim(dot2, 140);
+    const a3 = anim(dot3, 280);
     a1.start(); a2.start(); a3.start();
     return () => { a1.stop(); a2.stop(); a3.stop(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -106,10 +120,7 @@ const TypingIndicator: React.FC<{ colors: any }> = ({ colors }) => {
       <Text style={st.typingLabel}>Finn está escribiendo</Text>
       <View style={st.dotsRow}>
         {[dot1, dot2, dot3].map((dot, i) => (
-          <Animated.View
-            key={i}
-            style={[st.dot, { transform: [{ translateY: dot }] }]}
-          />
+          <Animated.View key={i} style={[st.dot, { transform: [{ translateY: dot }] }]} />
         ))}
       </View>
     </View>
@@ -119,24 +130,23 @@ const TypingIndicator: React.FC<{ colors: any }> = ({ colors }) => {
 // ── ConfirmacionCategorias ────────────────────────────────────────────────────
 
 interface ConfirmacionCategoriasProps {
-  categorias:     CategoriaSugerida[];
-  seleccionadas:  Set<string>;
-  onToggle:       (nombre: string) => void;
-  onConfirmar:    () => void;
-  onCancelar:     () => void;
+  categorias:    CategoriaSugerida[];
+  seleccionadas: Set<string>;
+  onToggle:      (nombre: string) => void;
+  onConfirmar:   () => void;
+  onCancelar:    () => void;
 }
 
 const ConfirmacionCategorias: React.FC<ConfirmacionCategoriasProps> = ({
   categorias, seleccionadas, onToggle, onConfirmar, onCancelar,
 }) => {
   const { colors, isDark } = useTheme();
-
   return (
     <View style={{ marginTop: 8, marginBottom: 4 }}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         {categorias.map(cat => {
-          const activa  = seleccionadas.has(cat.nombre);
-          const paleta  = getPaletaItem(cat.nombre, isDark);
+          const activa = seleccionadas.has(cat.nombre);
+          const paleta = getPaletaItem(cat.nombre, isDark);
           return (
             <TouchableOpacity
               key={cat.nombre}
@@ -148,15 +158,15 @@ const ConfirmacionCategorias: React.FC<ConfirmacionCategoriasProps> = ({
               style={{
                 width: '30%', aspectRatio: 1, borderRadius: 16,
                 borderWidth: activa ? 1.5 : 0.5,
-                borderColor: activa ? colors.primary : colors.border,
-                backgroundColor: activa ? colors.primaryLight : colors.card,
+                borderColor: activa ? PRIMARY : colors.border,
+                backgroundColor: activa ? PRIMARY_SOFT : colors.card,
                 alignItems: 'center', justifyContent: 'center', gap: 6, padding: 8,
               }}
             >
               <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: paleta.bg, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name={cat.icono as any} size={16} color={activa ? colors.primary : paleta.color} />
+                <Icon name={cat.icono as any} size={16} color={activa ? PRIMARY : paleta.color} />
               </View>
-              <Text style={{ fontSize: 10, fontWeight: '500', color: activa ? colors.primary : colors.textSecondary, textAlign: 'center' }} numberOfLines={2}>
+              <Text style={{ fontSize: 10, fontWeight: '500', color: activa ? PRIMARY : colors.textSecondary, textAlign: 'center' }} numberOfLines={2}>
                 {cat.nombre}
               </Text>
               {cat.presupuestoSugerido > 0 && (
@@ -178,7 +188,7 @@ const ConfirmacionCategorias: React.FC<ConfirmacionCategoriasProps> = ({
         <TouchableOpacity
           onPress={onConfirmar}
           disabled={seleccionadas.size === 0}
-          style={{ flex: 2, borderRadius: 12, backgroundColor: seleccionadas.size > 0 ? colors.primary : colors.cardSecondary, padding: 10, alignItems: 'center' }}
+          style={{ flex: 2, borderRadius: 12, backgroundColor: seleccionadas.size > 0 ? PRIMARY : colors.cardSecondary, padding: 10, alignItems: 'center' }}
         >
           <Text style={{ fontSize: 13, fontWeight: '500', color: seleccionadas.size > 0 ? '#fff' : colors.textTertiary }}>
             {seleccionadas.size > 0 ? `Agregar ${seleccionadas.size} categoría${seleccionadas.size > 1 ? 's' : ''}` : 'Selecciona categorías'}
@@ -205,13 +215,10 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
   const scrollRef    = useRef<FlatList<Message>>(null);
   const historialRef = useRef<MensajeChat[]>([]);
 
-  // ── Category confirmation state ───────────────────────────────────────────
   const [catsPendientes,    setCatsPendientes]    = useState<CategoriaSugerida[]>([]);
   const [catsSeleccionadas, setCatsSeleccionadas] = useState<Set<string>>(new Set());
   const [confirmacionId,    setConfirmacionId]    = useState<string | null>(null);
-
-  // ── Agentic action state ──────────────────────────────────────────────────
-  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [pendingAction,     setPendingAction]     = useState<PendingAction | null>(null);
 
   // ── Ping Worker + saludo inicial ──────────────────────────────────────────
   useEffect(() => {
@@ -239,7 +246,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
     }
   }, [messages, isTyping]);
 
-  // ── Confirmar categorías ─────────────────────────────────────────────────
+  // ── Confirmar categorías ──────────────────────────────────────────────────
   const confirmarCategorias = useCallback(() => {
     catsPendientes
       .filter(c => catsSeleccionadas.has(c.nombre))
@@ -269,24 +276,17 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
   // ── Ejecutar acción confirmada ────────────────────────────────────────────
   const ejecutarAccionConfirmada = useCallback((action: PendingAction) => {
     const agentCtx = {
-      transactions:      transactions as any,
-      categories:        categories as any,
-      goal:              goal as any,
-      addTransaction,
-      deleteTransaction,
-      updateTransaction,
-      updateCategory,
-      addCategory,
-      setGoal,
+      transactions:    transactions as any,
+      categories:      categories as any,
+      goal:            goal as any,
+      addTransaction, deleteTransaction, updateTransaction, updateCategory, addCategory, setGoal,
     };
     const result: FinnToolResult = ejecutarHerramienta(action.toolCall, agentCtx);
 
     const accionMsg: Message = {
-      id:          Date.now().toString(),
-      text:        result.descripcion,
-      sender:      'bot',
-      timestamp:   new Date(),
-      accionFinn:  { tool: action.toolCall.tool, descripcion: result.descripcion, exito: result.exito },
+      id: Date.now().toString(), text: result.descripcion,
+      sender: 'bot', timestamp: new Date(),
+      accionFinn: { tool: action.toolCall.tool, descripcion: result.descripcion, exito: result.exito },
     };
     setMessages(prev => [...prev, accionMsg]);
     setPendingAction(null);
@@ -309,54 +309,39 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
       txt, historialRef.current,
       transactions as any, categories as any, profile, goal,
     );
-
     setIsTyping(false);
 
-    // ── Tool call: Finn quiere ejecutar una acción ─────────────────────────
     if (resp.tipo === 'tool_call') {
       const toolCall: FinnToolCall = {
-        tool:             resp.tool,
-        input:            resp.input,
-        toolUseId:        resp.toolUseId,
-        assistantMessage: resp.assistantMessage,
+        tool: resp.tool, input: resp.input,
+        toolUseId: resp.toolUseId, assistantMessage: resp.assistantMessage,
       };
-
       if (resp.tool === 'eliminar_transaccion') {
-        // Requiere confirmación del usuario
         const preview = previewEliminar(resp.input.id, transactions as any);
         setPendingAction({ toolCall, preview: `¿Eliminar ${preview}?` });
       } else {
-        // Ejecutar inmediatamente
         ejecutarAccionConfirmada({ toolCall, preview: '' });
       }
-
-      // Actualizar historial con resumen de la acción
       historialRef.current = [
         ...historialRef.current,
         { role: 'user' as const, content: txt },
         { role: 'assistant' as const, content: `[Acción ejecutada: ${resp.tool}]` },
       ].slice(-20);
-
       return;
     }
 
-    // ── Respuesta de texto normal ─────────────────────────────────────────
     const botMsg: Message = {
-      id:        (Date.now() + 1).toString(),
-      text:      resp.texto,
-      sender:    'bot',
-      timestamp: new Date(),
-      esError:   !resp.exito,
+      id: (Date.now() + 1).toString(), text: resp.texto,
+      sender: 'bot', timestamp: new Date(), esError: !resp.exito,
     };
     setMessages(prev => [...prev, botMsg]);
 
     historialRef.current = [
       ...historialRef.current,
-      { role: 'user'      as const, content: txt       },
+      { role: 'user' as const, content: txt },
       { role: 'assistant' as const, content: resp.texto },
     ].slice(-20);
 
-    // Detectar si la respuesta local sugiere categorías
     if (!resp.error || resp.error === 'fallback') {
       const localResp = procesarMensajeUsuario(txt, transactions as any, categories as any, profile as any, goal as any);
       if (localResp.accion?.tipo === 'sugerir_categorias') {
@@ -376,26 +361,24 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
   }, [inputText, isTyping, transactions, categories, profile, goal, ejecutarAccionConfirmada]);
 
   // ── Render mensaje ────────────────────────────────────────────────────────
-  const renderMessage = useCallback(({ item }: { item: Message }) => {
+  const renderMessage = useCallback(({ item, index }: { item: Message; index: number }) => {
     const isUser           = item.sender === 'user';
     const showConfirmacion = !isUser && item.id === confirmacionId && catsPendientes.length > 0;
+    const timeStr          = new Date(item.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
+    // Acción de Finn
     if (item.accionFinn) {
       return (
         <View style={[st.msgRow, st.msgBot]}>
-          <View style={st.botAvatar}>
-            <Text style={st.botAvatarText}>FI</Text>
-          </View>
-          <View style={[st.accionBubble, { borderColor: '#8B5CF6' }]}>
+          <FinnAvatar size={34} />
+          <View style={st.accionBubble}>
             <View style={st.accionHeader}>
               <View style={st.accionBadge}>
-                <Text style={st.accionBadgeText}>Finn actuó</Text>
+                <Text style={st.accionBadgeText}>⚡ Finn actuó</Text>
               </View>
-              <Text style={[st.bubbleTime, { color: '#8B5CF680' }]}>
-                {new Date(item.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-              </Text>
+              <Text style={st.accionTime}>{timeStr}</Text>
             </View>
-            <Text style={[st.accionText, { color: item.accionFinn.exito ? '#8B5CF6' : colors.expense }]}>
+            <Text style={[st.accionText, { color: item.accionFinn.exito ? PRIMARY : THEME.colors.expense }]}>
               {item.accionFinn.exito ? '✓ ' : '✗ '}{item.accionFinn.descripcion}
             </Text>
           </View>
@@ -405,24 +388,25 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
 
     return (
       <View style={[st.msgRow, isUser ? st.msgUser : st.msgBot]}>
-        {!isUser && (
-          <View style={st.botAvatar}>
-            <Text style={st.botAvatarText}>FI</Text>
-          </View>
-        )}
-        <View style={{ flex: isUser ? undefined : 1, maxWidth: isUser ? '78%' : '78%' }}>
+        {!isUser && <FinnAvatar size={34} />}
+
+        <View style={{ flex: isUser ? undefined : 1, maxWidth: '78%' }}>
           <View style={[
             st.bubble,
-            isUser
-              ? st.bubbleUser
-              : [st.bubbleBot, item.esError && { backgroundColor: THEME.colors.expenseLight, borderColor: THEME.colors.expense }],
+            isUser ? st.bubbleUser : st.bubbleBot,
+            item.esError && !isUser && st.bubbleError,
           ]}>
-            <Text style={[st.bubbleText, isUser ? { color: '#FFFFFF' } : { color: '#111827' }]}>
-              {item.text}
-            </Text>
-            <Text style={[st.bubbleTime, isUser ? { color: 'rgba(255,255,255,0.65)', textAlign: 'right' } : { color: '#9CA3AF' }]}>
-              {new Date(item.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-            </Text>
+            {!isUser && (
+              <View style={st.bubbleAccent} />
+            )}
+            <View style={isUser ? undefined : st.bubbleInner}>
+              <Text style={[st.bubbleText, isUser ? st.bubbleTextUser : st.bubbleTextBot]}>
+                {item.text}
+              </Text>
+              <Text style={[st.bubbleTime, isUser ? st.bubbleTimeUser : st.bubbleTimeBot]}>
+                {timeStr}
+              </Text>
+            </View>
           </View>
 
           {showConfirmacion && (
@@ -439,68 +423,82 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
             />
           )}
         </View>
+
+        {isUser && <View style={st.userSpacer} />}
       </View>
     );
-  }, [colors, confirmacionId, catsPendientes, catsSeleccionadas, confirmarCategorias]);
+  }, [confirmacionId, catsPendientes, catsSeleccionadas, confirmarCategorias]);
 
-  // ── Status dot ────────────────────────────────────────────────────────────
-  const statusColor = workerStatus === 'online'  ? '#1D9E75'
-    : workerStatus === 'offline' ? '#F55B5B'
-    : '#9CA3AF';
-  const statusLabel = workerStatus === 'online'  ? 'IA en línea'
-    : workerStatus === 'offline' ? 'Modo básico'
-    : 'Conectando…';
+  // ── Status ────────────────────────────────────────────────────────────────
+  const statusColor = workerStatus === 'online' ? '#1D9E75' : workerStatus === 'offline' ? '#F55B5B' : '#9CA3AF';
+  const statusLabel = workerStatus === 'online' ? 'En línea · IA activa' : workerStatus === 'offline' ? 'Modo básico' : 'Conectando…';
 
   // ── JSX ──────────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={[st.root, { paddingTop: insets.top, backgroundColor: '#F8F7FF' }]}
+      style={[st.root, { paddingTop: insets.top }]}
     >
-      {/* Header */}
+      {/* Decorative blobs */}
+      <View style={st.blobTop} />
+      <View style={st.blobRight} />
+
+      {/* ── Header ── */}
       <View style={st.header}>
         {onBack && (
-          <Pressable onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ paddingRight: 8 }}>
+          <Pressable onPress={onBack} style={st.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Icon name="arrow-left" size={20} color="#111827" />
           </Pressable>
         )}
-        <View style={st.headerLeft}>
-          {/* Avatar + badge */}
-          <View>
+
+        <View style={st.headerCenter}>
+          <View style={st.headerAvatarWrap}>
             <View style={st.headerAvatar}>
               <Text style={st.headerAvatarText}>FI</Text>
             </View>
-            <View style={[st.statusBadge, { backgroundColor: statusColor }]} />
+            <View style={[st.onlineDot, { backgroundColor: statusColor }]} />
           </View>
           <View>
-            <Text style={st.headerTitle}>Finn</Text>
-            <Text style={st.statusLabel}>{statusLabel}</Text>
+            <Text style={st.headerName}>Finn</Text>
+            <Text style={st.headerSub}>{statusLabel}</Text>
           </View>
         </View>
+
+        {/* Placeholder right for layout balance */}
+        <View style={{ width: 32 }} />
       </View>
 
-      {/* Messages */}
+      {/* ── Messages ── */}
       <FlatList
         ref={scrollRef}
         data={messages}
         renderItem={renderMessage}
         keyExtractor={item => item.id}
         contentContainerStyle={st.list}
-        style={{ backgroundColor: '#F8F7FF' }}
+        style={st.listBg}
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+        ListEmptyComponent={
+          !isTyping ? (
+            <View style={st.emptyState}>
+              <View style={st.emptyAvatar}>
+                <Text style={st.emptyAvatarText}>FI</Text>
+              </View>
+              <Text style={st.emptyTitle}>Hola, soy Finn</Text>
+              <Text style={st.emptySub}>Tu asistente financiero personal.{'\n'}Pregúntame cualquier cosa sobre tus finanzas.</Text>
+            </View>
+          ) : null
+        }
         ListFooterComponent={
           isTyping ? (
             <View style={[st.msgRow, st.msgBot]}>
-              <View style={st.botAvatar}>
-                <Text style={st.botAvatarText}>FI</Text>
-              </View>
-              <TypingIndicator colors={colors} />
+              <FinnAvatar size={34} />
+              <TypingIndicator />
             </View>
           ) : null
         }
       />
 
-      {/* Quick suggestions */}
+      {/* ── Quick suggestions ── */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -509,17 +507,18 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
       >
         {QUICK_SUGGESTIONS.map(s => (
           <Pressable
-            key={s}
-            style={st.pill}
-            onPress={() => handleSend(s)}
+            key={s.label}
+            style={({ pressed }) => [st.pill, pressed && { opacity: 0.7 }]}
+            onPress={() => handleSend(`${s.emoji} ${s.label}`)}
             disabled={isTyping}
           >
-            <Text style={st.pillText}>{s}</Text>
+            <Text style={st.pillEmoji}>{s.emoji}</Text>
+            <Text style={st.pillText}>{s.label}</Text>
           </Pressable>
         ))}
       </ScrollView>
 
-      {/* Delete confirmation modal */}
+      {/* ── Delete confirmation modal ── */}
       <Modal
         transparent
         animationType="fade"
@@ -528,31 +527,28 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
       >
         <View style={st.modalOverlay}>
           <View style={st.modalCard}>
-            <View style={[st.modalIconWrap, { backgroundColor: '#8B5CF620' }]}>
-              <Text style={{ fontSize: 24 }}>🗑️</Text>
+            <View style={st.modalIconWrap}>
+              <Text style={{ fontSize: 26 }}>🗑️</Text>
             </View>
             <Text style={st.modalTitle}>Confirmar eliminación</Text>
             <Text style={st.modalBody}>{pendingAction?.preview}</Text>
             <View style={st.modalBtns}>
-              <TouchableOpacity
-                style={[st.modalBtn, { borderColor: '#E5E7EB', borderWidth: 1 }]}
-                onPress={() => setPendingAction(null)}
-              >
-                <Text style={[st.modalBtnText, { color: '#6B7280' }]}>Cancelar</Text>
+              <TouchableOpacity style={st.modalBtnCancel} onPress={() => setPendingAction(null)}>
+                <Text style={st.modalBtnCancelText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[st.modalBtn, { backgroundColor: THEME.colors.expense }]}
+                style={st.modalBtnDelete}
                 onPress={() => pendingAction && ejecutarAccionConfirmada(pendingAction)}
               >
-                <Text style={[st.modalBtnText, { color: '#FFFFFF' }]}>Eliminar</Text>
+                <Text style={st.modalBtnDeleteText}>Eliminar</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Input */}
-      <View style={[st.inputWrap, { paddingBottom: insets.bottom + 10 }]}>
+      {/* ── Input bar ── */}
+      <View style={[st.inputWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <VoiceButton
           size="small"
           onParsed={(tx) => {
@@ -562,25 +558,27 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
             setInputText(txt);
           }}
         />
-        <TextInput
-          style={[st.input, { color: '#111827' }]}
-          placeholder="Escribe a Finn…"
-          placeholderTextColor="#9CA3AF"
-          value={inputText}
-          onChangeText={setInputText}
-          onFocus={() => setInputFocused(true)}
-          onBlur={() => setInputFocused(false)}
-          multiline
-          maxLength={300}
-          editable={!isTyping}
-        />
-        <Pressable
-          style={[st.sendBtn, (isTyping || !inputText.trim()) && { opacity: 0.4 }]}
-          onPress={() => handleSend()}
-          disabled={isTyping || !inputText.trim()}
-        >
-          <Icon name="arrow-up" size={18} color="#FFFFFF" />
-        </Pressable>
+        <View style={[st.inputPill, inputFocused && st.inputPillFocused]}>
+          <TextInput
+            style={st.input}
+            placeholder="Pregunta a Finn…"
+            placeholderTextColor="#BBBBC8"
+            value={inputText}
+            onChangeText={setInputText}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
+            multiline
+            maxLength={300}
+            editable={!isTyping}
+          />
+          <Pressable
+            style={[st.sendBtn, (isTyping || !inputText.trim()) && st.sendBtnDisabled]}
+            onPress={() => handleSend()}
+            disabled={isTyping || !inputText.trim()}
+          >
+            <Icon name="arrow-up" size={16} color="#FFFFFF" />
+          </Pressable>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -589,170 +587,312 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
-  root: { flex: 1 },
+  root:    { flex: 1, backgroundColor: BG },
+  listBg:  { backgroundColor: BG },
 
-  // Header — white, light shadow
+  // Decorative blobs
+  blobTop: {
+    position: 'absolute',
+    width: SCREEN_W * 1.2,
+    height: SCREEN_W * 0.6,
+    borderRadius: SCREEN_W * 0.6,
+    backgroundColor: 'rgba(97,86,232,0.07)',
+    top: -SCREEN_W * 0.3,
+    left: -SCREEN_W * 0.1,
+  },
+  blobRight: {
+    position: 'absolute',
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(97,86,232,0.05)',
+    top: 60,
+    right: -40,
+  },
+
+  // ── Header ──────────────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 14,
-    paddingTop: 20,
+    paddingTop: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 0.5,
-    borderBottomColor: '#E5E7EB',
-    ...(Platform.OS !== 'web' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 } : {}),
+    borderBottomColor: 'rgba(97,86,232,0.12)',
+    ...(Platform.OS !== 'web' ? {
+      shadowColor: PRIMARY,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      elevation: 3,
+    } : {}),
   },
-  headerLeft:      { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  headerAvatar:    {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#6156E8',
+  backBtn: { width: 32, alignItems: 'flex-start' },
+  headerCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerAvatarWrap: { position: 'relative' },
+  headerAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
+    ...(Platform.OS !== 'web' ? {
+      shadowColor: PRIMARY,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
+    } : {}),
   },
-  headerAvatarText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
-  statusBadge:      {
+  headerAvatarText: { fontSize: 16, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.5 },
+  onlineDot: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    borderWidth: 1.5,
+    bottom: 1,
+    right: 1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
     borderColor: '#FFFFFF',
   },
-  headerTitle:  { fontSize: 17, fontWeight: '700', color: '#111827' },
-  statusLabel:  { fontSize: 12, color: '#9CA3AF', marginTop: 1 },
+  headerName: { fontSize: 17, fontWeight: '700', color: '#111827', letterSpacing: -0.3 },
+  headerSub:  { fontSize: 12, color: '#9CA3AF', marginTop: 1 },
 
-  // Message list
-  list:    { paddingTop: 16, paddingBottom: 8, gap: 4, paddingHorizontal: 16 },
-  msgRow:  { flexDirection: 'row', marginVertical: 4, alignItems: 'flex-end', gap: 8 },
+  // ── Message list ────────────────────────────────────────────────────────
+  list: { paddingTop: 20, paddingBottom: 10, gap: 6, paddingHorizontal: 16 },
+  msgRow:  { flexDirection: 'row', marginVertical: 3, alignItems: 'flex-end', gap: 8 },
   msgUser: { justifyContent: 'flex-end' },
   msgBot:  { justifyContent: 'flex-start' },
+  userSpacer: { width: 34 },
 
-  // Finn mini avatar in messages
-  botAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#6156E8',
+  // ── Finn avatar in messages ─────────────────────────────────────────────
+  avatar: {
+    backgroundColor: PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2,
     flexShrink: 0,
-  },
-  botAvatarText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
-
-  // Bubbles
-  bubble:     { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20 },
-  bubbleUser: {
-    borderBottomRightRadius: 4,
-    backgroundColor: '#6156E8',
-    alignSelf: 'flex-end',
-  },
-  bubbleBot: {
-    borderBottomLeftRadius: 4,
-    backgroundColor: '#FFFFFF',
+    marginBottom: 2,
     ...(Platform.OS !== 'web' ? {
-      shadowColor: '#000',
+      shadowColor: PRIMARY,
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.06,
-      shadowRadius: 8,
-      elevation: 2,
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 3,
     } : {}),
   },
-  bubbleText: { fontSize: 14, lineHeight: 21, fontWeight: '500' },
-  bubbleTime: { fontSize: 10, marginTop: 3, fontWeight: '400' },
+  avatarText: { fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.3 },
 
-  // Typing indicator — Finn bubble style
-  typingBubble: {
+  // ── Bubbles ─────────────────────────────────────────────────────────────
+  bubble: {
     borderRadius: 20,
-    borderBottomLeftRadius: 4,
-    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    maxWidth: '100%',
+  },
+  bubbleUser: {
+    borderBottomRightRadius: 5,
+    backgroundColor: PRIMARY,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    gap: 4,
+    alignSelf: 'flex-end',
+    ...(Platform.OS !== 'web' ? {
+      shadowColor: PRIMARY,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.28,
+      shadowRadius: 8,
+      elevation: 4,
+    } : {}),
+  },
+  bubbleBot: {
+    borderBottomLeftRadius: 5,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
     ...(Platform.OS !== 'web' ? {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.06,
-      shadowRadius: 8,
+      shadowOpacity: 0.07,
+      shadowRadius: 10,
       elevation: 2,
     } : {}),
   },
-  typingLabel:  { fontSize: 11, color: '#9CA3AF' },
-  dotsRow:      { flexDirection: 'row', gap: 5, alignItems: 'center' },
-  dot:          { width: 8, height: 8, borderRadius: 4, backgroundColor: '#9CA3AF' },
+  bubbleError: {
+    backgroundColor: '#FFF5F5',
+    borderWidth: 1,
+    borderColor: THEME.colors.expense,
+  },
+  bubbleAccent: {
+    width: 3,
+    backgroundColor: PRIMARY,
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 5,
+  },
+  bubbleInner: { flex: 1, paddingHorizontal: 14, paddingVertical: 12 },
+  bubbleText:     { fontSize: 14.5, lineHeight: 22, fontWeight: '500' },
+  bubbleTextUser: { color: '#FFFFFF' },
+  bubbleTextBot:  { color: '#111827' },
+  bubbleTime:     { fontSize: 10, marginTop: 4, fontWeight: '400' },
+  bubbleTimeUser: { color: 'rgba(255,255,255,0.6)', textAlign: 'right' },
+  bubbleTimeBot:  { color: '#9CA3AF' },
 
-  // Suggestion chips
-  suggestionsScroll:  { flexGrow: 0, backgroundColor: '#FFFFFF', borderTopWidth: 0.5, borderTopColor: '#E5E7EB' },
+  // ── Typing indicator ────────────────────────────────────────────────────
+  typingBubble: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderBottomLeftRadius: 5,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    ...(Platform.OS !== 'web' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.07,
+      shadowRadius: 10,
+      elevation: 2,
+    } : {}),
+  },
+  typingLabel: { fontSize: 11, color: '#9CA3AF' },
+  dotsRow:     { flexDirection: 'row', gap: 4, alignItems: 'center', marginLeft: 4 },
+  dot:         { width: 7, height: 7, borderRadius: 3.5, backgroundColor: PRIMARY },
+
+  // ── Empty state ─────────────────────────────────────────────────────────
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+    gap: 14,
+  },
+  emptyAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+    ...(Platform.OS !== 'web' ? {
+      shadowColor: PRIMARY,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.3,
+      shadowRadius: 16,
+      elevation: 8,
+    } : {}),
+  },
+  emptyAvatarText: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.5 },
+  emptyTitle:      { fontSize: 22, fontWeight: '700', color: '#111827', letterSpacing: -0.5 },
+  emptySub:        { fontSize: 14, color: '#9CA3AF', textAlign: 'center', lineHeight: 21, paddingHorizontal: 32 },
+
+  // ── Suggestion chips ────────────────────────────────────────────────────
+  suggestionsScroll:  {
+    flexGrow: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(97,86,232,0.1)',
+  },
   suggestionsContent: { flexDirection: 'row', gap: 8, paddingVertical: 10, paddingHorizontal: 16 },
   pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     borderRadius: 100,
     paddingHorizontal: 14,
-    paddingVertical: 7,
-    backgroundColor: '#EEF0FF',
+    paddingVertical: 8,
+    backgroundColor: PRIMARY_SOFT,
     borderWidth: 0.5,
-    borderColor: '#6156E8',
+    borderColor: 'rgba(97,86,232,0.3)',
   },
-  pillText: { fontSize: 12, fontWeight: '600', color: '#6156E8' },
+  pillEmoji: { fontSize: 13 },
+  pillText:  { fontSize: 12, fontWeight: '600', color: PRIMARY },
 
-  // Input bar
+  // ── Input bar ───────────────────────────────────────────────────────────
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 10,
-    paddingTop: 12,
-    paddingHorizontal: 16,
+    gap: 8,
+    paddingTop: 10,
+    paddingHorizontal: 12,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 0.5,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: 'rgba(97,86,232,0.1)',
+  },
+  inputPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: '#F4F3F8',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    gap: 8,
+  },
+  inputPillFocused: {
+    borderColor: PRIMARY,
+    backgroundColor: '#FFFFFF',
   },
   input: {
     flex: 1,
-    height: 42,
-    borderRadius: 100,
-    paddingHorizontal: 16,
     fontSize: 15,
-    backgroundColor: '#F4F3F8',
+    color: '#111827',
     maxHeight: 100,
+    paddingVertical: 6,
+    padding: 0,
   },
   sendBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#6156E8',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    marginBottom: 2,
+    ...(Platform.OS !== 'web' ? {
+      shadowColor: PRIMARY,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.35,
+      shadowRadius: 6,
+      elevation: 4,
+    } : {}),
   },
+  sendBtnDisabled: { opacity: 0.3 },
 
-  // Action bubble — Finn actuó
+  // ── Acción Finn ─────────────────────────────────────────────────────────
   accionBubble: {
     flex: 1,
-    borderWidth: 1.5,
-    borderRadius: 20,
+    borderRadius: 16,
     borderBottomLeftRadius: 4,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 11,
     gap: 6,
     backgroundColor: '#F3F0FF',
-    borderColor: '#8B5CF6',
+    borderWidth: 1.5,
+    borderColor: 'rgba(139,92,246,0.4)',
   },
   accionHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   accionBadge:     { backgroundColor: '#8B5CF6', borderRadius: 100, paddingHorizontal: 8, paddingVertical: 3 },
   accionBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+  accionTime:      { fontSize: 10, color: '#8B5CF680' },
   accionText:      { fontSize: 14, fontWeight: '600', lineHeight: 20 },
 
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  modalCard:    { width: '100%', borderRadius: 24, padding: 24, alignItems: 'center', gap: 12, backgroundColor: '#FFFFFF' },
-  modalIconWrap: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  modalTitle:   { fontSize: 17, fontWeight: '700', color: '#111827' },
-  modalBody:    { fontSize: 14, textAlign: 'center', lineHeight: 20, color: '#6B7280' },
-  modalBtns:    { flexDirection: 'row', gap: 12, marginTop: 8, width: '100%' },
-  modalBtn:     { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  modalBtnText: { fontSize: 15, fontWeight: '700' },
+  // ── Modal ───────────────────────────────────────────────────────────────
+  modalOverlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modalCard:      { width: '100%', borderRadius: 28, padding: 28, alignItems: 'center', gap: 10, backgroundColor: '#FFFFFF' },
+  modalIconWrap:  { width: 60, height: 60, borderRadius: 30, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  modalTitle:     { fontSize: 18, fontWeight: '700', color: '#111827' },
+  modalBody:      { fontSize: 14, textAlign: 'center', lineHeight: 20, color: '#6B7280' },
+  modalBtns:      { flexDirection: 'row', gap: 12, marginTop: 8, width: '100%' },
+  modalBtnCancel: { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' },
+  modalBtnCancelText: { fontSize: 15, fontWeight: '600', color: '#6B7280' },
+  modalBtnDelete: { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: 'center', backgroundColor: THEME.colors.expense },
+  modalBtnDeleteText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });

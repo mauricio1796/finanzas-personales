@@ -367,9 +367,9 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
       useNativeDriver: true,
     }).start();
 
-    // Balance counter animation
+    // Balance counter animation — shows available balance (income - expenses)
     Animated.timing(balanceAnim, {
-      toValue: metricas.ingresoEfectivo,
+      toValue: metricas.balanceDisponible,
       duration: 1200,
       useNativeDriver: false,
     }).start();
@@ -402,6 +402,19 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
       Animated.timing(a, { toValue: 1, duration: 600, useNativeDriver: false })
     )).start();
   }, [mesSeleccionado]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Re-animate balance counter when available balance changes ─────────────
+  useEffect(() => {
+    const current = displayBalance.current;
+    const target  = metricas.balanceDisponible;
+    if (Math.abs(current - target) < 1) return;
+    balanceAnim.stopAnimation();
+    Animated.timing(balanceAnim, {
+      toValue:  target,
+      duration: 600,
+      useNativeDriver: false,
+    }).start();
+  }, [metricas.balanceDisponible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const abrirQuickAdd = (tipo: 'income' | 'expense', initial?: QuickAddInitialData) => {
@@ -625,26 +638,24 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
             },
           ]}
         >
-          <Text style={s.balanceLabel}>
-            {metricas.esIngresoReal ? 'INGRESO REGISTRADO' : 'SALARIO ESTIMADO'}
-          </Text>
+          <Text style={s.balanceLabel}>DISPONIBLE AHORA</Text>
           <Text ref={balanceText} style={s.balanceAmount}>
-            {fmtCOP(metricas.ingresoEfectivo)}
+            {fmtCOP(metricas.balanceDisponible)}
           </Text>
           <Text style={s.balanceMonth}>
             {capitalize(getNombreMes(mesActual))} {añoActual}
           </Text>
 
-          {/* Sub-cards: ingresos / gastos */}
+          {/* Sub-cards: ingresos totales / gastos */}
           <View style={s.balanceSubCards}>
             <View style={s.balanceSubCard}>
               <Icon name="arrow-up" size={12} color="rgba(255,255,255,0.7)" />
-              <Text style={s.balanceSubLabel}>Ingresos</Text>
-              <Text style={s.balanceSubValue}>{fmtCOP(ingresosMes)}</Text>
+              <Text style={s.balanceSubLabel}>Ingresado</Text>
+              <Text style={s.balanceSubValue}>{fmtCOP(metricas.ingresoEfectivo)}</Text>
             </View>
             <View style={s.balanceSubCard}>
               <Icon name="arrow-down" size={12} color="rgba(255,255,255,0.7)" />
-              <Text style={s.balanceSubLabel}>Gastos</Text>
+              <Text style={s.balanceSubLabel}>Gastado</Text>
               <Text style={s.balanceSubValue}>{fmtCOP(gastosMes)}</Text>
             </View>
           </View>
@@ -744,30 +755,59 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
           .sort((a: any, b: any) => (gastosPorCatSel[b.name] ?? 0) - (gastosPorCatSel[a.name] ?? 0))
           .slice(0, 5)
           .map((cat: any) => {
-            const gasto   = gastosPorCatSel[cat.name] ?? 0;
-            const budget  = cat.budget ?? 0;
-            const iconName = (cat.icon as any) || getCategoryIcon(cat.name);
-            const iconBg   = ICON_MAP[cat.name]?.bg    ?? colors.cardSecondary;
-            const iconCol  = ICON_MAP[cat.name]?.color ?? colors.textSecondary;
-            const pct      = budget > 0 ? Math.min((gasto / budget) * 100, 100) : 0;
-            const pctColor = pct >= 100 ? colors.expense : pct >= 80 ? colors.warning : colors.income;
+            const gasto     = gastosPorCatSel[cat.name] ?? 0;
+            const budget    = cat.budget ?? 0;
+            const remaining = budget > 0 ? budget - gasto : 0;
+            const over      = budget > 0 && gasto > budget;
+            const iconName  = (cat.icon as any) || getCategoryIcon(cat.name);
+            const iconBg    = ICON_MAP[cat.name]?.bg    ?? colors.cardSecondary;
+            const iconCol   = ICON_MAP[cat.name]?.color ?? colors.textSecondary;
+            const pct       = budget > 0 ? Math.min((gasto / budget) * 100, 100) : 0;
+            const pctColor  = over ? colors.expense : pct >= 80 ? colors.warning : colors.income;
             return (
               <View key={cat.id} style={cf.row}>
                 <View style={[cf.iconCircle, { backgroundColor: iconBg }]}>
                   <Icon name={iconName as any} size={18} color={iconCol} />
                 </View>
                 <View style={cf.info}>
-                  <Text style={cf.catName} numberOfLines={1}>{cat.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={cf.catName} numberOfLines={1}>{cat.name}</Text>
+                    {budget > 0 && remaining > 0 && (
+                      <View style={[cf.surplusTag, { backgroundColor: colors.incomeLight }]}>
+                        <Text style={[cf.surplusText, { color: colors.income }]}>Libre</Text>
+                      </View>
+                    )}
+                    {over && (
+                      <View style={[cf.surplusTag, { backgroundColor: colors.expenseLight }]}>
+                        <Text style={[cf.surplusText, { color: colors.expense }]}>Excedido</Text>
+                      </View>
+                    )}
+                  </View>
                   {budget > 0 && (
                     <View style={cf.barWrap}>
                       <View style={[cf.barFill, { width: `${pct}%` as any, backgroundColor: pctColor }]} />
                     </View>
                   )}
                   <Text style={cf.budgetLabel}>
-                    {budget > 0 ? `Presupuesto ${fmtCOP(budget)}` : 'Sin presupuesto'}
+                    {budget > 0
+                      ? `Gastado ${fmtCOP(gasto)} de ${fmtCOP(budget)}`
+                      : `Gastado ${fmtCOP(gasto)}`}
                   </Text>
                 </View>
-                <Text style={[cf.amount, { color: colors.expense }]}>−{fmtCOP(gasto)}</Text>
+                <View style={{ alignItems: 'flex-end' }}>
+                  {budget > 0 ? (
+                    <>
+                      <Text style={[cf.amount, { color: over ? colors.expense : colors.income }]}>
+                        {over ? `−${fmtCOP(gasto - budget)}` : fmtCOP(remaining)}
+                      </Text>
+                      <Text style={[cf.budgetLabel, { fontSize: 10 }]}>
+                        {over ? 'excedido' : 'disponible'}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={[cf.amount, { color: colors.expense }]}>−{fmtCOP(gasto)}</Text>
+                  )}
+                </View>
               </View>
             );
           })}
@@ -1578,6 +1618,15 @@ const cf = StyleSheet.create({
   },
   amount: {
     fontSize: 14,
+    fontWeight: '700',
+  },
+  surplusTag: {
+    borderRadius: 100,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  surplusText: {
+    fontSize: 9,
     fontWeight: '700',
   },
   empty: {

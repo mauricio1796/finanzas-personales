@@ -21,9 +21,8 @@ export const TIPOS_INGRESO: IngresoConfig[] = [
 // ── Ingreso efectivo del mes ───────────────────────────────────────────────────
 
 /**
- * Ingreso efectivo = suma de transacciones income del mes.
- * Si no hay ninguna, usa monthlySalary como fallback estimado.
- * Este valor es LA BASE de todos los cálculos del sistema.
+ * Ingreso efectivo = salario base + ingresos extra registrados ese mes.
+ * El salario siempre se suma; los ingresos extra son adicionales.
  */
 export function getIngresoEfectivoMes(
   transactions: Transaction[],
@@ -31,14 +30,30 @@ export function getIngresoEfectivoMes(
   mes: number,
   año: number,
 ): number {
-  const ingresosTx = transactions
+  const extraIncome = transactions
     .filter(t => {
       const d = new Date(t.date);
       return t.type === 'income' && d.getMonth() === mes && d.getFullYear() === año;
     })
     .reduce((s, t) => s + t.amount, 0);
 
-  return ingresosTx > 0 ? ingresosTx : monthlySalary;
+  return monthlySalary + extraIncome;
+}
+
+/**
+ * Solo los ingresos extra del mes (sin incluir el salario base).
+ */
+export function getIngresosExtraMes(
+  transactions: Transaction[],
+  mes: number,
+  año: number,
+): number {
+  return transactions
+    .filter(t => {
+      const d = new Date(t.date);
+      return t.type === 'income' && d.getMonth() === mes && d.getFullYear() === año;
+    })
+    .reduce((s, t) => s + t.amount, 0);
 }
 
 /**
@@ -205,8 +220,9 @@ CONTEXTO FINANCIERO — ${mesLabel}
 Usuario: ${profile?.name || 'Usuario'} | Empleo: ${profile?.employmentType || 'no especificado'} | Preocupación principal: ${profile?.mainFinancialConcern || 'no especificada'}
 
 INGRESOS:
-- Ingreso del mes: ${f(metricas.ingresoEfectivo)} ${metricas.esIngresoReal ? '(registrado)' : '(estimado del perfil)'}
-- Salario base configurado: ${f(profile?.monthlySalary || 0)}
+- Salario base: ${f(profile?.monthlySalary || 0)}
+- Ingresos extra registrados: ${f(metricas.ingresoEfectivo - (profile?.monthlySalary || 0))}
+- Total ingresado: ${f(metricas.ingresoEfectivo)}
 
 GASTOS:
 - Total gastado: ${f(metricas.totalGastado)} (${metricas.porcentajeGastado}% del ingreso)
@@ -217,11 +233,22 @@ PENDIENTES:
 - Categorías: ${catsPendientes || 'ninguna'}
 
 BALANCE:
-- Disponible ahora: ${f(metricas.balanceDisponible)}
+- Disponible ahora: ${f(metricas.balanceDisponible)} (ingreso total − gastos registrados)
 - Balance final proyectado: ${f(metricas.balanceFinal)} (${metricas.porcentajeLibre}%)
 - Ahorro proyectado: ${f(metricas.ahorroProyectado)}
 - Días restantes: ${metricas.diasRestantesMes}
-- Presupuesto diario recomendado: ${f(metricas.gastoPromedioRecomendadoDia)}/día`.trim()];
+- Presupuesto diario recomendado: ${f(metricas.gastoPromedioRecomendadoDia)}/día
+
+SALDO POR CATEGORÍA (presupuesto − gastado):
+${categories
+  .filter((c: any) => c.isSelected && (c.budget ?? 0) > 0)
+  .map((c: any) => {
+    const gastado    = gastosPorCat[c.name] ?? 0;
+    const restante   = (c.budget as number) - gastado;
+    const estado     = restante < 0 ? 'EXCEDIDO' : gastado === 0 ? 'sin usar' : 'disponible';
+    return `  ${c.name}: ${f(Math.abs(restante))} ${estado} (presupuesto ${f(c.budget)}, gastado ${f(gastado)})`;
+  })
+  .join('\n') || '  Sin categorías con presupuesto'}`.trim()];
 
   // Metas de ahorro
   if (extra?.metas && extra.metas.length > 0) {

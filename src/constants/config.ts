@@ -17,7 +17,7 @@ export const CONFIG = {
   // URL del Cloudflare Worker
   // 1. Crea el archivo .env.local en finanzas-personales/
   // 2. Agrega: EXPO_PUBLIC_WORKER_URL=https://financyai-proxy.TU_SUBDOMINIO.workers.dev
-  WORKER_URL: WORKER_URL_ENV || 'https://financyai-proxy.TU_USUARIO.workers.dev',
+  WORKER_URL: WORKER_URL_ENV || 'https://financyai-proxy.ricardo-mosquerab.workers.dev',
 
   // Versión de la app (para headers de diagnóstico)
   APP_VERSION: '1.1.0',

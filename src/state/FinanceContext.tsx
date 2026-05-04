@@ -1,9 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { storageService } from '../services/storage/StorageService';
 import { supabaseService } from '../services/supabase/SupabaseService';
 import type { ServerData } from '../services/supabase/SupabaseService';
 import { syncQueue, type SyncStatus } from '../services/SyncQueueService';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
+import { getIngresoEfectivoMes } from '../utils/ingresoUtils';
 import {
   User,
   Category,
@@ -39,6 +40,8 @@ interface FinanceContextType {
   user: User | null;
   transactions: Transaction[];
   categories: Category[];
+  /** Salario base + ingresos extra del mes actual − gastos del mes actual */
+  saldoDisponible: number;
   profile: FinancialProfile | null;
   goal: FinancialGoal | null;
   userLevel: UserLevel | null;
@@ -631,12 +634,28 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setRecurrentes([]);
   };
 
+  // ── Saldo disponible (salario + ingresos extra − gastos del mes actual) ──────
+  const saldoDisponible = useMemo(() => {
+    const now  = new Date();
+    const mes  = now.getMonth();
+    const año  = now.getFullYear();
+    const ingresoTotal = getIngresoEfectivoMes(transactions, profile?.monthlySalary ?? 0, mes, año);
+    const gastosMes    = transactions
+      .filter(t => {
+        const d = new Date(t.date);
+        return t.type === 'expense' && d.getMonth() === mes && d.getFullYear() === año;
+      })
+      .reduce((s, t) => s + t.amount, 0);
+    return Math.max(0, ingresoTotal - gastosMes);
+  }, [transactions, profile?.monthlySalary]);
+
   const value: FinanceContextType = {
     user,
     syncStatus,
     syncPendingCount,
     transactions,
     categories,
+    saldoDisponible,
     metas,
     deudas,
     recurrentes,

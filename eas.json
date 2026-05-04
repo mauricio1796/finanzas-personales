@@ -1,0 +1,34 @@
+{
+  "cli": {
+    "version": ">= 10.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_WORKER_URL": "https://financyai-proxy.ricardo-mosquerab.workers.dev",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://diijivlpcuqxjpyvfavu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_f7e9POl9o4u0u8CgQBP3lA_cJb4pjhl"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_WORKER_URL": "https://financyai-proxy.ricardo-mosquerab.workers.dev",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://diijivlpcuqxjpyvfavu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_f7e9POl9o4u0u8CgQBP3lA_cJb4pjhl"
+      }
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_WORKER_URL": "https://financyai-proxy.ricardo-mosquerab.workers.dev",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://diijivlpcuqxjpyvfavu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_f7e9POl9o4u0u8CgQBP3lA_cJb4pjhl"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

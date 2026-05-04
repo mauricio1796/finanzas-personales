@@ -84,6 +84,51 @@ class AuthService {
     };
   }
 
+  // ─── OTP: enviar código al correo ────────────────────────────────────────
+  async sendOtp(email: string): Promise<{ error: string | null }> {
+    if (!supabase) return { error: 'Supabase no configurado' };
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true },
+    });
+    if (error) {
+      if (error.message.includes('rate limit')) return { error: 'Demasiados intentos. Espera un momento.' };
+      return { error: 'No se pudo enviar el código. Verifica el correo.' };
+    }
+    return { error: null };
+  }
+
+  // ─── OTP: verificar código ────────────────────────────────────────────────
+  async verifyOtp(email: string, token: string): Promise<AuthResult> {
+    if (!supabase) return { user: null, error: 'Supabase no configurado' };
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email',
+    });
+    if (error || !data.user) {
+      if (error?.message.includes('expired')) return { user: null, error: 'El código expiró. Solicita uno nuevo.' };
+      return { user: null, error: 'Código incorrecto. Intenta de nuevo.' };
+    }
+    // Esperar trigger si es usuario nuevo
+    await new Promise(r => setTimeout(r, 400));
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('name, monthly_salary')
+      .eq('id', data.user.id)
+      .single();
+    return {
+      user: {
+        id: data.user.id,
+        email: data.user.email!,
+        name: profile?.name || data.user.email!.split('@')[0],
+        monthlySalary: (profile?.monthly_salary as number) || undefined,
+        createdAt: data.user.created_at,
+      },
+      error: null,
+    };
+  }
+
   // ─── Sign Out ─────────────────────────────────────────────────────────────
   async signOut(): Promise<void> {
     if (!supabase) return;

@@ -139,12 +139,27 @@ const CategoriaCard: React.FC<CategoriaCardProps> = React.memo(({
         </View>
 
         <View style={s.cardRight}>
-          <Text style={[s.cardGastado, { color: estadoColor }]}>
-            {fmtCOP(categoria.gastado)}
-          </Text>
-          {budget > 0 && (
-            <Text style={[s.cardBudget, { color: colors.textTertiary }]}>
-              de {fmtCOP(budget)}
+          {budget > 0 ? (
+            <>
+              {/* Remaining = budget - spent (hero value) */}
+              <Text style={[s.cardGastado, {
+                color: categoria.estado === 'over'
+                  ? colors.expense
+                  : categoria.estado === 'paid' || (budget - categoria.gastado) > 0
+                  ? colors.income
+                  : colors.textPrimary,
+              }]}>
+                {categoria.estado === 'over'
+                  ? `−${fmtCOP(categoria.gastado - budget)}`
+                  : fmtCOP(Math.max(0, budget - categoria.gastado))}
+              </Text>
+              <Text style={[s.cardBudget, { color: colors.textTertiary }]}>
+                gastado {fmtCOP(categoria.gastado)}
+              </Text>
+            </>
+          ) : (
+            <Text style={[s.cardGastado, { color: estadoColor }]}>
+              {fmtCOP(categoria.gastado)}
             </Text>
           )}
         </View>
@@ -174,7 +189,13 @@ const CategoriaCard: React.FC<CategoriaCardProps> = React.memo(({
       {/* Footer row */}
       <View style={s.cardFooter}>
         <Text style={[s.estadoLabel, { color: estadoColor }]}>
-          {getLabelEstado(categoria.estado, categoria.pct)}
+          {budget > 0 && !categoria.pagado
+            ? categoria.estado === 'over'
+              ? `Excedido ${categoria.pct}% del presupuesto`
+              : budget - categoria.gastado > 0
+              ? `${Math.max(0, 100 - categoria.pct)}% disponible`
+              : 'Presupuesto agotado'
+            : getLabelEstado(categoria.estado, categoria.pct)}
         </Text>
         <View style={s.footerActions}>
           {categoria.estado === 'no_budget' && (

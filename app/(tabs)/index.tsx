@@ -90,7 +90,7 @@ export default function HomeScreen() {
     setUser, user, isOnboarded, setIsOnboarded, onboardingState, updateOnboardingStep, profile,
     transactions, categories, goal, userLevel, leccionesCompletadas, retosCompletados, retoActivo, premium,
     addTransaction: ctxAddTransaction, deleteTransaction: ctxDeleteTransaction,
-    isLoading, importServerData,
+    isLoading, importServerData, saldoDisponible,
   } = useFinance();
   const { colors } = useTheme();
 
@@ -105,12 +105,19 @@ export default function HomeScreen() {
   const [authState, setAuthState] = useState<AuthState>('login');
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [registerName, setRegisterName] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+
+  // ── OTP flow ──
+  const [otpEmail, setOtpEmail]   = useState('');
+  const [otpCode, setOtpCode]     = useState(['', '', '', '', '', '', '', '']);
+  const [otpSent, setOtpSent]     = useState(false);
+  const [otpResendSecs, setOtpResendSecs] = useState(0);
+  const otpRefs = useRef<(TextInput | null)[]>([]);
+  const resendTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ==================== APP STATE ====================
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('dashboard');
@@ -262,6 +269,86 @@ export default function HomeScreen() {
   }, [navegarA]);
 
   // ==================== AUTH HANDLERS ====================
+  // ── OTP: iniciar cuenta regresiva de reenvío ─────────────────────────────
+  const startResendTimer = () => {
+    setOtpResendSecs(60);
+    if (resendTimer.current) clearInterval(resendTimer.current);
+    resendTimer.current = setInterval(() => {
+      setOtpResendSecs(s => {
+        if (s <= 1) { clearInterval(resendTimer.current!); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+  };
+
+  // ── OTP: enviar código ────────────────────────────────────────────────────
+  const handleSendOtp = async () => {
+    setAuthError('');
+    const email = otpEmail.trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      setAuthError('Ingresa un correo válido');
+      return;
+    }
+    setAuthLoading(true);
+    try {
+      const { error } = await authService.sendOtp(email);
+      if (error) { setAuthError(error); return; }
+      setOtpSent(true);
+      setOtpCode(['', '', '', '', '', '']);
+      startResendTimer();
+      setTimeout(() => otpRefs.current[0]?.focus(), 300);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // ── OTP: verificar código ─────────────────────────────────────────────────
+  const handleVerifyOtp = async (codeArr?: string[]) => {
+    const code = (codeArr ?? otpCode).join('');
+    if (code.length < 8) return;
+    setAuthError('');
+    setAuthLoading(true);
+    try {
+      const { user: sbUser, error } = await authService.verifyOtp(otpEmail.trim().toLowerCase(), code);
+      if (error || !sbUser) { setAuthError(error ?? 'Código incorrecto'); setOtpCode(['','','','','','','','']); setTimeout(() => otpRefs.current[0]?.focus(), 100); return; }
+      setUser(sbUser);
+      const serverData = await supabaseService.pullFromServer(sbUser.id);
+      if (serverData) {
+        await importServerData(serverData);
+        if (serverData.name && serverData.name !== sbUser.name) {
+          setUser({ ...sbUser, name: serverData.name, monthlySalary: serverData.monthlySalary || sbUser.monthlySalary });
+        }
+      }
+      setOtpEmail(''); setOtpCode(['','','','','','','','']); setOtpSent(false);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // ── OTP: manejar input de cada dígito ────────────────────────────────────
+  const handleOtpDigit = (text: string, idx: number) => {
+    const digit = text.replace(/\D/g, '').slice(-1);
+    const next = [...otpCode];
+    next[idx] = digit;
+    setOtpCode(next);
+    if (digit && idx < 7) {
+      otpRefs.current[idx + 1]?.focus();
+    }
+    if (next.every(d => d !== '')) {
+      Keyboard.dismiss();
+      handleVerifyOtp(next);
+    }
+  };
+
+  const handleOtpKeyPress = (key: string, idx: number) => {
+    if (key === 'Backspace' && !otpCode[idx] && idx > 0) {
+      const next = [...otpCode];
+      next[idx - 1] = '';
+      setOtpCode(next);
+      otpRefs.current[idx - 1]?.focus();
+    }
+  };
+
   const handleLogin = async () => {
     setAuthError('');
     if (!loginEmail || !loginPassword) {
@@ -271,32 +358,21 @@ export default function HomeScreen() {
     setAuthLoading(true);
     try {
       if (authService.isReady) {
-        // ── Auth real con Supabase ──────────────────────────────────────────
         const { user: sbUser, error } = await authService.signIn(loginEmail, loginPassword);
         if (error || !sbUser) { setAuthError(error ?? 'Error al iniciar sesión'); return; }
-
         setUser(sbUser);
-
-        // Traer datos del servidor y cargarlos en el contexto
         const serverData = await supabaseService.pullFromServer(sbUser.id);
         if (serverData) {
           await importServerData(serverData);
-          // Sincronizar el nombre en el contexto del usuario si el servidor lo tiene
           if (serverData.name && serverData.name !== sbUser.name) {
             setUser({ ...sbUser, name: serverData.name, monthlySalary: serverData.monthlySalary || sbUser.monthlySalary });
           }
         }
       } else {
-        // ── Fallback local (sin Supabase configurado) ─────────────────────
-        const newUser: User = {
-          id: Date.now().toString(),
-          email: loginEmail,
-          name: loginEmail.split('@')[0],
-        };
+        const newUser: User = { id: Date.now().toString(), email: loginEmail, name: loginEmail.split('@')[0] };
         setUser(newUser);
       }
-      setLoginEmail('');
-      setLoginPassword('');
+      setLoginEmail(''); setLoginPassword('');
     } finally {
       setAuthLoading(false);
     }
@@ -304,10 +380,11 @@ export default function HomeScreen() {
 
   const handleRegister = async () => {
     setAuthError('');
-    if (!registerName || !registerEmail || !registerPassword || !registerConfirmPassword) {
+    if (!registerEmail || !registerPassword || !registerConfirmPassword) {
       setAuthError('Por favor completa todos los campos');
       return;
     }
+    const resolvedName = registerEmail.split('@')[0];
     if (registerPassword !== registerConfirmPassword) {
       setAuthError('Las contraseñas no coinciden');
       return;
@@ -320,7 +397,7 @@ export default function HomeScreen() {
     try {
       if (authService.isReady) {
         // ── Auth real con Supabase ──────────────────────────────────────────
-        const { user: sbUser, error } = await authService.signUp(registerEmail, registerPassword, registerName);
+        const { user: sbUser, error } = await authService.signUp(registerEmail, registerPassword, resolvedName);
         if (error || !sbUser) { setAuthError(error ?? 'Error al crear cuenta'); return; }
 
         setUser(sbUser);
@@ -337,7 +414,7 @@ export default function HomeScreen() {
           retoActivo: retoActivo ?? null,
           premium,
           isOnboarded,
-          name: registerName,
+          name: resolvedName,
           monthlySalary: profile?.monthlySalary ?? sbUser.monthlySalary ?? 0,
         });
       } else {
@@ -345,12 +422,11 @@ export default function HomeScreen() {
         const newUser: User = {
           id: Date.now().toString(),
           email: registerEmail,
-          name: registerName,
+          name: resolvedName,
           createdAt: new Date().toISOString(),
         };
         setUser(newUser);
       }
-      setRegisterName('');
       setRegisterEmail('');
       setRegisterPassword('');
       setRegisterConfirmPassword('');
@@ -367,8 +443,13 @@ export default function HomeScreen() {
     setAuthState('login');
     await setIsOnboarded(false);
     setCurrentScreen('dashboard');
-    setLoginEmail('');
-    setLoginPassword('');
+    // Limpiar estado OTP para volver a la pantalla de correo
+    setOtpEmail('');
+    setOtpCode(['', '', '', '', '', '']);
+    setOtpSent(false);
+    setOtpResendSecs(0);
+    if (resendTimer.current) clearInterval(resendTimer.current);
+    setAuthError('');
     setShowSplash(false);
   };
 
@@ -478,196 +559,140 @@ export default function HomeScreen() {
     );
   }
 
-  // ==================== 2. AUTH (DESPUÉS DEL ONBOARDING) ====================
-  // El perfil financiero ya está cargado; ahora el usuario crea su cuenta
+  // ==================== 2. AUTH — flujo OTP por correo ====================
   if (!user) {
-    if (authState === 'login') {
-      return (
-        <MobileShell>
-          <KeyboardAvoidingView
-            style={styles.authContainer}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={80}
-          >
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={styles.authContent}>
-                <Animated.View
-                  style={[
-                    styles.authBox,
-                    {
-                      transform: [{ scale: authAnim }],
-                      opacity: authAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
-                      backgroundColor: colors.card,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  {/* Badge de perfil listo */}
-                  <View style={styles.profileReadyBadge}>
-                    <Text style={[styles.profileReadyText, { color: colors.primary }]}>✦ Tu perfil financiero está listo</Text>
+    return (
+      <MobileShell>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.authRoot}>
+              {/* Blobs decorativos */}
+              <View style={[styles.blob, styles.blobTR]} />
+              <View style={[styles.blob, styles.blobBL]} />
+              <View style={[styles.blob, styles.blobBR]} />
+
+              <ScrollView
+                contentContainerStyle={styles.authScroll}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {/* Logo / marca */}
+                <View style={styles.otpLogoWrap}>
+                  <View style={styles.otpLogoCircle}>
+                    <Text style={styles.otpLogoText}>FI</Text>
                   </View>
+                  <Text style={styles.otpLogoName}>FinancyAI</Text>
+                </View>
 
-                  <Text style={[styles.authTitle, { color: colors.textPrimary }]}>¡Bienvenido{profile?.monthlySalary ? '' : ''} 🎉</Text>
-                  <Text style={[styles.authSubtitle, { color: colors.textSecondary }]}>
-                    Inicia sesión para acceder a tu app personalizada
-                  </Text>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={[styles.label, { color: colors.textSecondary }]}>Correo</Text>
-                    <TextInput
-                      style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.inputBg }]}
-                      placeholder="usuario@ejemplo.com"
-                      placeholderTextColor={colors.textTertiary}
-                      value={loginEmail}
-                      onChangeText={setLoginEmail}
-                      keyboardType="email-address"
-                    />
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={[styles.label, { color: colors.textSecondary }]}>Contraseña</Text>
-                    <TextInput
-                      style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.inputBg }]}
-                      placeholder="••••••••"
-                      placeholderTextColor={colors.textTertiary}
-                      value={loginPassword}
-                      onChangeText={setLoginPassword}
-                      secureTextEntry
-                    />
-                  </View>
-
-                  {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
-
-                  <Pressable
-                    style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: authLoading ? 0.7 : 1 }]}
-                    onPress={handleLogin}
-                    disabled={authLoading}
-                  >
-                    <Text style={[styles.primaryButtonText, { color: colors.background }]}>
-                      {authLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-                    </Text>
-                  </Pressable>
-
-                  <Pressable onPress={() => setAuthState('register')}>
-                    <Text style={[styles.toggleText, { color: colors.textSecondary }]}>
-                      ¿No tienes cuenta?{' '}
-                      <Text style={[styles.toggleLink, { color: colors.primary }]}>Crear cuenta</Text>
-                    </Text>
-                  </Pressable>
-                </Animated.View>
-              </View>
-            </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
-        </MobileShell>
-      );
-    }
-
-    // ==================== REGISTER ====================
-    if (authState === 'register') {
-      return (
-        <MobileShell>
-          <KeyboardAvoidingView
-            style={styles.authContainer}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={80}
-          >
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={styles.authContent}>
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                  <Animated.View
-                    style={[
-                      styles.authBox,
-                      {
-                        transform: [{ scale: authAnim }],
-                        opacity: authAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
-                        backgroundColor: colors.card,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  >
-                    {/* Badge de perfil listo */}
-                    <View style={styles.profileReadyBadge}>
-                      <Text style={[styles.profileReadyText, { color: colors.primary }]}>✦ Tu perfil financiero está listo</Text>
-                    </View>
-
-                    <Text style={[styles.authTitle, { color: colors.textPrimary }]}>Crea tu Cuenta 🚀</Text>
-                    <Text style={[styles.authSubtitle, { color: colors.textSecondary }]}>
-                      Último paso — guarda tu perfil personalizado
+                {!otpSent ? (
+                  /* ── Pantalla 1: ingresar correo ── */
+                  <>
+                    <Text style={styles.authBigTitle}>Ingresa tu{'\n'}correo</Text>
+                    <Text style={styles.otpSubtitle}>
+                      Te enviaremos un código de 6 dígitos para acceder
                     </Text>
 
-                    <View style={styles.inputGroup}>
-                      <Text style={[styles.label, { color: colors.textSecondary }]}>Nombre</Text>
-                      <TextInput
-                        style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.inputBg }]}
-                        placeholder="Tu nombre"
-                        placeholderTextColor={colors.textTertiary}
-                        value={registerName}
-                        onChangeText={setRegisterName}
-                      />
+                    <View style={styles.authFieldRow}>
+                      <View style={[styles.authFieldPill, { flex: 1 }]}>
+                        <Text style={styles.authFieldIcon}>✉</Text>
+                        <TextInput
+                          style={styles.authFieldInput}
+                          placeholder="tucorreo@ejemplo.com"
+                          placeholderTextColor="#BBBBC8"
+                          value={otpEmail}
+                          onChangeText={setOtpEmail}
+                          keyboardType="email-address"
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          returnKeyType="send"
+                          onSubmitEditing={handleSendOtp}
+                        />
+                      </View>
+                      <Pressable
+                        style={[styles.authFab, authLoading && { opacity: 0.6 }]}
+                        onPress={handleSendOtp}
+                        disabled={authLoading}
+                      >
+                        <Text style={styles.authFabIcon}>{authLoading ? '…' : '→'}</Text>
+                      </Pressable>
                     </View>
 
-                    <View style={styles.inputGroup}>
-                      <Text style={[styles.label, { color: colors.textSecondary }]}>Correo</Text>
-                      <TextInput
-                        style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.inputBg }]}
-                        placeholder="usuario@ejemplo.com"
-                        placeholderTextColor={colors.textTertiary}
-                        value={registerEmail}
-                        onChangeText={setRegisterEmail}
-                        keyboardType="email-address"
-                      />
+                    {authError ? <Text style={styles.authError}>{authError}</Text> : null}
+
+                    <Text style={styles.otpDisclaimer}>
+                      Si no tienes cuenta, la crearemos automáticamente
+                    </Text>
+                  </>
+                ) : (
+                  /* ── Pantalla 2: ingresar código ── */
+                  <>
+                    <Text style={styles.authBigTitle}>Código{'\n'}enviado</Text>
+                    <Text style={styles.otpSubtitle}>
+                      Revisá tu correo{'\n'}
+                      <Text style={{ fontWeight: '700', color: '#111827' }}>{otpEmail}</Text>
+                    </Text>
+
+                    {/* 8 cajas OTP */}
+                    <View style={styles.otpBoxRow}>
+                      {otpCode.map((digit, idx) => (
+                        <TextInput
+                          key={idx}
+                          ref={r => { otpRefs.current[idx] = r; }}
+                          style={[
+                            styles.otpBox,
+                            digit ? styles.otpBoxFilled : null,
+                            authLoading ? { opacity: 0.5 } : null,
+                          ]}
+                          value={digit}
+                          onChangeText={t => handleOtpDigit(t, idx)}
+                          onKeyPress={({ nativeEvent }) => handleOtpKeyPress(nativeEvent.key, idx)}
+                          keyboardType="number-pad"
+                          maxLength={1}
+                          selectTextOnFocus
+                          editable={!authLoading}
+                        />
+                      ))}
                     </View>
 
-                    <View style={styles.inputGroup}>
-                      <Text style={[styles.label, { color: colors.textSecondary }]}>Contraseña</Text>
-                      <TextInput
-                        style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.inputBg }]}
-                        placeholder="••••••••"
-                        placeholderTextColor={colors.textTertiary}
-                        value={registerPassword}
-                        onChangeText={setRegisterPassword}
-                        secureTextEntry
-                      />
-                    </View>
+                    {authLoading && (
+                      <Text style={styles.otpVerifying}>Verificando…</Text>
+                    )}
+                    {authError ? <Text style={styles.authError}>{authError}</Text> : null}
 
-                    <View style={styles.inputGroup}>
-                      <Text style={[styles.label, { color: colors.textSecondary }]}>Confirmar Contraseña</Text>
-                      <TextInput
-                        style={[styles.input, { color: colors.textPrimary, borderColor: colors.border, backgroundColor: colors.inputBg }]}
-                        placeholder="••••••••"
-                        placeholderTextColor={colors.textTertiary}
-                        value={registerConfirmPassword}
-                        onChangeText={setRegisterConfirmPassword}
-                        secureTextEntry
-                      />
-                    </View>
-
-                    {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
-
+                    {/* Reenviar código */}
                     <Pressable
-                      style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: authLoading ? 0.7 : 1 }]}
-                      onPress={handleRegister}
-                      disabled={authLoading}
+                      onPress={otpResendSecs === 0 ? handleSendOtp : undefined}
+                      style={styles.otpResendBtn}
+                      disabled={otpResendSecs > 0 || authLoading}
                     >
-                      <Text style={[styles.primaryButtonText, { color: colors.background }]}>
-                        {authLoading ? 'Creando cuenta...' : 'Crear Cuenta y Comenzar'}
+                      <Text style={[
+                        styles.otpResendText,
+                        otpResendSecs > 0 && { color: '#9CA3AF' },
+                      ]}>
+                        {otpResendSecs > 0
+                          ? `Reenviar código en ${otpResendSecs}s`
+                          : 'Reenviar código'}
                       </Text>
                     </Pressable>
 
-                    <Pressable onPress={() => setAuthState('login')}>
-                      <Text style={[styles.toggleText, { color: colors.textSecondary }]}>
-                        ¿Ya tienes cuenta?{' '}
-                        <Text style={[styles.toggleLink, { color: colors.primary }]}>Inicia sesión</Text>
-                      </Text>
+                    {/* Cambiar correo */}
+                    <Pressable
+                      onPress={() => { setOtpSent(false); setOtpCode(['','','','','','','','']); setAuthError(''); }}
+                      style={{ marginTop: 8 }}
+                    >
+                      <Text style={styles.otpChangeEmail}>Cambiar correo</Text>
                     </Pressable>
-                  </Animated.View>
-                </ScrollView>
-              </View>
-            </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
-        </MobileShell>
-      );
-    }
+                  </>
+                )}
+              </ScrollView>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </MobileShell>
+    );
   }
 
   // ==================== 3. MAIN APP (CON DATOS DEL PERFIL CARGADOS) ====================
@@ -707,7 +732,7 @@ export default function HomeScreen() {
             />
           )}
           {currentScreen === 'bot' && (
-            <BotIA transactions={transactions} monthlySalary={profile?.monthlySalary || 0} onBack={volver} />
+            <BotIA transactions={transactions} monthlySalary={saldoDisponible} onBack={volver} />
           )}
           {currentScreen === 'perfil' && (
             <Usuario
@@ -903,6 +928,219 @@ const styles = StyleSheet.create({
   toggleLink: {
     fontWeight: '700',
   },
+  // ── New minimal auth screens ────────────────────────────────────────────────
+  authRoot: {
+    flex: 1,
+    backgroundColor: '#F8F7FF',
+  },
+  blob: {
+    position: 'absolute',
+    borderRadius: 999,
+    backgroundColor: 'rgba(97,86,232,0.13)',
+  },
+  blobTR: {
+    width: 220,
+    height: 220,
+    top: -70,
+    right: -70,
+  },
+  blobBL: {
+    width: 160,
+    height: 160,
+    bottom: 80,
+    left: -60,
+  },
+  blobBR: {
+    width: 100,
+    height: 100,
+    bottom: -30,
+    right: 30,
+    backgroundColor: 'rgba(97,86,232,0.07)',
+  },
+  cornerLink: {
+    position: 'absolute',
+    top: 52,
+    right: 24,
+    zIndex: 10,
+  },
+  cornerLinkText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6156E8',
+  },
+  authScroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 60,
+  },
+  authBigTitle: {
+    fontSize: 52,
+    fontWeight: '800',
+    color: '#111827',
+    letterSpacing: -2,
+    marginBottom: 40,
+  },
+  authFields: {
+    gap: 14,
+  },
+  authFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  authFieldPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 50,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  authFieldIcon: {
+    fontSize: 16,
+    marginRight: 10,
+  },
+  authFieldInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#111827',
+    padding: 0,
+  },
+  authFab: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#6156E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#6156E8',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  authFabIcon: {
+    fontSize: 22,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  authError: {
+    fontSize: 13,
+    color: '#EF4444',
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  authForgot: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  authToggleBtn: {
+    marginTop: 32,
+    alignSelf: 'flex-start',
+  },
+  authToggleBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#6156E8',
+  },
+
+  // OTP screens
+  otpLogoWrap: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  otpLogoCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#6156E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  otpLogoText: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 1,
+  },
+  otpLogoName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    letterSpacing: 0.3,
+  },
+  otpSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  otpDisclaimer: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  otpBoxRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 7,
+    marginBottom: 20,
+  },
+  otpBox: {
+    width: 36,
+    height: 48,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#F9FAFB',
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  otpBoxFilled: {
+    borderColor: '#6156E8',
+    backgroundColor: '#EEF2FF',
+  },
+  otpVerifying: {
+    fontSize: 14,
+    color: '#6156E8',
+    textAlign: 'center',
+    marginBottom: 12,
+    fontWeight: '500',
+  },
+  otpResendBtn: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  otpResendText: {
+    fontSize: 13,
+    color: '#6156E8',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  otpChangeEmail: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+  },
+
   // App layout
   appContainer: {
     flex: 1,
