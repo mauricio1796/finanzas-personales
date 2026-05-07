@@ -30,14 +30,14 @@ const INCOME_CATS = [
 ];
 
 const EXPENSE_CATS = [
-  { id: 'alimentacion',    label: 'Alimentación' },
-  { id: 'transporte',      label: 'Transporte'   },
-  { id: 'servicios',       label: 'Servicios'    },
-  { id: 'arriendo',        label: 'Arriendo'     },
-  { id: 'salud',           label: 'Salud'        },
-  { id: 'entretenimiento', label: 'Entrete.'     },
-  { id: 'ropa',            label: 'Ropa'         },
-  { id: 'otros',           label: 'Otros'        },
+  { id: 'Alimentación',    label: 'Alimentación' },
+  { id: 'Transporte',      label: 'Transporte'   },
+  { id: 'Servicios',       label: 'Servicios'    },
+  { id: 'Arriendo',        label: 'Arriendo'     },
+  { id: 'Salud',           label: 'Salud'        },
+  { id: 'Entretenimiento', label: 'Entrete.'     },
+  { id: 'Ropa',            label: 'Ropa'         },
+  { id: 'Otros',           label: 'Otros'        },
 ];
 
 export interface QuickAddInitialData {
@@ -57,7 +57,7 @@ interface QuickAddSheetProps {
 
 export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onClose, onAdd, initialData }) => {
   const { colors } = useTheme();
-  const { categories, transactions, updateUserSalary } = useFinance();
+  const { categories, transactions } = useFinance();
   const slideAnim  = useRef(new Animated.Value(400)).current;
   const backdropOp = useRef(new Animated.Value(0)).current;
 
@@ -71,7 +71,7 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
   const accentBg = isIncome ? colors.incomeLight : colors.expenseLight;
   // Use user budget categories for expenses if available, fallback to defaults
   const userExpCats = !isIncome
-    ? categories.map((cat: any) => ({ id: cat.id, label: cat.name }))
+    ? categories.filter((cat: any) => cat.isSelected !== false).map((cat: any) => ({ id: cat.name, label: cat.name }))
     : [];
   const cats = isIncome ? INCOME_CATS : (userExpCats.length > 0 ? userExpCats : EXPENSE_CATS);
 
@@ -116,10 +116,6 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
 
     const fecha = new Date();
     onAdd(parsed, selectedCat, mode, fecha, description.trim() || undefined);
-
-    if (isIncome && selectedCat === 'salario') {
-      updateUserSalary(parsed);
-    }
 
     // Verificar gasto inusual de forma asíncrona (no bloquea la UI)
     if (mode === 'expense') {

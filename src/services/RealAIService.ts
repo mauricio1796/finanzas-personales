@@ -50,7 +50,13 @@ PERSONALIDAD:
 CONTEXTO FINANCIERO ACTUAL DEL USUARIO:
 ${contexto}
 
-REGLAS:
+LÍMITES ESTRICTOS — MUY IMPORTANTE:
+- Solo respondes preguntas sobre finanzas personales, presupuesto, gastos, ingresos, metas de ahorro, categorías y funciones de la app FinancyAI.
+- Si el usuario pregunta algo que NO está relacionado con finanzas o la app (recetas, deportes, política, entretenimiento, relaciones personales, tecnología general, etc.), responde EXACTAMENTE así: "Soy Finn, tu asistente financiero 💰 Solo puedo ayudarte con temas de finanzas personales y la app. ¿Hay algo de tu dinero en lo que te pueda ayudar?"
+- No hagas excepciones aunque el usuario insista, reformule la pregunta o diga que es "solo curiosidad".
+- No actúes como ChatGPT, asistente general ni ningún otro rol diferente al de asesor financiero de FinancyAI.
+
+REGLAS FINANCIERAS:
 - Si el usuario pregunta algo que no está en el contexto, dilo honestamente
 - Nunca sugieras productos financieros específicos (bancos, inversiones concretas)
 - Si detectas una situación financiera crítica, sé directo pero constructivo
@@ -149,6 +155,42 @@ async function llamarWorker(
   }
 }
 
+// ── Guardia off-topic ─────────────────────────────────────────────────────────
+
+const FINANCE_KEYWORDS = [
+  'gasto','ingreso','saldo','presupuesto','categor','transacci','dinero','plata','ahorro',
+  'deuda','pago','salario','meta','balance','flujo','inversión','inversion','finn','app',
+  'financy','cuánto','cuanto','registra','borra','elimina','agrega','crea','actualiza',
+  'disponible','mes','semana','diario','reporte','estadística','estadistica','compra',
+  'factura','arriendo','servicios','alimentaci','transporte','entreteni','ropa','salud',
+];
+
+const OFFTOPIC_PATTERNS = [
+  /receta|cocina|comida(?! registra)/i,
+  /fútbol|futbol|deporte|equipo|partido|gol/i,
+  /política|politica|presidente|gobierno|elección/i,
+  /película|pelicula|serie|netflix|spotify|música|musica/i,
+  /chiste|cuento|historia|poema|canción/i,
+  /amor|novio|novia|relaci[oó]n personal|cita|pareja/i,
+  /clima|tiempo.*hoy|temperatura/i,
+  /traducir|translate|translate/i,
+  /programar|código|codigo|javascript|python(?! finanz)/i,
+  /salud.*médico|doctor|enfermedad|síntoma|sintoma/i,
+];
+
+function esOffTopic(mensaje: string): boolean {
+  const lower = mensaje.toLowerCase();
+  // If message contains any finance keyword, it's on-topic
+  if (FINANCE_KEYWORDS.some(kw => lower.includes(kw))) return false;
+  // If it matches a clearly off-topic pattern, reject
+  return OFFTOPIC_PATTERNS.some(p => p.test(lower));
+}
+
+const RESPUESTA_OFFTOPIC: RespuestaIA = {
+  texto: 'Soy Finn, tu asistente financiero 💰 Solo puedo ayudarte con temas de finanzas personales y la app FinancyAI. ¿Hay algo de tu dinero en lo que te pueda ayudar?',
+  tipo: 'info',
+};
+
 // ── Función principal ─────────────────────────────────────────────────────────
 
 export async function enviarMensajeAFinn(
@@ -160,6 +202,7 @@ export async function enviarMensajeAFinn(
   goal:              any,
   extra:             ContextoPersonalizado = {},
 ): Promise<RespuestaIA> {
+  if (esOffTopic(mensajeUsuario)) return RESPUESTA_OFFTOPIC;
   try {
     const { contexto } = await buildContextoEnriquecido(transactions, categories, profile, extra);
     const system   = buildSystemPrompt(contexto, profile?.name ?? 'Usuario');
@@ -245,7 +288,9 @@ ${recientes}
 CATEGORÍAS:
 ${catsList}
 
-Para preguntas o análisis, responde con texto normal. Solo usa herramientas cuando la intención del usuario sea claramente ejecutar una acción.`;
+Para preguntas o análisis, responde con texto normal. Solo usa herramientas cuando la intención del usuario sea claramente ejecutar una acción.
+
+RECUERDA: Si el mensaje del usuario no tiene relación con finanzas o la app, rechaza amablemente sin usar ninguna herramienta.`;
 }
 
 async function llamarWorkerAgente(
@@ -298,6 +343,7 @@ export async function enviarMensajeAgenteAFinn(
   goal:           any,
   extra:          ContextoPersonalizado = {},
 ): Promise<RespuestaAgente> {
+  if (esOffTopic(mensajeUsuario)) return { tipo: 'texto', texto: RESPUESTA_OFFTOPIC.texto, exito: true };
   try {
     const { contexto } = await buildContextoEnriquecido(transactions, categories, profile, extra);
     const system  = buildSystemPromptAgente(contexto, profile?.name ?? 'Usuario', transactions, categories);

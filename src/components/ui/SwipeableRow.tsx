@@ -1,17 +1,17 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   Animated,
   PanResponder,
   TouchableOpacity,
   Platform,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { THEME } from '../../constants/theme';
 
-const SWIPE_THRESHOLD = -60;
-const DELETE_WIDTH    = 72;
+const SWIPE_THRESHOLD = -55;
+const DELETE_WIDTH    = 68;
 
 interface SwipeableRowProps {
   children: React.ReactNode;
@@ -19,8 +19,9 @@ interface SwipeableRowProps {
 }
 
 export const SwipeableRow: React.FC<SwipeableRowProps> = ({ children, onDelete }) => {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const rowOpen    = useRef(false);
+  const translateX  = useRef(new Animated.Value(0)).current;
+  const rowOpen     = useRef(false);
+  const deleteScale = useRef(new Animated.Value(1)).current;
 
   const close = () => {
     Animated.spring(translateX, { toValue: 0, useNativeDriver: true, friction: 8 }).start(() => {
@@ -62,23 +63,24 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({ children, onDelete }
   ).current;
 
   const handleDelete = () => {
-    // Animate row out, then call onDelete
-    Animated.timing(translateX, {
-      toValue: -400,
-      duration: 220,
-      useNativeDriver: true,
-    }).start(() => {
-      onDelete();
+    Animated.sequence([
+      Animated.timing(deleteScale, { toValue: 1.3, duration: 100, useNativeDriver: true }),
+      Animated.timing(deleteScale, { toValue: 1,   duration: 80,  useNativeDriver: true }),
+    ]).start(() => {
+      Animated.timing(translateX, {
+        toValue: -400,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => onDelete());
     });
   };
 
   if (Platform.OS === 'web') {
-    // On web, just show a trash button inline (no PanResponder swipe)
     return (
       <View style={styles.webRow}>
         {children}
-        <TouchableOpacity onPress={onDelete} style={styles.webDelete}>
-          <Text style={styles.deleteIcon}>🗑</Text>
+        <TouchableOpacity onPress={onDelete} style={styles.webDelete} activeOpacity={0.6}>
+          <Feather name="trash-2" size={16} color="#EF4444" />
         </TouchableOpacity>
       </View>
     );
@@ -86,11 +88,12 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({ children, onDelete }
 
   return (
     <View style={styles.container}>
-      {/* Delete button behind the row */}
+      {/* Delete zone */}
       <View style={styles.deleteAction}>
-        <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-          <Text style={styles.deleteIcon}>🗑</Text>
-          <Text style={styles.deleteLabel}>Borrar</Text>
+        <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn} activeOpacity={0.7}>
+          <Animated.View style={{ transform: [{ scale: deleteScale }] }}>
+            <Feather name="trash-2" size={18} color="#fff" />
+          </Animated.View>
         </TouchableOpacity>
       </View>
 
@@ -118,21 +121,16 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: DELETE_WIDTH,
-    backgroundColor: THEME.colors.expense,
+    backgroundColor: '#EF4444',
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 12,
   },
   deleteBtn: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 2,
-  },
-  deleteIcon: {
-    fontSize: 18,
-  },
-  deleteLabel: {
-    fontSize: 10,
-    color: THEME.colors.surface,
-    fontWeight: '700',
   },
 
   // Web fallback
@@ -141,7 +139,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   webDelete: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
 });

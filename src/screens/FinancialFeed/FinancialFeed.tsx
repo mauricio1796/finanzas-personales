@@ -18,6 +18,7 @@ import { generarInsightDiario } from '../../services/RealAIService';
 import { calcularMetricasFinancieras } from '../../utils/ingresoUtils';
 import { THEME } from '../../constants/theme';
 import { QuickAddSheet, type QuickAddInitialData } from '../../components/ui/QuickAddSheet';
+import { TransactionDetailSheet } from '../../components/ui/TransactionDetailSheet';
 import { VoiceButton } from '../../components/ui/VoiceButton';
 import { type ParsedTransaction } from '../../services/VoiceService';
 import { SwipeableRow } from '../../components/ui/SwipeableRow';
@@ -46,16 +47,23 @@ function capitalize(s: string): string {
 
 // ─── WeeklyAreaChart ─────────────────────────────────────────────────────────
 
-const CHART_H = 110;
-const CHART_W_OFFSET = 32; // left label space
+const CHART_H        = 110;
+const Y_AXIS_W       = 32;
+// scrollContent paddingH:16 each side (32) + card padding:16 each side (32) = 64 total
+const CHART_H_MARGIN = 64;
 
 interface WeeklyAreaChartProps {
   transactions: Transaction[];
 }
 
+const fmtShort = (v: number) =>
+  v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(1)}M` :
+  v >= 1_000     ? `$${Math.round(v / 1_000)}K` : `$${v}`;
+
 const WeeklyAreaChart: React.FC<WeeklyAreaChartProps> = ({ transactions }) => {
-  const { width: screenW } = require('react-native').Dimensions.get('window');
-  const chartW = screenW - 32 - CHART_W_OFFSET; // 16px padding each side
+  const [containerW, setContainerW] = React.useState(0);
+  // SVG width = measured container minus y-axis space
+  const chartW = Math.max(1, containerW - Y_AXIS_W);
 
   // Build last-7-days data
   const days = useMemo(() => {
@@ -77,13 +85,17 @@ const WeeklyAreaChart: React.FC<WeeklyAreaChartProps> = ({ transactions }) => {
 
   const maxVal = useMemo(() => Math.max(...days.map(d => Math.max(d.gastos, d.ingresos)), 1), [days]);
 
+  // Weekly totals for stats
+  const totalGastos   = useMemo(() => days.reduce((s, d) => s + d.gastos, 0), [days]);
+  const totalIngresos = useMemo(() => days.reduce((s, d) => s + d.ingresos, 0), [days]);
+  const peakDay       = useMemo(() => days.reduce((best, d) => d.gastos > best.gastos ? d : best, days[0]), [days]);
+
   const makeAreaPath = (values: number[], closed = true): string => {
+    if (chartW <= 1) return '';
     const pts = values.map((v, i) => ({
-      x: CHART_W_OFFSET + (i / (values.length - 1)) * chartW,
+      x: (i / (values.length - 1)) * chartW,
       y: CHART_H - 8 - (v / maxVal) * (CHART_H - 20),
     }));
-
-    // Smooth catmull-rom
     let d = `M ${pts[0].x} ${pts[0].y}`;
     for (let i = 1; i < pts.length; i++) {
       const cp1x = pts[i - 1].x + (pts[i].x - pts[i - 1].x) / 3;
@@ -111,6 +123,7 @@ const WeeklyAreaChart: React.FC<WeeklyAreaChartProps> = ({ transactions }) => {
 
   return (
     <View style={ac.wrap}>
+      {/* Header */}
       <View style={ac.header}>
         <Text style={ac.title}>Flujo semanal</Text>
         <View style={ac.legend}>
@@ -121,46 +134,67 @@ const WeeklyAreaChart: React.FC<WeeklyAreaChartProps> = ({ transactions }) => {
         </View>
       </View>
 
-      <View style={{ flexDirection: 'row', height: CHART_H }}>
+      {/* Chart area — measured via onLayout */}
+      <View
+        style={{ flexDirection: 'row', height: CHART_H }}
+        onLayout={e => setContainerW(e.nativeEvent.layout.width)}
+      >
         {/* Y-axis */}
-        <View style={{ width: CHART_W_OFFSET, height: CHART_H, justifyContent: 'space-between', paddingBottom: 16 }}>
+        <View style={{ width: Y_AXIS_W, height: CHART_H, justifyContent: 'space-between', paddingBottom: 16 }}>
           {[yLabels[2], yLabels[1], yLabels[0]].map((l, i) => (
             <Text key={i} style={ac.yLabel}>{l}</Text>
           ))}
         </View>
 
-        {/* Chart */}
-        <Svg width={chartW} height={CHART_H}>
-          <Defs>
-            <LinearGradient id="gastoGrad" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0"   stopColor="#6156E8" stopOpacity="0.25" />
-              <Stop offset="1"   stopColor="#6156E8" stopOpacity="0.01" />
-            </LinearGradient>
-            <LinearGradient id="ingresoGrad" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0"   stopColor="#1D9E75" stopOpacity="0.18" />
-              <Stop offset="1"   stopColor="#1D9E75" stopOpacity="0.01" />
-            </LinearGradient>
-          </Defs>
-          {/* Grid lines */}
-          {[0.25, 0.5, 0.75].map((f, i) => (
-            <Path key={i} d={`M 0 ${CHART_H * f - 4} H ${chartW}`} stroke="#E5E7EB" strokeWidth="0.5" />
-          ))}
-          {/* Areas */}
-          <Path d={gastosPath}   fill="url(#gastoGrad)"   />
-          <Path d={ingresosPath} fill="url(#ingresoGrad)" />
-          {/* Lines */}
-          <Path d={gastosLine}   fill="none" stroke="#6156E8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          <Path d={ingresosLine} fill="none" stroke="#1D9E75" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
+        {/* SVG — only render once width is known */}
+        {containerW > 0 && (
+          <Svg width={chartW} height={CHART_H}>
+            <Defs>
+              <LinearGradient id="gastoGrad" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor="#6156E8" stopOpacity="0.25" />
+                <Stop offset="1" stopColor="#6156E8" stopOpacity="0.01" />
+              </LinearGradient>
+              <LinearGradient id="ingresoGrad" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor="#1D9E75" stopOpacity="0.18" />
+                <Stop offset="1" stopColor="#1D9E75" stopOpacity="0.01" />
+              </LinearGradient>
+            </Defs>
+            {[0.25, 0.5, 0.75].map((f, i) => (
+              <Path key={i} d={`M 0 ${(CHART_H - 8) * f} H ${chartW}`} stroke="#E5E7EB" strokeWidth="0.5" />
+            ))}
+            <Path d={gastosPath}   fill="url(#gastoGrad)"   />
+            <Path d={ingresosPath} fill="url(#ingresoGrad)" />
+            <Path d={gastosLine}   fill="none" stroke="#6156E8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <Path d={ingresosLine} fill="none" stroke="#1D9E75" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </Svg>
+        )}
       </View>
 
       {/* X-axis labels */}
-      <View style={{ flexDirection: 'row', paddingLeft: CHART_W_OFFSET }}>
+      <View style={{ flexDirection: 'row', paddingLeft: Y_AXIS_W, marginBottom: 14 }}>
         {days.map((d, i) => (
           <Text key={i} style={[ac.xLabel, { flex: 1, textAlign: i === 0 ? 'left' : i === days.length - 1 ? 'right' : 'center' }]}>
             {d.label}
           </Text>
         ))}
+      </View>
+
+      {/* Stats strip */}
+      <View style={ac.statsRow}>
+        <View style={ac.statBox}>
+          <Text style={ac.statLabel}>Gastos 7 días</Text>
+          <Text style={[ac.statValue, { color: '#EF4444' }]}>{fmtShort(totalGastos)}</Text>
+        </View>
+        <View style={[ac.statDivider]} />
+        <View style={ac.statBox}>
+          <Text style={ac.statLabel}>Ingresos 7 días</Text>
+          <Text style={[ac.statValue, { color: '#1D9E75' }]}>{fmtShort(totalIngresos)}</Text>
+        </View>
+        <View style={[ac.statDivider]} />
+        <View style={ac.statBox}>
+          <Text style={ac.statLabel}>Día pico</Text>
+          <Text style={[ac.statValue, { color: '#6156E8' }]}>{peakDay?.label ?? '—'}</Text>
+        </View>
       </View>
     </View>
   );
@@ -209,12 +243,37 @@ const ac = StyleSheet.create({
     fontSize: 9,
     color: '#9CA3AF',
     textAlign: 'right',
-    width: CHART_W_OFFSET - 6,
+    width: Y_AXIS_W - 6,
   },
   xLabel: {
     fontSize: 10,
     color: '#9CA3AF',
     marginTop: 6,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 12,
+  },
+  statBox: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 3,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 2,
+  },
+  statLabel: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  statValue: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
 
@@ -231,7 +290,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   const {
     user, transactions, categories, profile, goal, userLevel,
     addTransaction: ctxAdd, deleteTransaction: ctxDelete,
-    metas,
+    metas, deudas,
   } = useFinance();
 
   // ── Date constants ──────────────────────────────────────────────────────────
@@ -294,6 +353,9 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   const txHoy  = useMemo(() => transactions.filter(t => new Date(t.date).toDateString() === hoyStr),  [transactions, hoyStr]);
   const txAyer = useMemo(() => transactions.filter(t => new Date(t.date).toDateString() === ayerStr), [transactions, ayerStr]);
 
+  // ── Active debts ───────────────────────────────────────────────────────────
+  const deudasActivas = useMemo(() => (deudas ?? []).filter(d => !d.saldada), [deudas]);
+
   // ── Payment alerts ─────────────────────────────────────────────────────────
   const catsPagoVencido = useMemo(() =>
     categories.filter(c => c.diaPago && !c.pagado && c.diaPago < diaHoy && c.isSelected),
@@ -306,15 +368,21 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   // ── Top categories ─────────────────────────────────────────────────────────
   const topCategorias = useMemo(() =>
     categories
-      .filter((c: any) => c.isSelected && (c.budget ?? 0) > 0)
+      .filter((c: any) => c.isSelected !== false)
       .map((c: any) => ({
         ...c,
         gastado: gastosPorCatSel[c.name] ?? 0,
-        pctReal: c.budget > 0 ? Math.round(((gastosPorCatSel[c.name] ?? 0) / c.budget) * 100) : 0,
-        pct: c.budget > 0 ? Math.min(Math.round(((gastosPorCatSel[c.name] ?? 0) / c.budget) * 100), 100) : 0,
+        hasBudget: (c.budget ?? 0) > 0,
+        pctReal: (c.budget ?? 0) > 0 ? Math.round(((gastosPorCatSel[c.name] ?? 0) / c.budget) * 100) : 0,
+        pct:     (c.budget ?? 0) > 0 ? Math.min(Math.round(((gastosPorCatSel[c.name] ?? 0) / c.budget) * 100), 100) : 0,
       }))
-      .sort((a: any, b: any) => b.pctReal - a.pctReal)
-      .slice(0, 3),
+      .sort((a: any, b: any) => {
+        // Categories with budget first, sorted by % used; then no-budget by amount spent
+        if (a.hasBudget && !b.hasBudget) return -1;
+        if (!a.hasBudget && b.hasBudget) return 1;
+        if (a.hasBudget && b.hasBudget) return b.pctReal - a.pctReal;
+        return b.gastado - a.gastado;
+      }),
   [categories, gastosPorCatSel]);
 
   // ── Pending payments ────────────────────────────────────────────────────────
@@ -339,6 +407,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   // ── States ─────────────────────────────────────────────────────────────────
   const [drawerVisible,   setDrawerVisible]   = useState(false);
   const [quickAddVisible, setQuickAddVisible] = useState(false);
+  const [selectedTx,      setSelectedTx]      = useState<Transaction | null>(null);
   const [quickAddType,    setQuickAddType]    = useState<'income' | 'expense'>('expense');
   const [quickAddInitial, setQuickAddInitial] = useState<QuickAddInitialData | undefined>(undefined);
   const [aiInsight,       setAiInsight]       = useState<string | null>(null);
@@ -348,10 +417,15 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   const balanceAnim = useRef(new Animated.Value(0)).current;
   const insightAnim = useRef(new Animated.Value(0)).current;
   // Fixed 3 bar anims (max top categories)
-  const barAnim0 = useRef(new Animated.Value(0)).current;
-  const barAnim1 = useRef(new Animated.Value(0)).current;
-  const barAnim2 = useRef(new Animated.Value(0)).current;
-  const barAnims = [barAnim0, barAnim1, barAnim2];
+  const barAnimsRef = useRef<Animated.Value[]>([]);
+  // Grow the anims array as needed (never shrink to avoid hook order issues)
+  const ensureBarAnims = (count: number) => {
+    while (barAnimsRef.current.length < count) {
+      barAnimsRef.current.push(new Animated.Value(0));
+    }
+    return barAnimsRef.current;
+  };
+  const barAnims = ensureBarAnims(categories.length || 8);
 
   // Balance counter display
   const displayBalance = useRef(0);
@@ -381,8 +455,9 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
       }
     });
 
-    // Bars staggered
-    Animated.stagger(100, barAnims.map(a =>
+    // Bars staggered — only animate as many as there are categories
+    const activeBars = barAnimsRef.current.slice(0, categories.length || 1);
+    Animated.stagger(100, activeBars.map(a =>
       Animated.timing(a, { toValue: 1, duration: 600, useNativeDriver: false })
     )).start();
 
@@ -397,8 +472,9 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
 
   // ── Re-animate bars when month selection changes ────────────────────────────
   useEffect(() => {
-    barAnims.forEach(a => a.setValue(0));
-    Animated.stagger(100, barAnims.map(a =>
+    const activeBars = barAnimsRef.current.slice(0, topCategorias.length || 1);
+    activeBars.forEach(a => a.setValue(0));
+    Animated.stagger(100, activeBars.map(a =>
       Animated.timing(a, { toValue: 1, duration: 600, useNativeDriver: false })
     )).start();
   }, [mesSeleccionado]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -466,34 +542,39 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
     const hora = new Date(tx.date).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
     return (
       <SwipeableRow key={tx.id} onDelete={() => ctxDelete(tx.id)}>
-        <View style={s.txCard}>
-          <View style={[s.txIcon, { backgroundColor: bg }]}>
-            <Icon name={icon as any} size={18} color={color} />
+        <TouchableOpacity activeOpacity={0.7} onPress={() => setSelectedTx(tx)}>
+          <View style={s.txCard}>
+            <View style={[s.txIcon, { backgroundColor: bg }]}>
+              <Icon name={icon as any} size={18} color={color} />
+            </View>
+            <View style={s.txInfo}>
+              <Text style={[s.txName, { color: THEME.colors.textPrimary }]} numberOfLines={1}>
+                {tx.description || tx.category}
+              </Text>
+              <Text style={s.txSub}>
+                {tx.category} · {hora}
+              </Text>
+            </View>
+            <View style={s.txRight}>
+              <Text style={[s.txAmount, { color: isIncome ? THEME.colors.income : THEME.colors.expense }]}>
+                {isIncome ? '+' : '-'}{fmtCOP(tx.amount)}
+              </Text>
+              <Icon name="chevron-left" size={12} color={THEME.colors.textTertiary ?? '#CBD5E1'} />
+            </View>
           </View>
-          <View style={s.txInfo}>
-            <Text style={[s.txName, { color: THEME.colors.textPrimary }]} numberOfLines={1}>
-              {tx.description || tx.category}
-            </Text>
-            <Text style={s.txSub}>
-              {tx.category} · {hora}
-            </Text>
-          </View>
-          <Text style={[s.txAmount, { color: isIncome ? THEME.colors.income : THEME.colors.expense }]}>
-            {isIncome ? '+' : '-'}{fmtCOP(tx.amount)}
-          </Text>
-        </View>
+        </TouchableOpacity>
       </SwipeableRow>
     );
   };
 
   const renderCatCard = (cat: any, idx: number) => {
-    const barAnim = barAnims[idx];
-    const pctColor =
+    const barAnim   = barAnims[idx] ?? new Animated.Value(0);
+    const pctColor  =
       cat.pctReal >= 100 ? colors.expense :
       cat.pctReal >= 80  ? colors.warning :
       colors.income;
-    const iconName = (cat.icon as any) || getCategoryIcon(cat.name);
-    const iconBg   = ICON_MAP[cat.name]?.bg    ?? colors.cardSecondary;
+    const iconName  = (cat.icon as any) || getCategoryIcon(cat.name);
+    const iconBg    = ICON_MAP[cat.name]?.bg    ?? colors.cardSecondary;
     const iconColor = ICON_MAP[cat.name]?.color ?? colors.textSecondary;
 
     return (
@@ -509,32 +590,41 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
           <Text style={[s.catName, { color: colors.textPrimary }]} numberOfLines={1}>
             {cat.name}
           </Text>
-          <Text style={[s.catPct, { color: pctColor }]}>{cat.pct}%</Text>
+          {cat.hasBudget
+            ? <Text style={[s.catPct, { color: pctColor }]}>{cat.pct}%</Text>
+            : <Text style={[s.catPct, { color: colors.textTertiary, fontSize: 10 }]}>Sin presupuesto</Text>
+          }
         </View>
         {/* Amounts row */}
         <View style={s.catAmountsRow}>
           <Text style={[s.catSpent, { color: colors.textSecondary }]}>
             {fmtCOP(cat.gastado)} gastado
           </Text>
-          <Text style={[s.catOf, { color: colors.textTertiary }]}>
-            de {fmtCOP(cat.budget)}
-          </Text>
+          {cat.hasBudget && (
+            <Text style={[s.catOf, { color: colors.textTertiary }]}>
+              de {fmtCOP(cat.budget)}
+            </Text>
+          )}
         </View>
-        {/* Progress bar */}
-        <View style={s.barTrack}>
-          <Animated.View
-            style={[
-              s.barFill,
-              {
-                backgroundColor: pctColor,
-                width: barAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['0%', `${cat.pct}%`],
-                }),
-              },
-            ]}
-          />
-        </View>
+        {/* Progress bar — solo si tiene presupuesto */}
+        {cat.hasBudget ? (
+          <View style={s.barTrack}>
+            <Animated.View
+              style={[
+                s.barFill,
+                {
+                  backgroundColor: pctColor,
+                  width: barAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0%', `${cat.pct}%`],
+                  }),
+                },
+              ]}
+            />
+          </View>
+        ) : (
+          <View style={[s.barTrack, { backgroundColor: colors.border }]} />
+        )}
       </View>
     );
   };
@@ -588,6 +678,11 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <View style={[s.root, { backgroundColor: THEME.colors.background }]}>
+      <ScrollView
+        style={s.fullScroll}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        showsVerticalScrollIndicator={false}
+      >
       {/* ── HERO ─────────────────────────────────────────────────────── */}
       <View style={[s.hero, { backgroundColor: THEME.colors.background, paddingTop: insets.top + 16 }]}>
         {/* Top bar */}
@@ -706,11 +801,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
       </View>
 
       {/* ── SCROLL BODY ───────────────────────────────────────────────── */}
-      <ScrollView
-        style={s.scrollBody}
-        contentContainerStyle={[s.scrollContent, { paddingBottom: 120 }]}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={[s.scrollBody, s.scrollContent]}>
         {/* ── Quick actions ──────────────────────────────────────────── */}
         <View style={s.quickActionsRow}>
           {QUICK_ACTIONS.map((item) => (
@@ -1034,6 +1125,86 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
           </View>
         )}
 
+        {/* ── Mis Deudas ─────────────────────────────────────────────── */}
+        {deudasActivas.length > 0 && (
+          <View style={{ marginBottom: 16 }}>
+            <View style={[s.sectionHeader, { marginTop: 0 }]}>
+              <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>Mis Deudas</Text>
+              <TouchableOpacity onPress={() => onNavigate('deudas')}>
+                <Text style={[s.sectionLink, { color: colors.primary }]}>Ver todas</Text>
+              </TouchableOpacity>
+            </View>
+
+            {deudasActivas.slice(0, 3).map(deuda => {
+              const pct = Math.min(1 - deuda.saldo / deuda.montoOriginal, 1);
+              const pagado = deuda.montoOriginal - deuda.saldo;
+              return (
+                <View
+                  key={deuda.id}
+                  style={{
+                    backgroundColor: colors.card,
+                    borderRadius: 14,
+                    padding: 14,
+                    marginBottom: 10,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 4,
+                    elevation: 1,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                      <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.expenseLight, alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name="credit-card" size={16} color={colors.expense} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }} numberOfLines={1}>{deuda.nombre}</Text>
+                        <Text style={{ fontSize: 11, color: colors.textTertiary }}>
+                          Cuota: {fmtCOP(deuda.cuotaMensual)}/mes
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: colors.expense }}>{fmtCOP(deuda.saldo)}</Text>
+                      <Text style={{ fontSize: 10, color: colors.textTertiary }}>pendiente</Text>
+                    </View>
+                  </View>
+
+                  {/* Progress bar */}
+                  <View style={{ height: 5, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden', marginBottom: 6 }}>
+                    <View style={{ height: '100%', borderRadius: 3, backgroundColor: colors.expense, width: `${Math.round(pct * 100)}%` as any }} />
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 10, color: colors.textTertiary }}>
+                      Pagado {fmtCOP(pagado)} de {fmtCOP(deuda.montoOriginal)}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => onNavigate('deudas')}
+                      style={{ backgroundColor: colors.expenseLight, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.expense }}>Ver deuda</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+
+            {deudasActivas.length > 3 && (
+              <TouchableOpacity
+                onPress={() => onNavigate('deudas')}
+                style={{ alignItems: 'center', paddingVertical: 8 }}
+              >
+                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '600' }}>
+                  +{deudasActivas.length - 3} deuda{deudasActivas.length - 3 > 1 ? 's' : ''} más · Ver todas
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         {/* ── Activity feed ──────────────────────────────────────────── */}
         <View style={[s.sectionHeader, { marginTop: 8 }]}>
           <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>Actividad reciente</Text>
@@ -1068,6 +1239,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
             )}
           </>
         )}
+      </View>
       </ScrollView>
 
       {/* ── DrawerMenu ────────────────────────────────────────────────── */}
@@ -1098,6 +1270,12 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
           setQuickAddInitial(undefined);
         }}
         initialData={quickAddInitial}
+      />
+
+      {/* ── TransactionDetailSheet ────────────────────────────────────── */}
+      <TransactionDetailSheet
+        transaction={selectedTx}
+        onClose={() => setSelectedTx(null)}
       />
     </View>
   );
@@ -1277,8 +1455,10 @@ const s = StyleSheet.create({
   },
 
   // Scroll body
-  scrollBody: {
+  fullScroll: {
     flex: 1,
+  },
+  scrollBody: {
     marginTop: -16,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -1530,6 +1710,10 @@ const s = StyleSheet.create({
   txSub: {
     fontSize: 11,
     color: '#9CA3AF',
+  },
+  txRight: {
+    alignItems: 'flex-end',
+    gap: 2,
   },
   txAmount: {
     fontSize: 14,

@@ -37,6 +37,7 @@ export function getIngresoEfectivoMes(
     })
     .reduce((s, t) => s + t.amount, 0);
 
+  // Balance = salary set during onboarding + any registered income transactions
   return monthlySalary + extraIncome;
 }
 

@@ -1,215 +1,138 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import { COLORS, SPACING } from '../../constants';
-import { THEME } from '../../constants/theme';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { Logro, RARITY_STYLE } from '../../services/GamificacionService';
 
-interface AchievementCardProps {
-  icon: string;
-  title: string;
-  description: string;
-  isUnlocked: boolean;
-  unlockedDate?: string;
-  rarity: 'common' | 'rare' | 'epic' | 'legendary';
-  onUnlock?: () => void;
+interface Props {
+  logro:    Logro;
+  unlocked: boolean;
+  isNew?:   boolean;
+  onPress?: () => void;
 }
 
-const RARITY_CONFIG = {
-  common: {
-    color: THEME.colors.textSecondary,
-    borderColor: '#D1D5DB',
-    bgColor: THEME.colors.surfaceSecondary,
-  },
-  rare: {
-    color: '#3B82F6',
-    borderColor: '#93C5FD',
-    bgColor: '#EFF6FF',
-  },
-  epic: {
-    color: '#8B5CF6',
-    borderColor: '#D8B4FE',
-    bgColor: '#F5F3FF',
-  },
-  legendary: {
-    color: '#F59E0B',
-    borderColor: '#FCD34D',
-    bgColor: '#FFFBEB',
-  },
+const RARITY_LABEL_ES: Record<string, string> = {
+  common: 'Común', rare: 'Raro', epic: 'Épico', legendary: 'Legendario',
 };
 
-export const AchievementCard: React.FC<AchievementCardProps> = ({
-  icon,
-  title,
-  description,
-  isUnlocked,
-  unlockedDate,
-  rarity,
-  onUnlock,
-}) => {
-  const config = RARITY_CONFIG[rarity];
-  const scaleAnim = new Animated.Value(isUnlocked ? 1 : 0.8);
+export const AchievementCard: React.FC<Props> = ({ logro, unlocked, isNew, onPress }) => {
+  const r = RARITY_STYLE[logro.rarity];
+
+  const glowAnim  = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(unlocked ? 1 : 0.95)).current;
+  const shineAnim = useRef(new Animated.Value(-1)).current;
+  const particles = useRef(
+    Array.from({ length: 6 }, () => ({
+      x: new Animated.Value(0), y: new Animated.Value(0),
+      op: new Animated.Value(0), s: new Animated.Value(0),
+    }))
+  ).current;
 
   useEffect(() => {
-    if (isUnlocked && onUnlock) {
-      onUnlock();
-      // Animate unlock
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-      }).start();
+    if (!unlocked) return;
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 1600, useNativeDriver: false }),
+        Animated.timing(glowAnim, { toValue: 0, duration: 1600, useNativeDriver: false }),
+      ])
+    ).start();
+
+    if (logro.rarity === 'legendary') {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(shineAnim, { toValue: 2, duration: 2000, useNativeDriver: true }),
+          Animated.delay(3000),
+          Animated.timing(shineAnim, { toValue: -1, duration: 0, useNativeDriver: true }),
+        ])
+      ).start();
     }
-  }, [isUnlocked]);
+
+    if (isNew) {
+      Animated.sequence([
+        Animated.spring(scaleAnim, { toValue: 1.1, tension: 80, friction: 5, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1,   tension: 60, friction: 8, useNativeDriver: true }),
+      ]).start();
+
+      const ANGLES = [0, 60, 120, 180, 240, 300];
+      Animated.stagger(30, particles.map((p, i) => {
+        const angle = (ANGLES[i] * Math.PI) / 180;
+        const dist  = 30 + Math.random() * 12;
+        p.op.setValue(1); p.s.setValue(1);
+        return Animated.parallel([
+          Animated.timing(p.x,  { toValue: Math.cos(angle) * dist, duration: 600, useNativeDriver: true }),
+          Animated.timing(p.y,  { toValue: Math.sin(angle) * dist, duration: 600, useNativeDriver: true }),
+          Animated.timing(p.op, { toValue: 0,   duration: 600, useNativeDriver: true }),
+          Animated.timing(p.s,  { toValue: 0.3, duration: 600, useNativeDriver: true }),
+        ]);
+      })).start();
+    }
+  }, [unlocked, isNew]);
+
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, logro.rarity === 'legendary' ? 0.5 : logro.rarity === 'epic' ? 0.3 : 0.15],
+  });
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          transform: [{ scale: scaleAnim }],
-          backgroundColor: config.bgColor,
-          borderColor: config.borderColor,
-        },
-      ]}
-    >
-      <View style={styles.badgeContainer}>
-        <View
-          style={[
-            styles.iconContainer,
-            isUnlocked && { backgroundColor: config.color },
-          ]}
-        >
-          <Text style={styles.icon}>{icon}</Text>
+    <TouchableOpacity onPress={onPress} activeOpacity={onPress ? 0.75 : 1} style={styles.wrapper}>
+      <Animated.View style={[styles.card, !unlocked && styles.cardLocked, { transform: [{ scale: scaleAnim }] }]}>
+
+        {/* Glow halo */}
+        {unlocked && (
+          <Animated.View style={[styles.glow, { backgroundColor: r.glow, opacity: glowOpacity }]} pointerEvents="none" />
+        )}
+
+        {/* Particles */}
+        <View style={styles.particleLayer} pointerEvents="none">
+          {particles.map((p, i) => (
+            <Animated.View key={i} style={[styles.particle, { backgroundColor: r.glow, opacity: p.op, transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.s }] }]} />
+          ))}
         </View>
 
-        {isUnlocked && (
-          <View style={styles.unlockBadge}>
-            <Text style={styles.unlockIcon}>✓</Text>
-          </View>
-        )}
-      </View>
+        {/* Icon */}
+        <View style={[styles.iconBox, { backgroundColor: unlocked ? r.bg : '#F3F4F6' }, unlocked && logro.rarity === 'legendary' && styles.legendaryBorder]}>
+          <Feather name={logro.icono as any} size={22} color={unlocked ? r.color : '#D1D5DB'} />
+        </View>
 
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text
-            style={[
-              styles.title,
-              !isUnlocked && styles.lockedText,
-            ]}
-          >
-            {title}
-          </Text>
-          <Text
-            style={[
-              styles.rarity,
-              { color: config.color },
-            ]}
-          >
-            {rarity.toUpperCase()}
+        {/* Rarity badge */}
+        <View style={[styles.rarityBadge, { backgroundColor: unlocked ? r.bg : '#F3F4F6' }]}>
+          <Text style={[styles.rarityText, { color: unlocked ? r.color : '#9CA3AF' }]}>
+            {RARITY_LABEL_ES[logro.rarity]}
           </Text>
         </View>
 
-        <Text
-          style={[
-            styles.description,
-            !isUnlocked && styles.lockedDescription,
-          ]}
-        >
-          {description}
-        </Text>
+        <Text style={[styles.title, !unlocked && styles.textDim]} numberOfLines={1}>{logro.titulo}</Text>
+        <Text style={[styles.desc,  !unlocked && styles.textDim]} numberOfLines={2}>{logro.descripcion}</Text>
 
-        {!isUnlocked && (
-          <Text style={styles.lockedLabel}>Bloqueado</Text>
-        )}
+        <View style={[styles.xpRow, { opacity: unlocked ? 1 : 0.4 }]}>
+          <Feather name="star" size={10} color={unlocked ? '#F59E0B' : '#9CA3AF'} />
+          <Text style={[styles.xpText, { color: unlocked ? '#F59E0B' : '#9CA3AF' }]}>+{logro.xp} XP</Text>
+        </View>
 
-        {isUnlocked && unlockedDate && (
-          <Text style={styles.unlockedDate}>
-            Desbloqueado el {unlockedDate}
-          </Text>
-        )}
-      </View>
-    </Animated.View>
+        {!unlocked && <View style={styles.lockOverlay} pointerEvents="none"><Feather name="lock" size={13} color="#C4C4C4" /></View>}
+        {isNew && unlocked && <View style={styles.newBadge}><Text style={styles.newBadgeText}>¡NUEVO!</Text></View>}
+      </Animated.View>
+    </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    borderRadius: THEME.radius.md,
-    borderWidth: 2,
-    padding: SPACING.md,
-    gap: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  badgeContainer: {
-    position: 'relative',
-  },
-  iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: THEME.radius.md,
-    backgroundColor: COLORS.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  icon: {
-    fontSize: 28,
-  },
-  unlockBadge: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: THEME.colors.income,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.cardSecondary,
-  },
-  unlockIcon: {
-    color: COLORS.background,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  content: {
-    flex: 1,
-    gap: SPACING.sm,
-  },
-  header: {
-    gap: SPACING.xs,
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  lockedText: {
-    color: COLORS.textSecondary,
-  },
-  rarity: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  description: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    lineHeight: 16,
-  },
-  lockedDescription: {
-    color: COLORS.textSecondary,
-    opacity: 0.6,
-  },
-  lockedLabel: {
-    fontSize: 10,
-    color: COLORS.textSecondary,
-    fontWeight: '600',
-    marginTop: SPACING.xs,
-  },
-  unlockedDate: {
-    fontSize: 10,
-    color: THEME.colors.income,
-    fontWeight: '500',
-    marginTop: SPACING.xs,
-  },
+  wrapper:      { width: '47%', margin: '1.5%' },
+  card:         { borderRadius: 16, backgroundColor: '#FFF', padding: 14, alignItems: 'center', gap: 5, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2, overflow: 'hidden', position: 'relative', minHeight: 158 },
+  cardLocked:   { backgroundColor: '#FAFAFA', borderColor: '#EEEEEE' },
+  glow:         { position: 'absolute', top: -6, left: -6, right: -6, bottom: -6, borderRadius: 22, zIndex: 0 },
+  particleLayer:{ position: 'absolute', top: '40%', left: '50%', width: 0, height: 0 },
+  particle:     { position: 'absolute', width: 6, height: 6, borderRadius: 3 },
+  iconBox:      { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  legendaryBorder: { borderWidth: 2, borderColor: '#FCD34D' },
+  rarityBadge:  { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 100, zIndex: 1 },
+  rarityText:   { fontSize: 9, fontWeight: '700', letterSpacing: 0.4 },
+  title:        { fontSize: 12, fontWeight: '700', color: '#111827', textAlign: 'center', zIndex: 1 },
+  desc:         { fontSize: 10, color: '#6B7280', textAlign: 'center', lineHeight: 14, zIndex: 1 },
+  textDim:      { color: '#D1D5DB' },
+  xpRow:        { flexDirection: 'row', alignItems: 'center', gap: 3, zIndex: 1 },
+  xpText:       { fontSize: 10, fontWeight: '700' },
+  lockOverlay:  { position: 'absolute', top: 8, right: 8, zIndex: 2 },
+  newBadge:     { position: 'absolute', top: 6, right: 6, backgroundColor: '#EF4444', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2, zIndex: 3 },
+  newBadgeText: { fontSize: 8, fontWeight: '800', color: '#FFF', letterSpacing: 0.3 },
 });

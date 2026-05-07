@@ -15,10 +15,8 @@ import {
   BackHandler,
 } from 'react-native';
 
-const SCREEN_W = Dimensions.get('window').width;
-
 import { useFinance } from '../../src/state';
-import { User, Transaction, AuthState } from '../../src/types';
+import { User, AuthState } from '../../src/types';
 import { useTheme } from '../../src/state/ThemeContext';
 import { MobileShell } from '../../src/components/layout/MobileShell';
 import { BottomNavBar } from '../../src/components/layout/BottomNavBar';
@@ -72,6 +70,8 @@ import {
   OnboardingConfirm,
 } from '../../src/screens/Onboarding';
 
+const SCREEN_W = Dimensions.get('window').width;
+
 type OnboardingStep = 'welcome' | 'profile' | 'salario' | 'categories' | 'montos' | 'confirm';
 const ONBOARDING_STEPS: OnboardingStep[] = ['welcome', 'profile', 'salario', 'categories', 'montos', 'confirm'];
 
@@ -90,7 +90,8 @@ export default function HomeScreen() {
     setUser, user, isOnboarded, setIsOnboarded, onboardingState, updateOnboardingStep, profile,
     transactions, categories, goal, userLevel, leccionesCompletadas, retosCompletados, retoActivo, premium,
     addTransaction: ctxAddTransaction, deleteTransaction: ctxDeleteTransaction,
-    isLoading, importServerData, saldoDisponible,
+    addCategory,
+    isLoading, importServerData, saldoDisponible, resetAll,
   } = useFinance();
   const { colors } = useTheme();
 
@@ -112,11 +113,12 @@ export default function HomeScreen() {
   const [authLoading, setAuthLoading] = useState(false);
 
   // ── OTP flow ──
-  const [otpEmail, setOtpEmail]       = useState('');
-  const [otpName, setOtpName]         = useState('');
-  const [otpPassword, setOtpPassword] = useState('');
-  const [otpConfirm, setOtpConfirm]   = useState('');
-  const [otpShowPwd, setOtpShowPwd]   = useState(false);
+  const [otpEmail, setOtpEmail]         = useState('');
+  const [otpName, setOtpName]           = useState('');
+  const [otpPassword, setOtpPassword]   = useState('');
+  const [otpConfirm, setOtpConfirm]     = useState('');
+  const [otpShowPwd, setOtpShowPwd]     = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false); // bloquea onboarding durante login
   const [otpCode, setOtpCode]         = useState(['', '', '', '', '', '', '', '']);
   const [otpStep, setOtpStep]         = useState<'email' | 'register' | 'code'>('email');
   const [otpResendSecs, setOtpResendSecs] = useState(0);
@@ -203,6 +205,26 @@ export default function HomeScreen() {
     }
   }, [isOnboarded]);
 
+  const goNext = () => {
+    const idx = ONBOARDING_STEPS.indexOf(onboardingStep);
+    if (idx < ONBOARDING_STEPS.length - 1) {
+      const nextStep = ONBOARDING_STEPS[idx + 1];
+      updateOnboardingStep(idx + 1);
+      onboardingAnim.setValue(0);
+      setOnboardingStep(nextStep);
+      Animated.timing(onboardingAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
+    }
+  };
+
+  const goBack = () => {
+    const idx = ONBOARDING_STEPS.indexOf(onboardingStep);
+    if (idx > 0) {
+      onboardingAnim.setValue(0);
+      setOnboardingStep(ONBOARDING_STEPS[idx - 1]);
+      Animated.timing(onboardingAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+    }
+  };
+
   // ==================== ANIMATIONS ====================
   const authAnim = useRef(new Animated.Value(0)).current;
 
@@ -225,12 +247,13 @@ export default function HomeScreen() {
       deberiasMostrarResumen().then(({ mostrar, mes, año }) => {
         if (mostrar) {
           setResumenMensualMes({ mes, año });
+          setNavHistory(['dashboard']);
           setCurrentScreen('resumenMensual');
         }
       }).catch(() => {});
     }, 1500);
     return () => clearTimeout(t);
-  }, [user?.id]);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Notification listeners — tap opens the target screen
   useEffect(() => {
@@ -257,8 +280,8 @@ export default function HomeScreen() {
 
       // Legacy format: data.type
       const legacyType = (data as any)?.type;
-      if (legacyType === 'weekly_summary') setCurrentScreen('resumenSemanal');
-      if (legacyType === 'cierre_mes') { setResumenMensualMes(undefined); setCurrentScreen('resumenMensual'); }
+      if (legacyType === 'weekly_summary') navegarA('resumenSemanal');
+      if (legacyType === 'cierre_mes') { setResumenMensualMes(undefined); navegarA('resumenMensual'); }
     });
 
     const foregroundSub = Notifications.addNotificationReceivedListener(notification => {
@@ -318,8 +341,8 @@ export default function HomeScreen() {
   // ── OTP: registrar nuevo usuario y enviar código ─────────────────────────
   const handleRegisterOtp = async () => {
     setAuthError('');
-    const name = otpName.trim();
-    if (!name) { setAuthError('Ingresa tu nombre'); return; }
+    // Usar nombre de Finn (profile) o email prefix como fallback
+    const name = profile?.mainFinancialConcern?.trim() || otpEmail.split('@')[0];
     if (otpPassword.length < 6) { setAuthError('La contraseña debe tener al menos 6 caracteres'); return; }
     if (otpPassword !== otpConfirm) { setAuthError('Las contraseñas no coinciden'); return; }
     setAuthLoading(true);
@@ -341,28 +364,62 @@ export default function HomeScreen() {
     if (code.length < 8) return;
     setAuthError('');
     setAuthLoading(true);
+    setOtpVerifying(true); // evita flash de onboarding durante el login
     try {
       const { user: sbUser, error } = await authService.verifyOtp(otpEmail.trim().toLowerCase(), code);
-      if (error || !sbUser) { setAuthError(error ?? 'Código incorrecto'); setOtpCode(['','','','','','','','']); setTimeout(() => otpRefs.current[0]?.focus(), 100); return; }
-      setUser(sbUser);
+      if (error || !sbUser) {
+        setAuthError(error ?? 'Código incorrecto');
+        setOtpCode(['','','','','','','','']);
+        setTimeout(() => otpRefs.current[0]?.focus(), 100);
+        return;
+      }
+      // Preservar datos locales del onboarding antes de cualquier importación
+      const locallyOnboarded = isOnboarded;
       const serverData = await supabaseService.pullFromServer(sbUser.id);
-      if (serverData) {
+
+      if (serverData?.isOnboarded) {
+        // ── Usuario existente: importar datos del servidor ──────────────
         await importServerData(serverData);
         const finalUser = { ...sbUser };
         if (serverData.name && serverData.name !== sbUser.name) {
           finalUser.name = serverData.name;
           finalUser.monthlySalary = serverData.monthlySalary || sbUser.monthlySalary;
-          setUser(finalUser);
         }
-        // Usuario ya completó el onboarding antes — ir directo al dashboard
-        if (serverData.isOnboarded) {
-          await setIsOnboarded(true);
-          setShowSplash(false);
-        }
+        setIsOnboarded(true);
+        setShowSplash(false);
+        setUser(finalUser);
+      } else if (locallyOnboarded) {
+        // ── Usuario nuevo que hizo onboarding offline ─────────────────
+        // NO importar datos vacíos del servidor — conservar los del onboarding
+        // Determinar nombre: profile de Finn > email prefix
+        const nombreLocal = profile?.mainFinancialConcern || sbUser.name;
+        const finalUser = { ...sbUser, name: nombreLocal };
+        setIsOnboarded(true);
+        setShowSplash(false);
+        setUser(finalUser);
+        // Subir todos los datos locales al servidor en background
+        supabaseService.pushAllToServer(sbUser.id, {
+          transactions,
+          categories,
+          profile: profile ?? null,
+          goal: goal ?? null,
+          userLevel: userLevel ?? null,
+          leccionesCompletadas,
+          retosCompletados,
+          retoActivo: retoActivo ?? null,
+          premium,
+          isOnboarded: true,
+          name: nombreLocal,
+          monthlySalary: profile?.monthlySalary ?? sbUser.monthlySalary ?? 0,
+        }).catch(() => {});
+      } else {
+        // ── Usuario completamente nuevo (sin onboarding local) ────────
+        setUser(sbUser);
       }
       setOtpEmail(''); setOtpName(''); setOtpCode(['','','','','','','','']); setOtpStep('email');
     } finally {
       setAuthLoading(false);
+      setOtpVerifying(false);
     }
   };
 
@@ -497,26 +554,52 @@ export default function HomeScreen() {
     setShowSplash(false);
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
+    // Cerrar sesión en Supabase
+    if (authService.isReady) await authService.signOut();
+    // Limpiar todos los datos persistidos
+    await resetAll();
+    await setIsOnboarded(false);
+    // Limpiar estado OTP
+    setOtpEmail('');
+    setOtpName('');
+    setOtpPassword('');
+    setOtpConfirm('');
+    setOtpCode(['', '', '', '', '', '', '', '']);
+    setOtpStep('email');
+    setOtpResendSecs(0);
+    if (resendTimer.current) clearInterval(resendTimer.current);
+    setAuthError('');
     setUser(null);
-    setAuthState('login');
     setCurrentScreen('dashboard');
-    setLoginEmail('');
-    setLoginPassword('');
+    // Arrancar desde splash
     setShowSplash(true);
   };
 
   // ==================== FINANCE HANDLERS ====================
   const addTransaction = (amount: number, category: string, type: 'income' | 'expense', date: Date, description?: string) => {
-    const newTransaction: Transaction = {
+    // Si es un gasto y la categoría no existe en la lista del usuario, crearla
+    if (type === 'expense') {
+      const exists = categories.some((c: any) => c.name === category);
+      if (!exists) {
+        addCategory({
+          id: Date.now().toString(),
+          name: category,
+          budget: 0,
+          isSelected: true,
+          tipo: 'gasto',
+          fechaCreacion: new Date().toISOString(),
+        });
+      }
+    }
+    ctxAddTransaction({
       id: Date.now().toString(),
       amount,
       category,
       type,
       date: date.toISOString(),
       ...(description?.trim() ? { description: description.trim() } : {}),
-    };
-    ctxAddTransaction(newTransaction);
+    });
   };
 
   const addIncome = (amount: number, category: string, date: Date, description?: string) =>
@@ -564,7 +647,26 @@ export default function HomeScreen() {
     return <MobileShell><DashboardSkeleton /></MobileShell>;
   }
 
-  // ==================== 1. AUTH — flujo OTP por correo ====================
+  // ==================== 1. ONBOARDING (usuario nuevo, antes de auth) ====================
+  // Mostrar onboarding solo si: no está onboarded Y no está en medio de verificar OTP
+  if (!isOnboarded && !otpVerifying) {
+    const slideX = onboardingAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
+    const wrapStyle = { flex: 1, opacity: onboardingAnim, transform: [{ translateX: slideX }] };
+    return (
+      <MobileShell>
+        <Animated.View style={wrapStyle}>
+          {onboardingStep === 'welcome'    && <OnboardingWelcome    onNext={goNext} />}
+          {onboardingStep === 'profile'    && <OnboardingProfile    onNext={goNext} onBack={goBack} />}
+          {onboardingStep === 'salario'    && <OnboardingSalario    onNext={goNext} onBack={goBack} />}
+          {onboardingStep === 'categories' && <OnboardingCategories onNext={goNext} onBack={goBack} />}
+          {onboardingStep === 'montos'     && <OnboardingMontos     onNext={goNext} onBack={goBack} />}
+          {onboardingStep === 'confirm'    && <OnboardingConfirm    onDone={goNext} />}
+        </Animated.View>
+      </MobileShell>
+    );
+  }
+
+  // ==================== 2. AUTH — flujo OTP por correo ====================
   if (!user) {
     return (
       <MobileShell>
@@ -634,28 +736,30 @@ export default function HomeScreen() {
                 )}
 
                 {otpStep === 'register' && (
-                  /* ── Pantalla 2: nuevo usuario — pedir nombre ── */
+                  /* ── Pantalla 2: nuevo usuario — crear contraseña ── */
                   <>
-                    <Text style={styles.authBigTitle}>Crear{'\n'}cuenta</Text>
-                    <Text style={styles.otpSubtitle}>
+                    {/* Saludo personalizado */}
+                    <Text style={styles.authBigTitle}>
+                      {'Hola '}
+                      {(profile?.mainFinancialConcern?.trim().split(' ')[0]) || otpEmail.split('@')[0]}
+                      {'! 👋'}
+                    </Text>
+                    <Text style={[styles.otpSubtitle, { marginBottom: 4 }]}>
+                      Crea una contraseña para{'\n'}
                       <Text style={{ fontWeight: '700', color: '#111827' }}>{otpEmail}</Text>
                     </Text>
 
-                    {/* Nombre */}
-                    <View style={[styles.authFieldPill, { marginBottom: 12 }]}>
-                      <Text style={styles.authFieldIcon}>👤</Text>
-                      <TextInput
-                        ref={otpNameRef}
-                        style={styles.authFieldInput}
-                        placeholder="Tu nombre"
-                        placeholderTextColor="#BBBBC8"
-                        value={otpName}
-                        onChangeText={setOtpName}
-                        autoCapitalize="words"
-                        autoCorrect={false}
-                        returnKeyType="next"
-                        onSubmitEditing={() => otpPwdRef.current?.focus()}
-                      />
+                    {/* Tips de contraseña */}
+                    <View style={{ backgroundColor: '#F0F9FF', borderRadius: 12, padding: 12, marginBottom: 16, gap: 4 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#0369A1', marginBottom: 2 }}>Tips para una buena contraseña:</Text>
+                      {[
+                        '• Mínimo 6 caracteres',
+                        '• Combina letras y números',
+                        '• Usa mayúsculas y minúsculas',
+                        '• Evita fechas de nacimiento o "1234"',
+                      ].map(tip => (
+                        <Text key={tip} style={{ fontSize: 12, color: '#0369A1' }}>{tip}</Text>
+                      ))}
                     </View>
 
                     {/* Contraseña */}
@@ -671,6 +775,7 @@ export default function HomeScreen() {
                         secureTextEntry={!otpShowPwd}
                         autoCapitalize="none"
                         returnKeyType="next"
+                        autoFocus
                         onSubmitEditing={() => otpCfmRef.current?.focus()}
                       />
                       <Pressable onPress={() => setOtpShowPwd(v => !v)} style={{ paddingHorizontal: 8 }}>
@@ -707,7 +812,7 @@ export default function HomeScreen() {
                     {authError ? <Text style={styles.authError}>{authError}</Text> : null}
 
                     <Pressable
-                      onPress={() => { setOtpStep('email'); setOtpName(''); setOtpPassword(''); setOtpConfirm(''); setAuthError(''); }}
+                      onPress={() => { setOtpStep('email'); setOtpPassword(''); setOtpConfirm(''); setAuthError(''); }}
                       style={{ marginTop: 12 }}
                     >
                       <Text style={styles.otpChangeEmail}>Cambiar correo</Text>
@@ -773,44 +878,6 @@ export default function HomeScreen() {
             </View>
           </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
-      </MobileShell>
-    );
-  }
-
-  // ==================== 2. ONBOARDING (solo usuarios nuevos, ya autenticados) ====================
-  const goNext = () => {
-    const idx = ONBOARDING_STEPS.indexOf(onboardingStep);
-    if (idx < ONBOARDING_STEPS.length - 1) {
-      const nextStep = ONBOARDING_STEPS[idx + 1];
-      updateOnboardingStep(idx + 1);
-      onboardingAnim.setValue(0);
-      setOnboardingStep(nextStep);
-      Animated.timing(onboardingAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
-    }
-  };
-
-  const goBack = () => {
-    const idx = ONBOARDING_STEPS.indexOf(onboardingStep);
-    if (idx > 0) {
-      onboardingAnim.setValue(0);
-      setOnboardingStep(ONBOARDING_STEPS[idx - 1]);
-      Animated.timing(onboardingAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
-    }
-  };
-
-  if (!isOnboarded) {
-    const slideX = onboardingAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
-    const wrapStyle = { flex: 1, opacity: onboardingAnim, transform: [{ translateX: slideX }] };
-    return (
-      <MobileShell>
-        <Animated.View style={wrapStyle}>
-          {onboardingStep === 'welcome'    && <OnboardingWelcome    onNext={goNext} />}
-          {onboardingStep === 'profile'    && <OnboardingProfile    onNext={goNext} onBack={goBack} />}
-          {onboardingStep === 'salario'    && <OnboardingSalario    onNext={goNext} onBack={goBack} />}
-          {onboardingStep === 'categories' && <OnboardingCategories onNext={goNext} onBack={goBack} />}
-          {onboardingStep === 'montos'     && <OnboardingMontos     onNext={goNext} onBack={goBack} />}
-          {onboardingStep === 'confirm'    && <OnboardingConfirm    onDone={goNext} />}
-        </Animated.View>
       </MobileShell>
     );
   }
