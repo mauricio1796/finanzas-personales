@@ -7,6 +7,7 @@ import '../global.css';
 import { FinanceProvider } from '@/src/state';
 import { ThemeProvider, useTheme } from '@/src/state/ThemeContext';
 import { LIGHT_COLORS, DARK_COLORS } from '@/src/constants/colors';
+import { ErrorBoundary } from '@/src/components/ui/ErrorBoundary';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -31,10 +32,12 @@ function AppShell() {
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <FinanceProvider>
-        <AppShell />
-      </FinanceProvider>
-    </ThemeProvider>
+    <ErrorBoundary fallbackLabel="La app encontró un error. Por favor reinicia.">
+      <ThemeProvider>
+        <FinanceProvider>
+          <AppShell />
+        </FinanceProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

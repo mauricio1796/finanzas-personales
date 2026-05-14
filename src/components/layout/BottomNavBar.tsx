@@ -8,6 +8,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHaptics } from '../../hooks/useHaptics';
 import { Icon } from '../ui/Icon';
+import { useTheme } from '../../state/ThemeContext';
 import type { FeatherName } from '../ui/Icon';
 
 // ── Tab config ───────────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ const TabItem: React.FC<TabItemProps> = ({
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const { selection } = useHaptics();
+  const { colors } = useTheme();
 
   const handlePress = () => {
     Animated.sequence([
@@ -60,7 +62,7 @@ const TabItem: React.FC<TabItemProps> = ({
     }
   };
 
-  const color = active ? '#6156E8' : '#9CA3AF';
+  const color = active ? colors.tabActive : colors.tabInactive;
 
   return (
     <TouchableOpacity
@@ -79,7 +81,7 @@ const TabItem: React.FC<TabItemProps> = ({
             width: 5,
             height: 5,
             borderRadius: 3,
-            backgroundColor: '#6156E8',
+            backgroundColor: colors.tabActive,
             marginTop: 1,
           }} />
         )}
@@ -94,6 +96,7 @@ const FABCenter: React.FC<{ onPress: () => void }> = ({ onPress }) => {
   const scaleAnim  = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const { medium } = useHaptics();
+  const { colors } = useTheme();
 
   const handlePress = () => {
     Animated.parallel([
@@ -123,11 +126,11 @@ const FABCenter: React.FC<{ onPress: () => void }> = ({ onPress }) => {
           width: 56,
           height: 56,
           borderRadius: 28,
-          backgroundColor: '#6156E8',
+          backgroundColor: colors.primary,
           alignItems: 'center',
           justifyContent: 'center',
           marginTop: -20,
-          shadowColor: '#6156E8',
+          shadowColor: colors.primary,
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.35,
           shadowRadius: 10,

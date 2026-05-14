@@ -56,7 +56,7 @@ function fmt(n: number): string {
 }
 
 async function cancelarPorTipo(tipo: NotifTipo): Promise<void> {
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const scheduled = (await Notifications.getAllScheduledNotificationsAsync()) ?? [];
   const targets = scheduled.filter((n: any) => n.content.data?.tipo === tipo);
   await Promise.all(
     targets.map(n => Notifications.cancelScheduledNotificationAsync(n.identifier)),
@@ -64,7 +64,7 @@ async function cancelarPorTipo(tipo: NotifTipo): Promise<void> {
 }
 
 async function cancelarPorTipoYCategoria(tipo: NotifTipo, categoriaId: string): Promise<void> {
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const scheduled = (await Notifications.getAllScheduledNotificationsAsync()) ?? [];
   const targets = scheduled.filter(
     (n: any) => n.content.data?.tipo === tipo && n.content.data?.categoriaId === categoriaId,
   );

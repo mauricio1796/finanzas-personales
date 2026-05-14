@@ -17,13 +17,12 @@ const HEADER_COLLAPSED = 88;
 const COLLAPSE_AT = 130;
 
 interface UsuarioProps {
-  onLogout?: () => void;
   onReset?: () => void;
   onStartTour?: () => void;
   onNavigate?: (screen: string) => void;
 }
 
-export function Usuario({ onLogout, onReset, onStartTour, onNavigate }: UsuarioProps) {
+export function Usuario({ onReset, onStartTour, onNavigate }: UsuarioProps) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -456,26 +455,6 @@ export function Usuario({ onLogout, onReset, onStartTour, onNavigate }: UsuarioP
         <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 8 }]}>CUENTA</Text>
 
         <View style={[styles.dangerCard, { backgroundColor: colors.card, borderColor: colors.danger + '33' }]}>
-          {/* Logout */}
-          <TouchableOpacity
-            style={styles.dangerRow}
-            onPress={() =>
-              Alert.alert('Cerrar Sesión', '¿Estás seguro?', [
-                { text: 'Cancelar', style: 'cancel' },
-                { text: 'Cerrar Sesión', onPress: onLogout, style: 'destructive' },
-              ])
-            }
-            activeOpacity={0.75}
-          >
-            <View style={[styles.actionIconCircle, { backgroundColor: colors.dangerLight }]}>
-              <Icon name="log-out" size={16} color={colors.danger} />
-            </View>
-            <Text style={[styles.dangerRowText, { color: colors.textPrimary }]}>Cerrar Sesión</Text>
-            <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-          </TouchableOpacity>
-
-          <View style={[styles.fieldDivider, { backgroundColor: colors.divider, marginHorizontal: 16 }]} />
-
           {/* Reset */}
           <TouchableOpacity
             style={styles.dangerRow}

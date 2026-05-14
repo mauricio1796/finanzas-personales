@@ -16,7 +16,8 @@ import { verificarConexionWorker } from '../services/RealAIService';
 import { THEME } from '../constants/theme';
 
 interface ConfiguracionScreenProps {
-  onBack: () => void;
+  onBack:      () => void;
+  onNavigate?: (screen: string) => void;
 }
 
 // ─── Mini preview card ────────────────────────────────────────────────────────
@@ -190,7 +191,7 @@ const NotifToggle = ({
 };
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
-export function ConfiguracionScreen({ onBack }: ConfiguracionScreenProps) {
+export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenProps) {
   const insets = useSafeAreaInsets();
   const { isDark, colors, preference, setPreference, toggle } = useTheme();
   const { categories, transactions, profile } = useFinance();
@@ -295,6 +296,33 @@ export function ConfiguracionScreen({ onBack }: ConfiguracionScreenProps) {
           colors={colors}
           showBadge
         />
+
+        {/* ── Personalización ── */}
+        {onNavigate && (
+          <>
+            <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 20 }]}>
+              PERSONALIZACIÓN
+            </Text>
+            <TouchableOpacity
+              style={[styles.personalizacionBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => onNavigate('personalizacion')}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.personalizacionIcon, { backgroundColor: colors.primaryLight }]}>
+                <Icon name="sliders" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.personalizacionTitle, { color: colors.textPrimary }]}>
+                  Color, tipografía y formato
+                </Text>
+                <Text style={[styles.personalizacionSub, { color: colors.textTertiary }]}>
+                  Personaliza cada detalle visual de la app
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
+          </>
+        )}
 
         {/* ── Vista previa ── */}
         <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 20 }]}>VISTA PREVIA</Text>
@@ -783,5 +811,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'absolute',
+  },
+  personalizacionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 4,
+  },
+  personalizacionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  personalizacionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  personalizacionSub: {
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '400',
   },
 });

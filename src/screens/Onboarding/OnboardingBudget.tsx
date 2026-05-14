@@ -23,11 +23,11 @@ interface BudgetItem {
 
 
 export const OnboardingBudget: React.FC = () => {
-  const { updateOnboardingStep } = useFinance();
+  const { updateOnboardingStep, profile, user } = useFinance();
   const { colors } = useTheme();
 
   const [budgetItems, setBudgetItems] = useState<BudgetItem[]>([]);
-  const [monthlyIncome] = useState(2500); // TODO: obtener del perfil si está disponible
+  const monthlyIncome = profile?.monthlySalary ?? user?.monthlySalary ?? 0;
   const [isLoading, setIsLoading] = useState(true);
   const [step, setStep] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;

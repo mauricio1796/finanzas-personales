@@ -16,14 +16,14 @@ import {
 } from 'react-native';
 
 import { useFinance } from '../../src/state';
-import { User, AuthState } from '../../src/types';
+import { User } from '../../src/types';
 import { useTheme } from '../../src/state/ThemeContext';
 import { MobileShell } from '../../src/components/layout/MobileShell';
 import { BottomNavBar } from '../../src/components/layout/BottomNavBar';
 import { FinancialFeed } from '../../src/screens/FinancialFeed/FinancialFeed';
 import { SplashScreen } from '../../src/screens/SplashScreen';
 import { QuickAddSheet } from '../../src/components/ui/QuickAddSheet';
-import { ProductTour, APP_TOUR_STEPS } from '../../src/components/ui/ProductTour';
+import { FinnTour, FINN_TOUR_STEPS } from '../../src/components/ui/FinnTour';
 import { storageService } from '../../src/services/storage/StorageService';
 import { authService } from '../../src/services/supabase/AuthService';
 import { supabaseService } from '../../src/services/supabase/SupabaseService';
@@ -37,6 +37,7 @@ import { WidgetConfigScreen } from '../../src/screens/WidgetConfigScreen';
 import { deberiasMostrarResumen } from '../../src/utils/resumenMensualUtils';
 import { GamificacionScreen } from '../../src/screens/GamificacionScreen';
 import { ConfiguracionScreen } from '../../src/screens/ConfiguracionScreen';
+import { PersonalizacionScreen } from '../../src/screens/PersonalizacionScreen';
 import { ResumenSemanalCard } from '../../src/components/finanzas/ResumenSemanalCard';
 import { type NotifData } from '../../src/services/NotificacionesService';
 import { useNotificacionesManager } from '../../src/hooks/useNotificacionesManager';
@@ -69,6 +70,7 @@ import {
   OnboardingMontos,
   OnboardingConfirm,
 } from '../../src/screens/Onboarding';
+import { PermissionsScreen } from '../../src/screens/PermissionsScreen';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -102,8 +104,16 @@ export default function HomeScreen() {
   // ==================== SPLASH ====================
   const [showSplash, setShowSplash] = useState(true);
 
+  // ==================== PERMISSIONS ====================
+  const [showPermissions, setShowPermissions] = useState(false);
+
+  useEffect(() => {
+    storageService.getPermissionsShown().then(shown => {
+      if (!shown) setShowPermissions(true);
+    });
+  }, []);
+
   // ==================== AUTH STATE ====================
-  const [authState, setAuthState] = useState<AuthState>('login');
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
@@ -225,12 +235,7 @@ export default function HomeScreen() {
     }
   };
 
-  // ==================== ANIMATIONS ====================
-  const authAnim = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    Animated.spring(authAnim, { toValue: 1, friction: 8, useNativeDriver: true }).start();
-  }, [authState, authAnim]);
 
   // Auto-show tour on first login
   useEffect(() => {
@@ -533,30 +538,12 @@ export default function HomeScreen() {
     }
   };
 
-  const handleLogout = async () => {
-    if (authService.isReady) {
-      await authService.signOut();
-    }
-    setUser(null);
-    setAuthState('login');
-    await setIsOnboarded(false);
-    setCurrentScreen('dashboard');
-    // Limpiar estado OTP para volver a la pantalla de correo
-    setOtpEmail('');
-    setOtpName('');
-    setOtpPassword('');
-    setOtpConfirm('');
-    setOtpCode(['', '', '', '', '', '', '', '']);
-    setOtpStep('email');
-    setOtpResendSecs(0);
-    if (resendTimer.current) clearInterval(resendTimer.current);
-    setAuthError('');
-    setShowSplash(false);
-  };
 
   const handleReset = async () => {
-    // Cerrar sesión en Supabase
-    if (authService.isReady) await authService.signOut();
+    // Intentar cerrar sesión en Supabase, pero continuar aunque falle
+    if (authService.isReady) {
+      try { await authService.signOut(); } catch {}
+    }
     // Limpiar todos los datos persistidos
     await resetAll();
     await setIsOnboarded(false);
@@ -645,6 +632,15 @@ export default function HomeScreen() {
   // ==================== 0b. LOADING (hydrating AsyncStorage) ====================
   if (isLoading) {
     return <MobileShell><DashboardSkeleton /></MobileShell>;
+  }
+
+  // ==================== 0c. PERMISOS (primera vez, antes de onboarding/auth) ====================
+  if (showPermissions) {
+    return (
+      <MobileShell>
+        <PermissionsScreen onDone={() => setShowPermissions(false)} />
+      </MobileShell>
+    );
   }
 
   // ==================== 1. ONBOARDING (usuario nuevo, antes de auth) ====================
@@ -923,7 +919,6 @@ export default function HomeScreen() {
           )}
           {currentScreen === 'perfil' && (
             <Usuario
-              onLogout={handleLogout}
               onReset={handleReset}
               onStartTour={handleStartTour}
               onNavigate={navegarA}
@@ -948,7 +943,10 @@ export default function HomeScreen() {
             <GamificacionScreen onNavigate={navegarA} onBack={volver} />
           )}
           {currentScreen === 'configuracion' && (
-            <ConfiguracionScreen onBack={volver} />
+            <ConfiguracionScreen onBack={volver} onNavigate={navegarA} />
+          )}
+          {currentScreen === 'personalizacion' && (
+            <PersonalizacionScreen onBack={volver} />
           )}
           {currentScreen === 'retos' && (
             <RetosScreen onBack={volver} />
@@ -998,9 +996,9 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Product Tour */}
-      <ProductTour
-        steps={APP_TOUR_STEPS}
+      {/* Finn Tour */}
+      <FinnTour
+        steps={FINN_TOUR_STEPS}
         visible={showTour}
         onFinish={handleTourFinish}
       />

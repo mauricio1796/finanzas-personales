@@ -23,8 +23,9 @@ import { VoiceButton } from '../../components/ui/VoiceButton';
 import { type ParsedTransaction } from '../../services/VoiceService';
 import { SwipeableRow } from '../../components/ui/SwipeableRow';
 import { DrawerMenu } from '../../components/layout/DrawerMenu';
+import { NotificationsPanel } from '../../components/ui/NotificationsPanel';
+import { useNotificacionesInApp } from '../../hooks/useNotificacionesInApp';
 import { Transaction } from '../../types';
-import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtCOP = (n: number) =>
@@ -45,237 +46,6 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// ─── WeeklyAreaChart ─────────────────────────────────────────────────────────
-
-const CHART_H        = 110;
-const Y_AXIS_W       = 32;
-// scrollContent paddingH:16 each side (32) + card padding:16 each side (32) = 64 total
-const CHART_H_MARGIN = 64;
-
-interface WeeklyAreaChartProps {
-  transactions: Transaction[];
-}
-
-const fmtShort = (v: number) =>
-  v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(1)}M` :
-  v >= 1_000     ? `$${Math.round(v / 1_000)}K` : `$${v}`;
-
-const WeeklyAreaChart: React.FC<WeeklyAreaChartProps> = ({ transactions }) => {
-  const [containerW, setContainerW] = React.useState(0);
-  // SVG width = measured container minus y-axis space
-  const chartW = Math.max(1, containerW - Y_AXIS_W);
-
-  // Build last-7-days data
-  const days = useMemo(() => {
-    const result: { label: string; gastos: number; ingresos: number }[] = [];
-    const now = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(now.getDate() - i);
-      const dayStr = d.toDateString();
-      const label = d.toLocaleDateString('es-CO', { weekday: 'short' })
-        .replace('.', '')
-        .charAt(0).toUpperCase() + d.toLocaleDateString('es-CO', { weekday: 'short' }).replace('.', '').slice(1, 3);
-      const gastos   = transactions.filter(t => t.type === 'expense' && new Date(t.date).toDateString() === dayStr).reduce((a, t) => a + t.amount, 0);
-      const ingresos = transactions.filter(t => t.type === 'income'  && new Date(t.date).toDateString() === dayStr).reduce((a, t) => a + t.amount, 0);
-      result.push({ label, gastos, ingresos });
-    }
-    return result;
-  }, [transactions]);
-
-  const maxVal = useMemo(() => Math.max(...days.map(d => Math.max(d.gastos, d.ingresos)), 1), [days]);
-
-  // Weekly totals for stats
-  const totalGastos   = useMemo(() => days.reduce((s, d) => s + d.gastos, 0), [days]);
-  const totalIngresos = useMemo(() => days.reduce((s, d) => s + d.ingresos, 0), [days]);
-  const peakDay       = useMemo(() => days.reduce((best, d) => d.gastos > best.gastos ? d : best, days[0]), [days]);
-
-  const makeAreaPath = (values: number[], closed = true): string => {
-    if (chartW <= 1) return '';
-    const pts = values.map((v, i) => ({
-      x: (i / (values.length - 1)) * chartW,
-      y: CHART_H - 8 - (v / maxVal) * (CHART_H - 20),
-    }));
-    let d = `M ${pts[0].x} ${pts[0].y}`;
-    for (let i = 1; i < pts.length; i++) {
-      const cp1x = pts[i - 1].x + (pts[i].x - pts[i - 1].x) / 3;
-      const cp1y = pts[i - 1].y;
-      const cp2x = pts[i].x - (pts[i].x - pts[i - 1].x) / 3;
-      const cp2y = pts[i].y;
-      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${pts[i].x} ${pts[i].y}`;
-    }
-    if (closed) {
-      d += ` L ${pts[pts.length - 1].x} ${CHART_H} L ${pts[0].x} ${CHART_H} Z`;
-    }
-    return d;
-  };
-
-  const gastosPath   = makeAreaPath(days.map(d => d.gastos));
-  const ingresosPath = makeAreaPath(days.map(d => d.ingresos));
-  const gastosLine   = makeAreaPath(days.map(d => d.gastos), false);
-  const ingresosLine = makeAreaPath(days.map(d => d.ingresos), false);
-
-  // Y-axis labels
-  const yLabels = [0, Math.round(maxVal / 2), maxVal].map(v =>
-    v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` :
-    v >= 1_000     ? `${Math.round(v / 1_000)}K` : String(v)
-  );
-
-  return (
-    <View style={ac.wrap}>
-      {/* Header */}
-      <View style={ac.header}>
-        <Text style={ac.title}>Flujo semanal</Text>
-        <View style={ac.legend}>
-          <View style={ac.legendDot} />
-          <Text style={ac.legendText}>Gastos</Text>
-          <View style={[ac.legendDot, { backgroundColor: '#1D9E75' }]} />
-          <Text style={ac.legendText}>Ingresos</Text>
-        </View>
-      </View>
-
-      {/* Chart area — measured via onLayout */}
-      <View
-        style={{ flexDirection: 'row', height: CHART_H }}
-        onLayout={e => setContainerW(e.nativeEvent.layout.width)}
-      >
-        {/* Y-axis */}
-        <View style={{ width: Y_AXIS_W, height: CHART_H, justifyContent: 'space-between', paddingBottom: 16 }}>
-          {[yLabels[2], yLabels[1], yLabels[0]].map((l, i) => (
-            <Text key={i} style={ac.yLabel}>{l}</Text>
-          ))}
-        </View>
-
-        {/* SVG — only render once width is known */}
-        {containerW > 0 && (
-          <Svg width={chartW} height={CHART_H}>
-            <Defs>
-              <LinearGradient id="gastoGrad" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#6156E8" stopOpacity="0.25" />
-                <Stop offset="1" stopColor="#6156E8" stopOpacity="0.01" />
-              </LinearGradient>
-              <LinearGradient id="ingresoGrad" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#1D9E75" stopOpacity="0.18" />
-                <Stop offset="1" stopColor="#1D9E75" stopOpacity="0.01" />
-              </LinearGradient>
-            </Defs>
-            {[0.25, 0.5, 0.75].map((f, i) => (
-              <Path key={i} d={`M 0 ${(CHART_H - 8) * f} H ${chartW}`} stroke="#E5E7EB" strokeWidth="0.5" />
-            ))}
-            <Path d={gastosPath}   fill="url(#gastoGrad)"   />
-            <Path d={ingresosPath} fill="url(#ingresoGrad)" />
-            <Path d={gastosLine}   fill="none" stroke="#6156E8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            <Path d={ingresosLine} fill="none" stroke="#1D9E75" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </Svg>
-        )}
-      </View>
-
-      {/* X-axis labels */}
-      <View style={{ flexDirection: 'row', paddingLeft: Y_AXIS_W, marginBottom: 14 }}>
-        {days.map((d, i) => (
-          <Text key={i} style={[ac.xLabel, { flex: 1, textAlign: i === 0 ? 'left' : i === days.length - 1 ? 'right' : 'center' }]}>
-            {d.label}
-          </Text>
-        ))}
-      </View>
-
-      {/* Stats strip */}
-      <View style={ac.statsRow}>
-        <View style={ac.statBox}>
-          <Text style={ac.statLabel}>Gastos 7 días</Text>
-          <Text style={[ac.statValue, { color: '#EF4444' }]}>{fmtShort(totalGastos)}</Text>
-        </View>
-        <View style={[ac.statDivider]} />
-        <View style={ac.statBox}>
-          <Text style={ac.statLabel}>Ingresos 7 días</Text>
-          <Text style={[ac.statValue, { color: '#1D9E75' }]}>{fmtShort(totalIngresos)}</Text>
-        </View>
-        <View style={[ac.statDivider]} />
-        <View style={ac.statBox}>
-          <Text style={ac.statLabel}>Día pico</Text>
-          <Text style={[ac.statValue, { color: '#6156E8' }]}>{peakDay?.label ?? '—'}</Text>
-        </View>
-      </View>
-    </View>
-  );
-};
-
-const ac = StyleSheet.create({
-  wrap: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  legend: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#6156E8',
-  },
-  legendText: {
-    fontSize: 11,
-    color: '#9CA3AF',
-    marginRight: 6,
-  },
-  yLabel: {
-    fontSize: 9,
-    color: '#9CA3AF',
-    textAlign: 'right',
-    width: Y_AXIS_W - 6,
-  },
-  xLabel: {
-    fontSize: 10,
-    color: '#9CA3AF',
-    marginTop: 6,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: 12,
-  },
-  statBox: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 3,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: '#F3F4F6',
-    marginVertical: 2,
-  },
-  statLabel: {
-    fontSize: 10,
-    color: '#9CA3AF',
-    fontWeight: '500',
-  },
-  statValue: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-});
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface FinancialFeedProps {
@@ -286,7 +56,7 @@ interface FinancialFeedProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpenBot }) => {
   const insets = useSafeAreaInsets();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, accentColor, formatAmount, cardStyle, fontScale } = useTheme();
   const {
     user, transactions, categories, profile, goal, userLevel,
     addTransaction: ctxAdd, deleteTransaction: ctxDelete,
@@ -344,6 +114,14 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
     txMesSel.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0),
   [txMesSel]);
 
+  const totalPresupuesto = useMemo(() =>
+    categories.filter((c: any) => c.isSelected && (c.budget ?? 0) > 0).reduce((a: number, c: any) => a + (c.budget as number), 0),
+  [categories]);
+
+  const totalGastadoCatSel = useMemo(() =>
+    categories.filter((c: any) => c.isSelected && (c.budget ?? 0) > 0).reduce((a: number, c: any) => a + (gastosPorCatSel[c.name] ?? 0), 0),
+  [categories, gastosPorCatSel]);
+
   // ── Today / Yesterday transactions ─────────────────────────────────────────
   const hoyStr  = now.toDateString();
   const ayerDate = new Date(now);
@@ -385,6 +163,10 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
       }),
   [categories, gastosPorCatSel]);
 
+  const catsEnRiesgo = useMemo(() =>
+    topCategorias.filter((c: any) => c.hasBudget && c.pctReal >= 80).length,
+  [topCategorias]);
+
   // ── Pending payments ────────────────────────────────────────────────────────
   const categoriasPendientesPago = useMemo(() => {
     return categories
@@ -405,7 +187,9 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   }, [categories, diaHoy]);
 
   // ── States ─────────────────────────────────────────────────────────────────
-  const [drawerVisible,   setDrawerVisible]   = useState(false);
+  const [drawerVisible,      setDrawerVisible]      = useState(false);
+  const [notifPanelVisible,  setNotifPanelVisible]  = useState(false);
+  const { items: notifItems, noLeidas, marcarLeidas, eliminar: eliminarNotif, limpiarTodo: limpiarNotifs } = useNotificacionesInApp();
   const [quickAddVisible, setQuickAddVisible] = useState(false);
   const [selectedTx,      setSelectedTx]      = useState<Transaction | null>(null);
   const [quickAddType,    setQuickAddType]    = useState<'income' | 'expense'>('expense');
@@ -567,67 +351,6 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
     );
   };
 
-  const renderCatCard = (cat: any, idx: number) => {
-    const barAnim   = barAnims[idx] ?? new Animated.Value(0);
-    const pctColor  =
-      cat.pctReal >= 100 ? colors.expense :
-      cat.pctReal >= 80  ? colors.warning :
-      colors.income;
-    const iconName  = (cat.icon as any) || getCategoryIcon(cat.name);
-    const iconBg    = ICON_MAP[cat.name]?.bg    ?? colors.cardSecondary;
-    const iconColor = ICON_MAP[cat.name]?.color ?? colors.textSecondary;
-
-    return (
-      <View
-        key={cat.id}
-        style={[s.catCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-      >
-        {/* Top row */}
-        <View style={s.catTopRow}>
-          <View style={[s.catIconBox, { backgroundColor: iconBg }]}>
-            <Icon name={iconName as any} size={14} color={iconColor} />
-          </View>
-          <Text style={[s.catName, { color: colors.textPrimary }]} numberOfLines={1}>
-            {cat.name}
-          </Text>
-          {cat.hasBudget
-            ? <Text style={[s.catPct, { color: pctColor }]}>{cat.pct}%</Text>
-            : <Text style={[s.catPct, { color: colors.textTertiary, fontSize: 10 }]}>Sin presupuesto</Text>
-          }
-        </View>
-        {/* Amounts row */}
-        <View style={s.catAmountsRow}>
-          <Text style={[s.catSpent, { color: colors.textSecondary }]}>
-            {fmtCOP(cat.gastado)} gastado
-          </Text>
-          {cat.hasBudget && (
-            <Text style={[s.catOf, { color: colors.textTertiary }]}>
-              de {fmtCOP(cat.budget)}
-            </Text>
-          )}
-        </View>
-        {/* Progress bar — solo si tiene presupuesto */}
-        {cat.hasBudget ? (
-          <View style={s.barTrack}>
-            <Animated.View
-              style={[
-                s.barFill,
-                {
-                  backgroundColor: pctColor,
-                  width: barAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', `${cat.pct}%`],
-                  }),
-                },
-              ]}
-            />
-          </View>
-        ) : (
-          <View style={[s.barTrack, { backgroundColor: colors.border }]} />
-        )}
-      </View>
-    );
-  };
 
   // ── Quick action items (inside component to access colors + handlers) ───────
   const QUICK_ACTIONS = [
@@ -704,8 +427,19 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
 
           {/* Icon buttons — light-themed */}
           <View style={s.heroIconsRow}>
-            <TouchableOpacity style={s.heroIconBtn} onPress={() => onNavigate('calendario')}>
-              <Icon name="bell" size={16} color={THEME.colors.textSecondary} />
+            <TouchableOpacity
+              style={s.heroIconBtn}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                setNotifPanelVisible(true);
+              }}
+            >
+              <Icon name="bell" size={16} color={noLeidas > 0 ? THEME.colors.primary : THEME.colors.textSecondary} />
+              {noLeidas > 0 && (
+                <View style={s.bellBadge}>
+                  <Text style={s.bellBadgeText}>{noLeidas > 9 ? '9+' : noLeidas}</Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity style={s.heroIconBtn} onPress={() => onNavigate('historial')}>
               <Icon name="search" size={16} color={THEME.colors.textSecondary} />
@@ -723,35 +457,71 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
           </View>
         </View>
 
-        {/* ── Balance Card — purple ─────────────────────────────────── */}
+        {/* ── Balance Card ─────────────────────────────────────────── */}
+        {(() => {
+          // Compute card appearance from cardStyle
+          let cardBg         = accentColor;
+          let cardBorder     = 'transparent';
+          let cardBorderW    = 0;
+          let textColor      = '#FFFFFF';
+          let subTextColor   = 'rgba(255,255,255,0.75)';
+          let subCardBg      = 'rgba(255,255,255,0.15)';
+
+          if (cardStyle === 'minimal') {
+            cardBg        = isDark ? '#1C1C1F' : '#FFFFFF';
+            cardBorder    = accentColor;
+            cardBorderW   = 2;
+            textColor     = isDark ? '#F4F4F5' : '#111827';
+            subTextColor  = isDark ? '#A1A1AA' : '#6B7280';
+            subCardBg     = isDark ? '#252528' : '#F4F3F8';
+          } else if (cardStyle === 'dark') {
+            cardBg      = isDark ? '#0A0A0F' : '#111827';
+            textColor   = '#FFFFFF';
+            subTextColor = 'rgba(255,255,255,0.6)';
+            subCardBg   = 'rgba(255,255,255,0.08)';
+          } else if (cardStyle === 'glass') {
+            cardBg      = accentColor + '28';
+            cardBorder  = accentColor + '66';
+            cardBorderW = 1.5;
+            textColor   = isDark ? '#FFFFFF' : '#111827';
+            subTextColor = isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.55)';
+            subCardBg   = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)';
+          }
+
+          const fs = (n: number) => Math.round(n * fontScale);
+
+          return (
         <Animated.View
           style={[
             s.balanceCard,
             {
+              backgroundColor: cardBg,
+              borderColor: cardBorder,
+              borderWidth: cardBorderW,
               opacity: heroAnim,
               transform: [{ scale: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) }],
             },
           ]}
         >
-          <Text style={s.balanceLabel}>DISPONIBLE AHORA</Text>
-          <Text ref={balanceText} style={s.balanceAmount}>
-            {fmtCOP(metricas.balanceDisponible)}
+          <Text style={[s.balanceLabel, { color: subTextColor, fontSize: fs(10) }]}>DISPONIBLE AHORA</Text>
+          <Text ref={balanceText} style={[s.balanceAmount, { color: textColor, fontSize: fs(36) }]}>
+            {formatAmount(metricas.balanceDisponible)}
           </Text>
-          <Text style={s.balanceMonth}>
+          <Text style={[s.balanceMonth, { color: subTextColor, fontSize: fs(12) }]}>
             {capitalize(getNombreMes(mesActual))} {añoActual}
           </Text>
 
           {/* Sub-cards: ingresos totales / gastos */}
           <View style={s.balanceSubCards}>
-            <View style={s.balanceSubCard}>
-              <Icon name="arrow-up" size={12} color="rgba(255,255,255,0.7)" />
-              <Text style={s.balanceSubLabel}>Ingresado</Text>
-              <Text style={s.balanceSubValue}>{fmtCOP(metricas.ingresoEfectivo)}</Text>
+            <View style={[s.balanceSubCard, { backgroundColor: subCardBg }]}>
+              <Icon name="arrow-up" size={12} color={subTextColor} />
+              <Text style={[s.balanceSubLabel, { color: subTextColor, fontSize: fs(10) }]}>Ingresado</Text>
+              <Text style={[s.balanceSubValue, { color: textColor, fontSize: fs(13) }]}>{formatAmount(metricas.ingresoEfectivo)}</Text>
             </View>
-            <View style={s.balanceSubCard}>
-              <Icon name="arrow-down" size={12} color="rgba(255,255,255,0.7)" />
-              <Text style={s.balanceSubLabel}>Gastado</Text>
-              <Text style={s.balanceSubValue}>{fmtCOP(gastosMes)}</Text>
+            <View style={[s.balanceSubCard, { backgroundColor: subCardBg }]}>
+              <Icon name="arrow-down" size={12} color={subTextColor} />
+              <Text style={[s.balanceSubLabel, { color: subTextColor, fontSize: fs(10) }]}>Gastado</Text>
+              <Text style={[s.balanceSubValue, { color: textColor, fontSize: fs(13) }]}>{formatAmount(gastosMes)}</Text>
             </View>
           </View>
 
@@ -784,9 +554,9 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
 
           {/* Daily budget pill */}
           <View style={s.dailyPill}>
-            <Icon name="calendar" size={10} color="rgba(255,255,255,0.75)" />
-            <Text style={s.dailyPillText}>
-              {fmtCOP(metricas.gastoPromedioRecomendadoDia)}/día · {metricas.diasRestantesMes} días restantes
+            <Icon name="calendar" size={10} color={subTextColor} />
+            <Text style={[s.dailyPillText, { color: subTextColor, fontSize: fs(10) }]}>
+              {formatAmount(metricas.gastoPromedioRecomendadoDia)}/día · {metricas.diasRestantesMes} días restantes
             </Text>
           </View>
 
@@ -798,6 +568,8 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
             </TouchableOpacity>
           )}
         </Animated.View>
+          );
+        })()}
       </View>
 
       {/* ── SCROLL BODY ───────────────────────────────────────────────── */}
@@ -831,82 +603,222 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
           ))}
         </View>
 
-        {/* ── Area chart ─────────────────────────────────────────────── */}
-        <WeeklyAreaChart transactions={transactions} />
+        {/* ── Presupuesto por Categoría — sección principal ───────────── */}
+        <View style={{ marginBottom: 8 }}>
+          {/* Header */}
+          <View style={[s.sectionHeader, { marginBottom: 10 }]}>
+            <View>
+              <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>Presupuesto del mes</Text>
+              <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 1 }}>
+                {capitalize(getNombreMes(mesSeleccionado.mes))} {mesSeleccionado.año}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => onNavigate('categorias')}>
+              <Text style={[s.sectionLink, { color: colors.primary }]}>Gestionar</Text>
+            </TouchableOpacity>
+          </View>
 
-        {/* ── Categorías — estilo imagen ──────────────────────────────── */}
-        <View style={s.sectionHeader}>
-          <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>Flujo por categoría</Text>
-          <TouchableOpacity onPress={() => onNavigate('estadisticas')}>
-            <Text style={[s.sectionLink, { color: colors.primary }]}>Ver más</Text>
-          </TouchableOpacity>
-        </View>
-        {categories
-          .filter((c: any) => c.isSelected && (gastosPorCatSel[c.name] ?? 0) > 0)
-          .sort((a: any, b: any) => (gastosPorCatSel[b.name] ?? 0) - (gastosPorCatSel[a.name] ?? 0))
-          .slice(0, 5)
-          .map((cat: any) => {
-            const gasto     = gastosPorCatSel[cat.name] ?? 0;
-            const budget    = cat.budget ?? 0;
-            const remaining = budget > 0 ? budget - gasto : 0;
-            const over      = budget > 0 && gasto > budget;
-            const iconName  = (cat.icon as any) || getCategoryIcon(cat.name);
-            const iconBg    = ICON_MAP[cat.name]?.bg    ?? colors.cardSecondary;
-            const iconCol   = ICON_MAP[cat.name]?.color ?? colors.textSecondary;
-            const pct       = budget > 0 ? Math.min((gasto / budget) * 100, 100) : 0;
-            const pctColor  = over ? colors.expense : pct >= 80 ? colors.warning : colors.income;
+          {/* Month pills */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={s.monthScroll}
+            contentContainerStyle={s.monthScrollContent}
+          >
+            {meses.map((m) => {
+              const active = m.mes === mesSeleccionado.mes && m.año === mesSeleccionado.año;
+              return (
+                <TouchableOpacity
+                  key={`${m.mes}-${m.año}`}
+                  style={[s.monthPill, active ? { backgroundColor: THEME.colors.primary } : { backgroundColor: '#F4F3F8' }]}
+                  onPress={() => setMesSeleccionado({ mes: m.mes, año: m.año })}
+                >
+                  <Text style={[s.monthPillText, { color: active ? '#FFFFFF' : '#6B7280', fontWeight: active ? '600' : '400' }]}>
+                    {m.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* Summary card — resumen global del presupuesto */}
+          {totalPresupuesto > 0 && (() => {
+            const globalPct = Math.min((totalGastadoCatSel / totalPresupuesto) * 100, 100);
+            const globalColor =
+              globalPct >= 100 ? colors.expense :
+              globalPct >= 80  ? colors.warning :
+              colors.income;
             return (
-              <View key={cat.id} style={cf.row}>
-                <View style={[cf.iconCircle, { backgroundColor: iconBg }]}>
-                  <Icon name={iconName as any} size={18} color={iconCol} />
-                </View>
-                <View style={cf.info}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={cf.catName} numberOfLines={1}>{cat.name}</Text>
-                    {budget > 0 && remaining > 0 && (
-                      <View style={[cf.surplusTag, { backgroundColor: colors.incomeLight }]}>
-                        <Text style={[cf.surplusText, { color: colors.income }]}>Libre</Text>
-                      </View>
-                    )}
-                    {over && (
-                      <View style={[cf.surplusTag, { backgroundColor: colors.expenseLight }]}>
-                        <Text style={[cf.surplusText, { color: colors.expense }]}>Excedido</Text>
+              <View style={{
+                backgroundColor: colors.card,
+                borderRadius: 18,
+                padding: 18,
+                marginBottom: 14,
+                borderWidth: 0.5,
+                borderColor: globalPct >= 80 ? globalColor : colors.border,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.07,
+                shadowRadius: 10,
+                elevation: 3,
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 26, fontWeight: '800', color: colors.textPrimary, letterSpacing: -1 }}>
+                      {fmtCOP(totalGastadoCatSel)}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>
+                      gastado de {fmtCOP(totalPresupuesto)} presupuestado
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 5 }}>
+                    <Text style={{ fontSize: 30, fontWeight: '800', color: globalColor, letterSpacing: -1 }}>
+                      {Math.round(globalPct)}%
+                    </Text>
+                    {catsEnRiesgo > 0 && (
+                      <View style={{ backgroundColor: colors.warningLight, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 3 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.warning }}>
+                          {catsEnRiesgo} en alerta
+                        </Text>
                       </View>
                     )}
                   </View>
-                  {budget > 0 && (
-                    <View style={cf.barWrap}>
-                      <View style={[cf.barFill, { width: `${pct}%` as any, backgroundColor: pctColor }]} />
-                    </View>
-                  )}
-                  <Text style={cf.budgetLabel}>
-                    {budget > 0
-                      ? `Gastado ${fmtCOP(gasto)} de ${fmtCOP(budget)}`
-                      : `Gastado ${fmtCOP(gasto)}`}
-                  </Text>
                 </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  {budget > 0 ? (
-                    <>
-                      <Text style={[cf.amount, { color: over ? colors.expense : colors.income }]}>
-                        {over ? `−${fmtCOP(gasto - budget)}` : fmtCOP(remaining)}
-                      </Text>
-                      <Text style={[cf.budgetLabel, { fontSize: 10 }]}>
-                        {over ? 'excedido' : 'disponible'}
-                      </Text>
-                    </>
-                  ) : (
-                    <Text style={[cf.amount, { color: colors.expense }]}>−{fmtCOP(gasto)}</Text>
-                  )}
+                {/* Barra global */}
+                <View style={{ height: 10, borderRadius: 100, backgroundColor: colors.border, overflow: 'hidden', marginBottom: 8 }}>
+                  <View style={{ height: '100%', borderRadius: 100, backgroundColor: globalColor, width: `${globalPct}%` as any }} />
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 11, color: colors.textTertiary }}>
+                    Libre: <Text style={{ fontWeight: '600', color: colors.income }}>{fmtCOP(Math.max(totalPresupuesto - totalGastadoCatSel, 0))}</Text>
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.textTertiary }}>
+                    {metricas.diasRestantesMes} días restantes
+                  </Text>
                 </View>
               </View>
             );
-          })}
-        {categories.filter((c: any) => c.isSelected && (gastosPorCatSel[c.name] ?? 0) > 0).length === 0 && (
-          <View style={[cf.empty, { backgroundColor: colors.card }]}>
-            <Text style={{ fontSize: 12, color: colors.textTertiary }}>Sin gastos registrados este mes</Text>
-          </View>
-        )}
+          })()}
+
+          {/* Tarjetas de categoría — diseño impactante */}
+          {topCategorias.filter((c: any) => c.hasBudget || c.gastado > 0).length > 0
+            ? topCategorias
+                .filter((c: any) => c.hasBudget || c.gastado > 0)
+                .map((cat: any, idx: number) => {
+                  const barAnim  = barAnims[idx] ?? new Animated.Value(1);
+                  const pctColor =
+                    cat.pctReal >= 100 ? colors.expense :
+                    cat.pctReal >= 80  ? colors.warning :
+                    colors.income;
+                  const iconName  = (cat.icon as any) || getCategoryIcon(cat.name);
+                  const iconBg    = ICON_MAP[cat.name]?.bg    ?? colors.cardSecondary;
+                  const iconColor = ICON_MAP[cat.name]?.color ?? colors.textSecondary;
+                  const isOver    = cat.hasBudget && cat.pctReal >= 100;
+                  const isRisk    = cat.hasBudget && cat.pctReal >= 80 && cat.pctReal < 100;
+                  return (
+                    <View
+                      key={cat.id}
+                      style={{
+                        backgroundColor: colors.card,
+                        borderRadius: 18,
+                        padding: 16,
+                        marginBottom: 10,
+                        borderWidth: 0.5,
+                        borderColor: isOver ? colors.expense : isRisk ? colors.warning : colors.border,
+                        shadowColor: isOver ? colors.expense : '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: isOver ? 0.12 : 0.05,
+                        shadowRadius: 8,
+                        elevation: isOver ? 4 : 2,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                        {/* Ícono */}
+                        <View style={{
+                          width: 50,
+                          height: 50,
+                          borderRadius: 15,
+                          backgroundColor: iconBg,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}>
+                          <Icon name={iconName as any} size={24} color={iconColor} />
+                        </View>
+
+                        {/* Info central */}
+                        <View style={{ flex: 1, gap: 7 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary, flex: 1 }} numberOfLines={1}>
+                              {cat.name}
+                            </Text>
+                            {isOver && (
+                              <View style={{ backgroundColor: colors.expenseLight, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                                <Text style={{ fontSize: 9, fontWeight: '800', color: colors.expense, letterSpacing: 0.3 }}>EXCEDIDO</Text>
+                              </View>
+                            )}
+                            {isRisk && (
+                              <View style={{ backgroundColor: colors.warningLight, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                                <Text style={{ fontSize: 9, fontWeight: '800', color: colors.warning, letterSpacing: 0.3 }}>ALERTA</Text>
+                              </View>
+                            )}
+                          </View>
+
+                          {cat.hasBudget ? (
+                            <>
+                              <View style={{ height: 8, borderRadius: 100, backgroundColor: colors.border, overflow: 'hidden' }}>
+                                <Animated.View style={{
+                                  height: '100%',
+                                  borderRadius: 100,
+                                  backgroundColor: pctColor,
+                                  width: barAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', `${cat.pct}%`] }),
+                                }} />
+                              </View>
+                              <Text style={{ fontSize: 11, color: colors.textTertiary }}>
+                                {fmtCOP(cat.gastado)} de {fmtCOP(cat.budget)}
+                              </Text>
+                            </>
+                          ) : (
+                            <Text style={{ fontSize: 11, color: colors.textTertiary }}>Sin presupuesto asignado</Text>
+                          )}
+                        </View>
+
+                        {/* Monto derecho */}
+                        <View style={{ alignItems: 'flex-end', gap: 2, minWidth: 64 }}>
+                          {cat.hasBudget ? (
+                            <>
+                              <Text style={{ fontSize: 16, fontWeight: '800', color: pctColor, letterSpacing: -0.5 }}>
+                                {cat.pct}%
+                              </Text>
+                              <Text style={{ fontSize: 10, color: isOver ? colors.expense : colors.textTertiary, fontWeight: isOver ? '700' : '400', textAlign: 'right' }}>
+                                {isOver
+                                  ? `−${fmtCOP(cat.gastado - cat.budget)}`
+                                  : `libre\n${fmtCOP(cat.budget - cat.gastado)}`}
+                              </Text>
+                            </>
+                          ) : (
+                            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.expense }}>
+                              −{fmtCOP(cat.gastado)}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })
+            : (
+              <View style={[s.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Icon name="pie-chart" size={28} color={colors.textTertiary} />
+                <Text style={[s.emptyTitle, { color: colors.textSecondary }]}>
+                  Sin categorías configuradas
+                </Text>
+                <TouchableOpacity onPress={() => onNavigate('categorias')}>
+                  <Text style={[s.emptyAction, { color: colors.primary }]}>Configurar categorías</Text>
+                </TouchableOpacity>
+              </View>
+            )
+          }
+        </View>
 
         {/* ── Metas carousel ─────────────────────────────────────────── */}
         {metas.filter(m => !m.completada).length > 0 && (
@@ -995,62 +907,6 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
           );
         })()}
 
-        {/* ── Budget section ─────────────────────────────────────────── */}
-        <View style={s.sectionHeader}>
-          <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>Presupuesto del mes</Text>
-          <TouchableOpacity onPress={() => onNavigate('estadisticas')}>
-            <Text style={[s.sectionLink, { color: colors.primary }]}>Ver todo</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Month pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={s.monthScroll}
-          contentContainerStyle={s.monthScrollContent}
-        >
-          {meses.map((m) => {
-            const active = m.mes === mesSeleccionado.mes && m.año === mesSeleccionado.año;
-            return (
-              <TouchableOpacity
-                key={`${m.mes}-${m.año}`}
-                style={[
-                  s.monthPill,
-                  active
-                    ? { backgroundColor: THEME.colors.primary }
-                    : { backgroundColor: '#F4F3F8' },
-                ]}
-                onPress={() => setMesSeleccionado({ mes: m.mes, año: m.año })}
-              >
-                <Text
-                  style={[
-                    s.monthPillText,
-                    { color: active ? '#FFFFFF' : '#6B7280', fontWeight: active ? '600' : '400' },
-                  ]}
-                >
-                  {m.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* Category cards */}
-        {topCategorias.length > 0
-          ? topCategorias.map((cat: any, idx: number) => renderCatCard(cat, idx))
-          : (
-            <View style={[s.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Icon name="pie-chart" size={28} color={colors.textTertiary} />
-              <Text style={[s.emptyTitle, { color: colors.textSecondary }]}>
-                Sin categorías con presupuesto asignado
-              </Text>
-              <TouchableOpacity onPress={() => onNavigate('estadisticas')}>
-                <Text style={[s.emptyAction, { color: colors.primary }]}>Configurar</Text>
-              </TouchableOpacity>
-            </View>
-          )
-        }
 
         {/* ── Pending payments ───────────────────────────────────────── */}
         {categoriasPendientesPago.length > 0 && (
@@ -1252,6 +1108,20 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
         }}
       />
 
+      {/* ── NotificationsPanel ────────────────────────────────────────── */}
+      <NotificationsPanel
+        visible={notifPanelVisible}
+        items={notifItems}
+        onClose={() => setNotifPanelVisible(false)}
+        onNavigate={(screen) => {
+          setNotifPanelVisible(false);
+          onNavigate(screen);
+        }}
+        onEliminar={eliminarNotif}
+        onLimpiarTodo={limpiarNotifs}
+        onMarcarLeidas={marcarLeidas}
+      />
+
       {/* ── QuickAddSheet ─────────────────────────────────────────────── */}
       <QuickAddSheet
         visible={quickAddVisible}
@@ -1341,6 +1211,27 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: THEME.colors.surfaceSecondary,
+    position: 'relative',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+    borderWidth: 1.5,
+    borderColor: THEME.colors.surfaceSecondary,
+  },
+  bellBadgeText: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#fff',
+    lineHeight: 11,
   },
 
   // Balance Card — purple

@@ -23,6 +23,10 @@ export function useNotificacionesManager() {
   // ── Inicializar al montar ────────────────────────────────────────────────
   useEffect(() => {
     const inicializar = async () => {
+      // No intentar programar notificaciones si el permiso no está concedido
+      const { status } = await import('expo-notifications').then(m => m.getPermissionsAsync());
+      if (status !== 'granted') return;
+
       await limpiarCacheMensualNotificaciones();
       await programarDiaSinGastar();
 
@@ -84,6 +88,8 @@ export function useNotificacionesManager() {
 
   // ── Detectar cambios en categorías ──────────────────────────────────────
   useEffect(() => {
+    if (!Array.isArray(categories) || categories.length === 0) return;
+
     const snapshot = JSON.stringify(
       categories.map(c => ({
         id: c.id, pagado: c.pagado, diaPago: c.diaPago, budget: c.budget,
