@@ -162,12 +162,13 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   onScrollToTop,
 }) => {
   const insets = useSafeAreaInsets();
+  const { isDark, colors } = useTheme();
 
   return (
     <View style={{
-      backgroundColor: '#FFFFFF',
+      backgroundColor: isDark ? colors.card : '#FFFFFF',
       borderTopWidth: 0.5,
-      borderTopColor: '#E5E7EB',
+      borderTopColor: colors.border,
       flexDirection: 'row',
       alignItems: 'flex-start',
       height: 64 + insets.bottom,
@@ -184,9 +185,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           onScrollToTop={currentScreen === tab.key ? onScrollToTop : undefined}
         />
       ))}
-
       <FABCenter onPress={onQuickAdd} />
-
       {RIGHT_TABS.map(tab => (
         <TabItem
           key={tab.key}

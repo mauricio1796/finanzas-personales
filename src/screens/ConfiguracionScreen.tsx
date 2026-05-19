@@ -232,7 +232,7 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
     const nueva = { ...notifConfig, [key]: !notifConfig[key] };
     setNotifConfig(nueva);
     await AsyncStorage.setItem('@financy_notif_config', JSON.stringify(nueva));
-    haptistyles.selection();
+    haptics.selection();
   };
 
   // Animate preview when theme changes
@@ -388,7 +388,7 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
             {!permisosNotif && (
               <TouchableOpacity
                 onPress={() => {
-                  haptistyles.medium();
+                  haptics.medium();
                   Notifications.requestPermissionsAsync().then(({ status }) => {
                     setPermisosNotif(status === 'granted');
                   });
@@ -485,7 +485,7 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
 
         <TouchableOpacity
           onPress={async () => {
-            haptistyles.medium();
+            haptics.medium();
             await reprogramarTodasLasNotificaciones(
               categories, transactions, profile?.monthlySalary ?? 0,
             );

@@ -6,13 +6,16 @@ export function getGastoCategoria(
   transactions: Transaction[],
   mes: number,
   año: number,
+  categoryId?: string, // para resolver transacciones que guardaron el ID
 ): number {
   return transactions
     .filter(t => {
       const d = new Date(t.date);
+      const matchName = t.category === categoryName;
+      const matchId   = categoryId ? t.category === categoryId : false;
       return (
         t.type === 'expense' &&
-        t.category === categoryName &&
+        (matchName || matchId) &&
         d.getMonth() === mes &&
         d.getFullYear() === año
       );

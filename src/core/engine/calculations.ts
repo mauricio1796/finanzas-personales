@@ -19,14 +19,16 @@ export function calculateBalance(transactions: Transaction[]): number {
 }
 
 export function expensesByCategory(
-  transactions: Transaction[]
+  transactions: Transaction[],
+  idToName?: Record<string, string>,
 ): Record<string, number> {
   const result: Record<string, number> = {};
 
   transactions
     .filter(t => t.type === 'expense')
     .forEach(t => {
-      result[t.category] = (result[t.category] || 0) + t.amount;
+      const key = idToName ? (idToName[t.category] ?? t.category) : t.category;
+      result[key] = (result[key] || 0) + t.amount;
     });
 
   return result;

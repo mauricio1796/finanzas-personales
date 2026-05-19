@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,7 @@ import {
   TouchableOpacity,
   Animated,
 } from 'react-native';
-import { FinanceContext } from '@/core/context/FinanceContext';
-import { Colors } from '@/constants/colors';
-import { Spacing } from '@/constants/spacing';
-import {
-  AchievementCard,
-  UserLevelBadge,
-} from '@/components/gamification';
+import { useTheme } from '../../state/ThemeContext';
 
 interface Achievement {
   id: string;
@@ -27,409 +21,120 @@ interface Achievement {
 }
 
 const ALL_ACHIEVEMENTS: Achievement[] = [
-  {
-    id: 'first_expense',
-    icon: '💰',
-    title: 'Primer Gasto',
-    description: 'Registra tu primer gasto en la aplicación',
-    rarity: 'common',
-    isUnlocked: true,
-    unlockedDate: '2024-01-15',
-  },
-  {
-    id: 'budget_hero',
-    icon: '📊',
-    title: 'Héroe del Presupuesto',
-    description: 'Mantén tu presupuesto bajo control durante un mes completo',
-    rarity: 'rare',
-    isUnlocked: false,
-  },
-  {
-    id: 'savings_champion',
-    icon: '🏆',
-    title: 'Campeón de Ahorros',
-    description: 'Ahorra 30% de tus ingresos durante 3 meses consecutivos',
-    rarity: 'epic',
-    isUnlocked: false,
-  },
-  {
-    id: 'financial_genius',
-    icon: '🧠',
-    title: 'Genio Financiero',
-    description: 'Alcanza el nivel máximo en la aplicación',
-    rarity: 'legendary',
-    isUnlocked: false,
-  },
-  {
-    id: 'early_bird',
-    icon: '🌅',
-    title: 'Madrugador',
-    description: 'Registra un gasto antes de las 8 AM durante 7 días seguidos',
-    rarity: 'common',
-    isUnlocked: true,
-    unlockedDate: '2024-01-20',
-  },
-  {
-    id: 'weekend_warrior',
-    icon: '⚔️',
-    title: 'Guerrero del Fin de Semana',
-    description: 'Completa tu presupuesto sin superar límites un fin de semana completo',
-    rarity: 'common',
-    isUnlocked: false,
-  },
-  {
-    id: 'debt_slayer',
-    icon: '🗡️',
-    title: 'Cazador de Deudas',
-    description: 'Paga una deuda completamente',
-    rarity: 'rare',
-    isUnlocked: false,
-  },
-  {
-    id: 'investment_guru',
-    icon: '📈',
-    title: 'Gurú de Inversiones',
-    description: 'Invierte por primera vez a través de la aplicación',
-    rarity: 'epic',
-    isUnlocked: false,
-  },
+  { id: 'first_expense', icon: '💰', title: 'Primer Gasto', description: 'Registra tu primer gasto en la aplicación', rarity: 'common', isUnlocked: true, unlockedDate: '2024-01-15' },
+  { id: 'budget_hero', icon: '📊', title: 'Héroe del Presupuesto', description: 'Mantén tu presupuesto bajo control durante un mes completo', rarity: 'rare', isUnlocked: false },
+  { id: 'savings_champion', icon: '🏆', title: 'Campeón de Ahorros', description: 'Ahorra 30% de tus ingresos durante 3 meses consecutivos', rarity: 'epic', isUnlocked: false },
+  { id: 'financial_genius', icon: '🧠', title: 'Genio Financiero', description: 'Alcanza el nivel máximo en la aplicación', rarity: 'legendary', isUnlocked: false },
+  { id: 'early_bird', icon: '🌅', title: 'Madrugador', description: 'Registra un gasto antes de las 8 AM durante 7 días seguidos', rarity: 'common', isUnlocked: true, unlockedDate: '2024-01-20' },
+  { id: 'weekend_warrior', icon: '⚔️', title: 'Guerrero del Fin de Semana', description: 'Completa tu presupuesto sin superar límites un fin de semana', rarity: 'common', isUnlocked: false },
+  { id: 'debt_slayer', icon: '🗡️', title: 'Cazador de Deudas', description: 'Paga una deuda completamente', rarity: 'rare', isUnlocked: false },
+  { id: 'investment_guru', icon: '📈', title: 'Gurú de Inversiones', description: 'Invierte por primera vez a través de la aplicación', rarity: 'epic', isUnlocked: false },
 ];
 
+const RARITY_COLORS: Record<Achievement['rarity'], string> = {
+  common: '#6B7280', rare: '#3B82F6', epic: '#8B5CF6', legendary: '#F59E0B',
+};
+
 export const MyAchievements: React.FC = () => {
-  const { financeState } = useContext(FinanceContext);
-  const [achievements, setAchievements] = useState<Achievement[]>(ALL_ACHIEVEMENTS);
+  const { colors } = useTheme();
   const [filter, setFilter] = useState<'all' | 'unlocked' | 'locked'>('all');
   const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const unlockedCount = achievements.filter((a) => a.isUnlocked).length;
-  const totalCount = achievements.length;
+  const unlockedCount = ALL_ACHIEVEMENTS.filter(a => a.isUnlocked).length;
+  const totalCount = ALL_ACHIEVEMENTS.length;
   const completionPercent = (unlockedCount / totalCount) * 100;
 
-  const filteredAchievements = achievements.filter((a) => {
+  const filtered = ALL_ACHIEVEMENTS.filter(a => {
     if (filter === 'unlocked') return a.isUnlocked;
     if (filter === 'locked') return !a.isUnlocked;
     return true;
   });
 
-  const handleUnlock = () => {
-    Animated.spring(fadeAnim, {
-      toValue: 1.1,
-      useNativeDriver: true,
-    }).start();
-  };
-
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Logros</Text>
-          <View style={styles.statsContainer}>
-            <View style={styles.stat}>
-              <Text style={styles.statLabel}>Desbloqueados</Text>
-              <Text style={styles.statValue}>
-                {unlockedCount}/{totalCount}
-              </Text>
+    <SafeAreaView style={[st.root, { backgroundColor: colors.background }]}>
+      <ScrollView contentContainerStyle={st.scroll}>
+        <Text style={[st.title, { color: colors.textPrimary }]}>Logros</Text>
+
+        {/* Stats */}
+        <View style={st.statsRow}>
+          {[{ label: 'Desbloqueados', value: `${unlockedCount}/${totalCount}` }, { label: 'Progreso', value: `${completionPercent.toFixed(0)}%` }].map(s => (
+            <View key={s.label} style={[st.stat, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[st.statLabel, { color: colors.textSecondary }]}>{s.label}</Text>
+              <Text style={[st.statValue, { color: colors.primary }]}>{s.value}</Text>
             </View>
-            <View style={styles.stat}>
-              <Text style={styles.statLabel}>Progreso</Text>
-              <Text style={styles.statValue}>
-                {completionPercent.toFixed(0)}%
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Progress Bar */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View
-              style={[
-                styles.progressFill,
-                { width: `${completionPercent}%` },
-              ]}
-            />
-          </View>
-          <Text style={styles.progressText}>
-            {Math.round(totalCount - unlockedCount)} por desbloquear
-          </Text>
-        </View>
-
-        {/* Filter Buttons */}
-        <View style={styles.filterContainer}>
-          <FilterButton
-            label="Todos"
-            isActive={filter === 'all'}
-            onPress={() => setFilter('all')}
-            emoji="🎯"
-          />
-          <FilterButton
-            label="Desbloqueados"
-            isActive={filter === 'unlocked'}
-            onPress={() => setFilter('unlocked')}
-            emoji="✓"
-          />
-          <FilterButton
-            label="Bloqueados"
-            isActive={filter === 'locked'}
-            onPress={() => setFilter('locked')}
-            emoji="🔒"
-          />
-        </View>
-
-        {/* Achievements Grid */}
-        <View style={styles.achievementsContainer}>
-          {filteredAchievements.map((achievement) => (
-            <AchievementCard
-              key={achievement.id}
-              icon={achievement.icon}
-              title={achievement.title}
-              description={achievement.description}
-              isUnlocked={achievement.isUnlocked}
-              unlockedDate={achievement.unlockedDate}
-              rarity={achievement.rarity}
-              onUnlock={handleUnlock}
-            />
           ))}
         </View>
 
-        {/* Empty State */}
-        {filteredAchievements.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🔒</Text>
-            <Text style={styles.emptyText}>
-              No hay logros {filter !== 'all' ? 'en esta categoría' : 'aún'}
-            </Text>
+        {/* Progress bar */}
+        <View style={[st.progressBg, { backgroundColor: colors.inputBg }]}>
+          <View style={[st.progressFill, { width: `${completionPercent}%`, backgroundColor: colors.primary }]} />
+        </View>
+
+        {/* Filters */}
+        <View style={st.filters}>
+          {(['all', 'unlocked', 'locked'] as const).map(f => (
+            <TouchableOpacity
+              key={f}
+              onPress={() => setFilter(f)}
+              style={[st.filterBtn, { backgroundColor: filter === f ? colors.primary : colors.card, borderColor: filter === f ? colors.primary : colors.border }]}
+            >
+              <Text style={[st.filterLabel, { color: filter === f ? '#FFF' : colors.textSecondary }]}>
+                {f === 'all' ? 'Todos' : f === 'unlocked' ? 'Desbloqueados' : 'Bloqueados'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Achievements */}
+        {filtered.map(a => (
+          <View key={a.id} style={[st.card, { backgroundColor: colors.card, borderColor: colors.border, opacity: a.isUnlocked ? 1 : 0.55 }]}>
+            <Text style={st.cardIcon}>{a.icon}</Text>
+            <View style={st.cardInfo}>
+              <Text style={[st.cardTitle, { color: colors.textPrimary }]}>{a.title}</Text>
+              <Text style={[st.cardDesc, { color: colors.textSecondary }]}>{a.description}</Text>
+              <View style={[st.rarity, { backgroundColor: RARITY_COLORS[a.rarity] + '22' }]}>
+                <Text style={[st.rarityText, { color: RARITY_COLORS[a.rarity] }]}>{a.rarity}</Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 20 }}>{a.isUnlocked ? '✓' : '🔒'}</Text>
+          </View>
+        ))}
+
+        {filtered.length === 0 && (
+          <View style={st.empty}>
+            <Text style={{ fontSize: 40 }}>🔒</Text>
+            <Text style={[st.emptyText, { color: colors.textSecondary }]}>No hay logros en esta categoría</Text>
           </View>
         )}
-
-        {/* Rarity Info */}
-        <View style={styles.rarityInfoContainer}>
-          <Text style={styles.rarityTitle}>Rareza de Logros</Text>
-          <RarityBadge
-            label="Común"
-            color="#6B7280"
-            example="Fácil de desbloquear"
-          />
-          <RarityBadge
-            label="Raro"
-            color="#3B82F6"
-            example="Requiere esfuerzo"
-          />
-          <RarityBadge
-            label="Épico"
-            color="#8B5CF6"
-            example="Muy desafiante"
-          />
-          <RarityBadge
-            label="Legendario"
-            color="#F59E0B"
-            example="Extremadamente difícil"
-          />
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-interface FilterButtonProps {
-  label: string;
-  isActive: boolean;
-  onPress: () => void;
-  emoji: string;
-}
-
-const FilterButton: React.FC<FilterButtonProps> = ({
-  label,
-  isActive,
-  onPress,
-  emoji,
-}) => (
-  <TouchableOpacity
-    onPress={onPress}
-    style={[
-      styles.filterButton,
-      isActive && styles.filterButtonActive,
-    ]}
-    activeOpacity={0.7}
-  >
-    <Text style={styles.filterEmoji}>{emoji}</Text>
-    <Text
-      style={[
-        styles.filterLabel,
-        isActive && styles.filterLabelActive,
-      ]}
-    >
-      {label}
-    </Text>
-  </TouchableOpacity>
-);
-
-interface RarityBadgeProps {
-  label: string;
-  color: string;
-  example: string;
-}
-
-const RarityBadge: React.FC<RarityBadgeProps> = ({
-  label,
-  color,
-  example,
-}) => (
-  <View style={styles.rarityItem}>
-    <View style={[styles.rarityDot, { backgroundColor: color }]} />
-    <View style={styles.rarityContent}>
-      <Text style={styles.rarityLabel}>{label}</Text>
-      <Text style={styles.rarityExample}>{example}</Text>
-    </View>
-  </View>
-);
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scrollContent: {
-    padding: Spacing.lg,
-    gap: Spacing.lg,
-  },
-  header: {
-    gap: Spacing.md,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  stat: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: Spacing.md,
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  progressContainer: {
-    gap: Spacing.sm,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: Colors.surface,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.primary,
-  },
-  progressText: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    textAlign: 'right',
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  filterButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Colors.surface,
-    borderRadius: 8,
-    paddingVertical: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  filterButtonActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  filterEmoji: {
-    fontSize: 16,
-  },
-  filterLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  filterLabelActive: {
-    color: Colors.background,
-  },
-  achievementsContainer: {
-    gap: Spacing.md,
-  },
-  emptyState: {
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingVertical: Spacing.xl,
-  },
-  emptyIcon: {
-    fontSize: 48,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  rarityInfoContainer: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: Spacing.lg,
-    gap: Spacing.md,
-  },
-  rarityTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: Spacing.sm,
-  },
-  rarityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  rarityDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  rarityContent: {
-    flex: 1,
-  },
-  rarityLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  rarityExample: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
-  },
+const st = StyleSheet.create({
+  root: { flex: 1 },
+  scroll: { padding: 20, gap: 16 },
+  title: { fontSize: 28, fontWeight: '700', marginBottom: 4 },
+  statsRow: { flexDirection: 'row', gap: 12 },
+  stat: { flex: 1, borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1 },
+  statLabel: { fontSize: 12, fontWeight: '500' },
+  statValue: { fontSize: 20, fontWeight: '700', marginTop: 2 },
+  progressBg: { height: 8, borderRadius: 4, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 4 },
+  filters: { flexDirection: 'row', gap: 8 },
+  filterBtn: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 8, borderWidth: 1 },
+  filterLabel: { fontSize: 12, fontWeight: '600' },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14 },
+  cardIcon: { fontSize: 32 },
+  cardInfo: { flex: 1, gap: 4 },
+  cardTitle: { fontSize: 14, fontWeight: '700' },
+  cardDesc: { fontSize: 12, lineHeight: 17 },
+  rarity: { alignSelf: 'flex-start', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginTop: 2 },
+  rarityText: { fontSize: 10, fontWeight: '600', textTransform: 'capitalize' },
+  empty: { alignItems: 'center', gap: 12, paddingVertical: 40 },
+  emptyText: { fontSize: 14, fontWeight: '500' },
 });

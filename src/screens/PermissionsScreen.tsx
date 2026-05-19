@@ -108,7 +108,7 @@ function PermissionCard({ item, status, onRequest }: CardProps) {
           <Text style={styles.iconText}>{item.icon}</Text>
         </View>
         <View style={styles.cardTitles}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
+          <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>{item.title}</Text>
           <View style={[styles.statusBadge, { backgroundColor: statusColor() + '20' }]}>
             <Text style={[styles.statusText, { color: statusColor() }]}>{statusLabel()}</Text>
           </View>
@@ -207,7 +207,7 @@ export function PermissionsScreen({ onDone }: Props) {
           <View style={styles.heroIconWrap}>
             <Text style={styles.heroIcon}>🔐</Text>
           </View>
-          <Text style={[styles.heroTitle, { color: colors.text }]}>
+          <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
             Permisos de la app
           </Text>
           <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>

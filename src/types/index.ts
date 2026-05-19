@@ -19,6 +19,7 @@ export interface Category {
   pagado?: boolean;
   tipo?: 'gasto' | 'ingreso' | 'fijo' | 'variable';
   fechaCreacion?: string;
+  parentCategoryId?: string; // ID of parent category (if this is a subcategory)
 }
 
 export type CategoryUpdate = Partial<Omit<Category, 'id'>>;
@@ -31,6 +32,7 @@ export interface Transaction {
   date: string;
   type: 'income' | 'expense';
   description?: string;
+  subcategory?: string; // subcategory ID (optional)
 }
 
 // Auth Types

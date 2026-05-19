@@ -15,12 +15,15 @@ import {
   FontScaleKey,
   NumFormatKey,
   CardStyleKey,
+  BalanceLayoutKey,
   ACCENT_PALETTES,
   ACCENT_LABELS,
   FONT_SCALES,
   FONT_SCALE_LABELS,
   NUM_FORMAT_LABELS,
   CARD_STYLE_LABELS,
+  BALANCE_LAYOUT_LABELS,
+  BALANCE_LAYOUT_ICONS,
   buildFormatAmount,
 } from '../state/ThemeContext';
 
@@ -33,12 +36,13 @@ interface PersonalizacionScreenProps {
 // ─── Live preview card ────────────────────────────────────────────────────────
 
 const PreviewCard: React.FC<{
-  accentKey:  AccentKey;
-  fontScale:  number;
-  numFormat:  NumFormatKey;
-  cardStyle:  CardStyleKey;
-  isDark:     boolean;
-}> = ({ accentKey, fontScale, numFormat, cardStyle, isDark }) => {
+  accentKey:     AccentKey;
+  fontScale:     number;
+  numFormat:     NumFormatKey;
+  cardStyle:     CardStyleKey;
+  balanceLayout: BalanceLayoutKey;
+  isDark:        boolean;
+}> = ({ accentKey, fontScale, numFormat, cardStyle, balanceLayout, isDark }) => {
   const palette = ACCENT_PALETTES[accentKey];
   const primary = isDark ? palette.primaryDark_dm : palette.primary;
   const bg      = isDark ? '#0F0F11' : '#F8F7FF';
@@ -50,7 +54,7 @@ const PreviewCard: React.FC<{
   const fmt = buildFormatAmount(numFormat);
   const fs  = (base: number) => Math.round(base * fontScale);
 
-  // Balance card appearance
+  // Balance card style colours
   let balanceBg = primary;
   let balanceText = '#FFFFFF';
   let balanceBorder = 'transparent';
@@ -67,33 +71,100 @@ const PreviewCard: React.FC<{
     balanceBorder = primary + '55';
   }
 
-  return (
-    <View style={[pv.wrap, { backgroundColor: bg }]}>
-      {/* Balance card */}
-      <View style={[pv.balCard, {
-        backgroundColor: balanceBg,
-        borderWidth: cardStyle === 'minimal' || cardStyle === 'glass' ? 2 : 0,
-        borderColor: balanceBorder,
-      }]}>
-        <Text style={[pv.balLabel, { color: balanceText + 'BB', fontSize: fs(9) }]}>
-          DISPONIBLE AHORA
-        </Text>
-        <Text style={[pv.balAmount, { color: balanceText, fontSize: fs(20) }]}>
-          {fmt(2_850_000)}
-        </Text>
+  const t  = balanceText;
+  const tB = balanceText + 'BB';
+  const tC = balanceText + 'CC';
+  const progW = 0.55; // 55% spent mock
+
+  // ── Balance card content by layout ──────────────────────────────────────────
+  const renderBalance = () => {
+    if (balanceLayout === 'compacta') {
+      return (
+        <View style={[pv.balCard, { backgroundColor: balanceBg, borderWidth: cardStyle === 'minimal' || cardStyle === 'glass' ? 2 : 0, borderColor: balanceBorder, gap: 8 }]}>
+          <Text style={[pv.balLabel, { color: tB, fontSize: fs(8) }]}>DISPONIBLE AHORA</Text>
+          <Text style={[pv.balAmount, { color: t, fontSize: fs(17) }]}>{fmt(2_850_000)}</Text>
+          {/* Progress bar */}
+          <View style={{ height: 4, backgroundColor: balanceText + '33', borderRadius: 2, overflow: 'hidden' }}>
+            <View style={{ width: `${progW * 100}%`, height: '100%', backgroundColor: balanceText, borderRadius: 2 }} />
+          </View>
+          {/* 3 stats */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
+            {[['↑', fmt(3_200_000)], ['↓', fmt(350_000)], ['📅', '16d']].map(([icon, val], i) => (
+              <View key={i} style={{ alignItems: 'center' }}>
+                <Text style={{ color: tC, fontSize: fs(8) }}>{icon}</Text>
+                <Text style={{ color: t, fontSize: fs(8), fontWeight: '700' }}>{val}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      );
+    }
+
+    if (balanceLayout === 'anillo') {
+      return (
+        <View style={[pv.balCard, { backgroundColor: balanceBg, borderWidth: cardStyle === 'minimal' || cardStyle === 'glass' ? 2 : 0, borderColor: balanceBorder, flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
+          {/* Ring */}
+          <View style={{ width: 52, height: 52, borderRadius: 26, borderWidth: 6, borderColor: balanceText + '33', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+            <View style={{ position: 'absolute', width: 52, height: 52, borderRadius: 26, borderWidth: 6, borderColor: balanceText, borderRightColor: 'transparent', borderBottomColor: 'transparent', transform: [{ rotate: '-45deg' }] }} />
+            <Text style={{ color: t, fontSize: fs(8), fontWeight: '800' }}>55%</Text>
+          </View>
+          {/* Info col */}
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={[pv.balLabel, { color: tB, fontSize: fs(7) }]}>DISPONIBLE</Text>
+            <Text style={[pv.balAmount, { color: t, fontSize: fs(14) }]}>{fmt(2_850_000)}</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Text style={{ color: tC, fontSize: fs(8) }}>↑ {fmt(3_200_000)}</Text>
+              <Text style={{ color: tC, fontSize: fs(8) }}>↓ {fmt(350_000)}</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (balanceLayout === 'horizontal') {
+      return (
+        <View style={[pv.balCard, { backgroundColor: balanceBg, borderWidth: cardStyle === 'minimal' || cardStyle === 'glass' ? 2 : 0, borderColor: balanceBorder, flexDirection: 'row', gap: 10 }]}>
+          {/* Left col */}
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={[pv.balLabel, { color: tB, fontSize: fs(7) }]}>DISPONIBLE</Text>
+            <Text style={[pv.balAmount, { color: t, fontSize: fs(13) }]}>{fmt(2_850_000)}</Text>
+            <View style={{ height: 3, backgroundColor: balanceText + '33', borderRadius: 2, overflow: 'hidden', marginTop: 2 }}>
+              <View style={{ width: `${progW * 100}%`, height: '100%', backgroundColor: balanceText, borderRadius: 2 }} />
+            </View>
+          </View>
+          {/* Right col */}
+          <View style={{ gap: 4, justifyContent: 'center' }}>
+            {[['Ingresos', fmt(3_200_000)], ['Gastos', fmt(350_000)], ['Ahorro', '10%'], ['Días', '16']].map(([label, val]) => (
+              <View key={label} style={{ alignItems: 'flex-end' }}>
+                <Text style={{ color: tC, fontSize: fs(7) }}>{label}</Text>
+                <Text style={{ color: t, fontSize: fs(8), fontWeight: '700' }}>{val}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      );
+    }
+
+    // clasica (default)
+    return (
+      <View style={[pv.balCard, { backgroundColor: balanceBg, borderWidth: cardStyle === 'minimal' || cardStyle === 'glass' ? 2 : 0, borderColor: balanceBorder }]}>
+        <Text style={[pv.balLabel, { color: tB, fontSize: fs(9) }]}>DISPONIBLE AHORA</Text>
+        <Text style={[pv.balAmount, { color: t, fontSize: fs(20) }]}>{fmt(2_850_000)}</Text>
         <View style={pv.balRow}>
           <View style={pv.balChip}>
-            <Text style={[pv.balChipText, { color: balanceText + 'CC', fontSize: fs(9) }]}>
-              ↑ {fmt(3_200_000)}
-            </Text>
+            <Text style={[pv.balChipText, { color: tC, fontSize: fs(9) }]}>↑ {fmt(3_200_000)}</Text>
           </View>
           <View style={pv.balChip}>
-            <Text style={[pv.balChipText, { color: balanceText + 'CC', fontSize: fs(9) }]}>
-              ↓ {fmt(350_000)}
-            </Text>
+            <Text style={[pv.balChipText, { color: tC, fontSize: fs(9) }]}>↓ {fmt(350_000)}</Text>
           </View>
         </View>
       </View>
+    );
+  };
+
+  return (
+    <View style={[pv.wrap, { backgroundColor: bg }]}>
+      {renderBalance()}
 
       {/* Mock transactions */}
       <View style={[pv.card, { backgroundColor: cardBg, borderColor: border }]}>
@@ -107,9 +178,7 @@ const PreviewCard: React.FC<{
             <Text style={[pv.txName, { color: textMain, fontSize: fs(11) }]}>Supermercado</Text>
             <Text style={[pv.txCat,  { color: textSub,  fontSize: fs(9)  }]}>Alimentación</Text>
           </View>
-          <Text style={[pv.txAmt, { color: '#F55B5B', fontSize: fs(12) }]}>
-            -{fmt(127_000)}
-          </Text>
+          <Text style={[pv.txAmt, { color: '#F55B5B', fontSize: fs(12) }]}>-{fmt(127_000)}</Text>
         </View>
 
         <View style={pv.txRow}>
@@ -120,9 +189,7 @@ const PreviewCard: React.FC<{
             <Text style={[pv.txName, { color: textMain, fontSize: fs(11) }]}>Salario</Text>
             <Text style={[pv.txCat,  { color: textSub,  fontSize: fs(9)  }]}>Ingresos</Text>
           </View>
-          <Text style={[pv.txAmt, { color: '#1D9E75', fontSize: fs(12) }]}>
-            +{fmt(3_200_000)}
-          </Text>
+          <Text style={[pv.txAmt, { color: '#1D9E75', fontSize: fs(12) }]}>+{fmt(3_200_000)}</Text>
         </View>
       </View>
 
@@ -133,10 +200,7 @@ const PreviewCard: React.FC<{
           const icons = ['home', 'message-circle', 'plus', 'compass', 'user'];
           return (
             <View key={tab} style={pv.navItem}>
-              <View style={[
-                pv.navIconWrap,
-                isActive && { backgroundColor: primary + '18' },
-              ]}>
+              <View style={[pv.navIconWrap, isActive && { backgroundColor: primary + '18' }]}>
                 <Icon
                   name={icons[i] as any}
                   size={fs(13)}
@@ -180,6 +244,7 @@ const SectionTitle: React.FC<{ label: string; sub?: string }> = ({ label, sub })
   </View>
 );
 
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export const PersonalizacionScreen: React.FC<PersonalizacionScreenProps> = ({ onBack }) => {
@@ -190,6 +255,7 @@ export const PersonalizacionScreen: React.FC<PersonalizacionScreenProps> = ({ on
     fontScaleKey, setFontScaleKey,
     numFormat, setNumFormat,
     cardStyle, setCardStyle,
+    balanceLayout, setBalanceLayout,
     fontScale,
   } = useTheme();
 
@@ -197,7 +263,8 @@ export const PersonalizacionScreen: React.FC<PersonalizacionScreenProps> = ({ on
   const [prevAccent,    setPrevAccent]    = useState<AccentKey>(accentKey);
   const [prevFontScale, setPrevFontScale] = useState<FontScaleKey>(fontScaleKey);
   const [prevNumFormat, setPrevNumFormat] = useState<NumFormatKey>(numFormat);
-  const [prevCardStyle, setPrevCardStyle] = useState<CardStyleKey>(cardStyle);
+  const [prevCardStyle,     setPrevCardStyle]     = useState<CardStyleKey>(cardStyle);
+  const [prevBalanceLayout, setPrevBalanceLayout] = useState<BalanceLayoutKey>(balanceLayout);
 
   const applyAccent = (k: AccentKey) => {
     setPrevAccent(k);
@@ -215,6 +282,10 @@ export const PersonalizacionScreen: React.FC<PersonalizacionScreenProps> = ({ on
     setPrevCardStyle(k);
     setCardStyle(k);
   };
+  const applyLayout = (k: BalanceLayoutKey) => {
+    setPrevBalanceLayout(k);
+    setBalanceLayout(k);
+  };
 
   const fs = (base: number) => Math.round(base * fontScale);
 
@@ -231,25 +302,26 @@ export const PersonalizacionScreen: React.FC<PersonalizacionScreenProps> = ({ on
         </View>
       </View>
 
+      {/* ── Sticky live preview ── */}
+      <View style={[s.previewSticky, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <Text style={[s.previewLabel, { color: colors.textTertiary, fontSize: fs(11) }]}>
+          VISTA PREVIA
+        </Text>
+        <PreviewCard
+          accentKey={prevAccent}
+          fontScale={FONT_SCALES[prevFontScale]}
+          numFormat={prevNumFormat}
+          cardStyle={prevCardStyle}
+          balanceLayout={prevBalanceLayout}
+          isDark={isDark}
+        />
+      </View>
+
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
       >
-
-        {/* ── Live preview ── */}
-        <View style={s.previewSection}>
-          <Text style={[s.previewLabel, { color: colors.textTertiary, fontSize: fs(11) }]}>
-            VISTA PREVIA EN TIEMPO REAL
-          </Text>
-          <PreviewCard
-            accentKey={prevAccent}
-            fontScale={FONT_SCALES[prevFontScale]}
-            numFormat={prevNumFormat}
-            cardStyle={prevCardStyle}
-            isDark={isDark}
-          />
-        </View>
 
         {/* ──────────────────────────────────────────────────────
             1. COLOR DE ACENTO
@@ -415,6 +487,58 @@ export const PersonalizacionScreen: React.FC<PersonalizacionScreenProps> = ({ on
           </View>
         </View>
 
+        {/* ──────────────────────────────────────────────────────
+            5. DISEÑO DE LA TARJETA DE INICIO
+        ────────────────────────────────────────────────────── */}
+        <SectionTitle
+          label="Diseño del panel de inicio"
+          sub="Elige cómo ver tu balance y estadísticas en inicio"
+        />
+
+        <View style={[s.card, { backgroundColor: colors.card }]}>
+          <View style={s.layoutGrid}>
+            {(Object.keys(BALANCE_LAYOUT_LABELS) as BalanceLayoutKey[]).map(key => {
+              const active = prevBalanceLayout === key;
+              const descs: Record<BalanceLayoutKey, string> = {
+                clasica:    'Balance completo con métricas y barra de progreso',
+                compacta:   'Vista condensada con barra única y 3 datos',
+                anillo:     'Anillo de progreso con estadísticas al lado',
+                horizontal: 'Dos columnas: balance e indicadores',
+              };
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[
+                    s.layoutItem,
+                    { backgroundColor: colors.cardSecondary },
+                    active && { borderColor: colors.primary, borderWidth: 2 },
+                  ]}
+                  onPress={() => applyLayout(key)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[s.layoutIcon, { color: active ? colors.primary : colors.textSecondary }]}>
+                    {BALANCE_LAYOUT_ICONS[key]}
+                  </Text>
+                  <Text style={[s.layoutName, {
+                    color: active ? colors.primary : colors.textPrimary,
+                    fontSize: fs(12),
+                  }]}>
+                    {BALANCE_LAYOUT_LABELS[key]}
+                  </Text>
+                  <Text style={[s.layoutDesc, { color: colors.textTertiary, fontSize: fs(10) }]}>
+                    {descs[key]}
+                  </Text>
+                  {active && (
+                    <View style={[s.cardStyleBadge, { backgroundColor: colors.primary }]}>
+                      <Text style={s.cardStyleBadgeText}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         {/* Reset */}
         <TouchableOpacity
           style={[s.resetBtn, { borderColor: colors.border }]}
@@ -423,6 +547,7 @@ export const PersonalizacionScreen: React.FC<PersonalizacionScreenProps> = ({ on
             applyFont('normal');
             applyFormat('cop');
             applyCard('gradient');
+            applyLayout('clasica');
           }}
           activeOpacity={0.7}
         >
@@ -474,10 +599,13 @@ const s = StyleSheet.create({
     gap: 8,
   },
 
-  // ── Preview ──
-  previewSection: {
-    marginBottom: 24,
-    gap: 10,
+  // ── Preview (sticky) ──
+  previewSticky: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    gap: 8,
+    borderBottomWidth: 1,
   },
   previewLabel: {
     fontWeight: '700',
@@ -618,6 +746,135 @@ const s = StyleSheet.create({
     fontSize: 9,
     fontWeight: '800',
     color: '#fff',
+  },
+
+  // ── Balance layout grid ──
+  layoutGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 12,
+    gap: 8,
+  },
+  layoutItem: {
+    width: '47%',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    position: 'relative',
+    gap: 6,
+  },
+  layoutIcon: {
+    fontSize: 28,
+    fontWeight: '700',
+  },
+  layoutName: {
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  layoutDesc: {
+    textAlign: 'center',
+    lineHeight: 14,
+    fontWeight: '400',
+  },
+
+  // ── Glass mode master banner ──
+  glassMasterBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: 'rgba(97,86,232,0.12)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(97,86,232,0.25)',
+  },
+  glassMasterIcon: {
+    fontSize: 28,
+    marginTop: 2,
+  },
+  glassMasterTitle: {
+    fontWeight: '800',
+    color: '#6156E8',
+    letterSpacing: -0.2,
+  },
+  glassMasterSub: {
+    color: '#6B7280',
+    marginTop: 3,
+    fontWeight: '400',
+    lineHeight: 17,
+  },
+  lockedSection: {
+    opacity: 0.35,
+  },
+
+  // ── Liquid Glass card ──
+  glassCard: {
+    borderRadius: 20,
+    padding: 20,
+    gap: 10,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  glassCardActive: {
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  glassShimmer: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: 50,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  glassRim: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  glassRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  glassLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    flex: 1,
+  },
+  glassEmoji: {
+    fontSize: 32,
+  },
+  glassTitle: {
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  glassSub: {
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  glassFeat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingLeft: 4,
+  },
+  glassFeatDot: {
+    fontSize: 7,
+  },
+  glassFeatText: {
+    fontWeight: '400',
   },
 
   // ── Reset ──

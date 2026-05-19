@@ -56,7 +56,7 @@ interface FinancialFeedProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpenBot }) => {
   const insets = useSafeAreaInsets();
-  const { colors, isDark, accentColor, formatAmount, cardStyle, fontScale } = useTheme();
+  const { colors, isDark, accentColor, formatAmount, cardStyle, fontScale, balanceLayout } = useTheme();
   const {
     user, transactions, categories, profile, goal, userLevel,
     addTransaction: ctxAdd, deleteTransaction: ctxDelete,
@@ -97,14 +97,23 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
     [transactions, categories, profile?.monthlySalary, mesActual, añoActual],
   );
 
+  // Mapa id→nombre para resolver transacciones que guardan el ID en lugar del nombre
+  const idToNameFeed = useMemo(() => {
+    const map: Record<string, string> = {};
+    (categories as any[]).forEach((c: any) => { map[c.id] = c.name; });
+    return map;
+  }, [categories]);
+
   const gastosPorCatSel = useMemo(() => {
     return txMesSel
       .filter(t => t.type === 'expense')
       .reduce((acc, t) => {
-        acc[t.category] = (acc[t.category] || 0) + t.amount;
+        // t.category puede ser ID (Gastos.tsx antiguo) o nombre (Finn / imports)
+        const nombre = idToNameFeed[t.category] ?? t.category;
+        acc[nombre] = (acc[nombre] || 0) + t.amount;
         return acc;
       }, {} as Record<string, number>);
-  }, [txMesSel]);
+  }, [txMesSel, idToNameFeed]);
 
   const ingresosMes = useMemo(() =>
     txMesSel.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0),
@@ -327,12 +336,12 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
     return (
       <SwipeableRow key={tx.id} onDelete={() => ctxDelete(tx.id)}>
         <TouchableOpacity activeOpacity={0.7} onPress={() => setSelectedTx(tx)}>
-          <View style={s.txCard}>
+          <View style={[s.txCard, { backgroundColor: colors.card }]}>
             <View style={[s.txIcon, { backgroundColor: bg }]}>
               <Icon name={icon as any} size={18} color={color} />
             </View>
             <View style={s.txInfo}>
-              <Text style={[s.txName, { color: THEME.colors.textPrimary }]} numberOfLines={1}>
+              <Text style={[s.txName, { color: colors.textPrimary }]} numberOfLines={1}>
                 {tx.description || tx.category}
               </Text>
               <Text style={s.txSub}>
@@ -340,10 +349,10 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
               </Text>
             </View>
             <View style={s.txRight}>
-              <Text style={[s.txAmount, { color: isIncome ? THEME.colors.income : THEME.colors.expense }]}>
+              <Text style={[s.txAmount, { color: isIncome ? colors.income : colors.expense }]}>
                 {isIncome ? '+' : '-'}{fmtCOP(tx.amount)}
               </Text>
-              <Icon name="chevron-left" size={12} color={THEME.colors.textTertiary ?? '#CBD5E1'} />
+              <Icon name="chevron-left" size={12} color={colors.textTertiary} />
             </View>
           </View>
         </TouchableOpacity>
@@ -359,7 +368,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
       icon: 'arrow-up',
       bg: colors.incomeLight,
       color: colors.income,
-      onPress: () => abrirQuickAdd('income'),
+      onPress: () => onNavigate('ingresos'),
       isVoice: false,
     },
     {
@@ -367,14 +376,14 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
       icon: 'arrow-down',
       bg: colors.expenseLight,
       color: colors.expense,
-      onPress: () => abrirQuickAdd('expense'),
+      onPress: () => onNavigate('gastos'),
       isVoice: false,
     },
     {
       label: 'Voz',
       icon: 'mic',
-      bg: '#F3E8FF',
-      color: '#8B5CF6',
+      bg: colors.aiLight,
+      color: colors.ai,
       onPress: () => {},
       isVoice: true,
     },
@@ -400,18 +409,18 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <View style={[s.root, { backgroundColor: THEME.colors.background }]}>
+    <View style={[s.root, { backgroundColor: colors.background }]}>
       <ScrollView
         style={s.fullScroll}
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
       >
       {/* ── HERO ─────────────────────────────────────────────────────── */}
-      <View style={[s.hero, { backgroundColor: THEME.colors.background, paddingTop: insets.top + 16 }]}>
+      <View style={[s.hero, { backgroundColor: colors.background, paddingTop: insets.top + 16 }]}>
         {/* Top bar */}
         <View style={s.heroTopBar}>
           {/* Avatar - 40×40, light indigo */}
-          <TouchableOpacity style={s.avatar} onPress={() => onNavigate('perfil')}>
+          <TouchableOpacity style={[s.avatar, { backgroundColor: colors.primaryLight }]} onPress={() => onNavigate('perfil')}>
             <Text style={s.avatarLetter}>{(user?.name ?? 'U').charAt(0).toUpperCase()}</Text>
           </TouchableOpacity>
 
@@ -434,7 +443,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
                 setNotifPanelVisible(true);
               }}
             >
-              <Icon name="bell" size={16} color={noLeidas > 0 ? THEME.colors.primary : THEME.colors.textSecondary} />
+              <Icon name="bell" size={16} color={noLeidas > 0 ? colors.primary : colors.textSecondary} />
               {noLeidas > 0 && (
                 <View style={s.bellBadge}>
                   <Text style={s.bellBadgeText}>{noLeidas > 9 ? '9+' : noLeidas}</Text>
@@ -442,7 +451,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
               )}
             </TouchableOpacity>
             <TouchableOpacity style={s.heroIconBtn} onPress={() => onNavigate('historial')}>
-              <Icon name="search" size={16} color={THEME.colors.textSecondary} />
+              <Icon name="search" size={16} color={colors.textSecondary} />
             </TouchableOpacity>
             <TouchableOpacity
               style={s.heroIconBtn}
@@ -452,128 +461,200 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
               }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Icon name="menu" size={16} color={THEME.colors.textSecondary} />
+              <Icon name="menu" size={16} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* ── Balance Card ─────────────────────────────────────────── */}
         {(() => {
-          // Compute card appearance from cardStyle
-          let cardBg         = accentColor;
-          let cardBorder     = 'transparent';
-          let cardBorderW    = 0;
-          let textColor      = '#FFFFFF';
-          let subTextColor   = 'rgba(255,255,255,0.75)';
-          let subCardBg      = 'rgba(255,255,255,0.15)';
-
+          // ── Colores según cardStyle ────────────────────────────────
+          let cardBg       = accentColor;
+          let cardBorder   = 'transparent';
+          let cardBorderW  = 0;
+          let textColor    = '#FFFFFF';
+          let sub          = 'rgba(255,255,255,0.75)';
+          let subCardBg    = 'rgba(255,255,255,0.15)';
           if (cardStyle === 'minimal') {
-            cardBg        = isDark ? '#1C1C1F' : '#FFFFFF';
-            cardBorder    = accentColor;
-            cardBorderW   = 2;
-            textColor     = isDark ? '#F4F4F5' : '#111827';
-            subTextColor  = isDark ? '#A1A1AA' : '#6B7280';
-            subCardBg     = isDark ? '#252528' : '#F4F3F8';
+            cardBg = isDark ? '#1C1C1F' : '#FFFFFF'; cardBorder = accentColor; cardBorderW = 2;
+            textColor = isDark ? '#F4F4F5' : '#111827'; sub = isDark ? '#A1A1AA' : '#6B7280'; subCardBg = isDark ? '#252528' : '#F4F3F8';
           } else if (cardStyle === 'dark') {
-            cardBg      = isDark ? '#0A0A0F' : '#111827';
-            textColor   = '#FFFFFF';
-            subTextColor = 'rgba(255,255,255,0.6)';
-            subCardBg   = 'rgba(255,255,255,0.08)';
+            cardBg = isDark ? '#0A0A0F' : '#111827'; textColor = '#FFFFFF'; sub = 'rgba(255,255,255,0.6)'; subCardBg = 'rgba(255,255,255,0.08)';
           } else if (cardStyle === 'glass') {
-            cardBg      = accentColor + '28';
-            cardBorder  = accentColor + '66';
-            cardBorderW = 1.5;
-            textColor   = isDark ? '#FFFFFF' : '#111827';
-            subTextColor = isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.55)';
-            subCardBg   = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)';
+            cardBg = accentColor + '28'; cardBorder = accentColor + '66'; cardBorderW = 1.5;
+            textColor = isDark ? '#FFFFFF' : '#111827'; sub = isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.55)'; subCardBg = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)';
           }
-
           const fs = (n: number) => Math.round(n * fontScale);
+          const pctGastado = metricas.porcentajeGastado;
 
-          return (
-        <Animated.View
-          style={[
-            s.balanceCard,
-            {
-              backgroundColor: cardBg,
-              borderColor: cardBorder,
-              borderWidth: cardBorderW,
-              opacity: heroAnim,
-              transform: [{ scale: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) }],
-            },
-          ]}
-        >
-          <Text style={[s.balanceLabel, { color: subTextColor, fontSize: fs(10) }]}>DISPONIBLE AHORA</Text>
-          <Text ref={balanceText} style={[s.balanceAmount, { color: textColor, fontSize: fs(36) }]}>
-            {formatAmount(metricas.balanceDisponible)}
-          </Text>
-          <Text style={[s.balanceMonth, { color: subTextColor, fontSize: fs(12) }]}>
-            {capitalize(getNombreMes(mesActual))} {añoActual}
-          </Text>
-
-          {/* Sub-cards: ingresos totales / gastos */}
-          <View style={s.balanceSubCards}>
-            <View style={[s.balanceSubCard, { backgroundColor: subCardBg }]}>
-              <Icon name="arrow-up" size={12} color={subTextColor} />
-              <Text style={[s.balanceSubLabel, { color: subTextColor, fontSize: fs(10) }]}>Ingresado</Text>
-              <Text style={[s.balanceSubValue, { color: textColor, fontSize: fs(13) }]}>{formatAmount(metricas.ingresoEfectivo)}</Text>
-            </View>
-            <View style={[s.balanceSubCard, { backgroundColor: subCardBg }]}>
-              <Icon name="arrow-down" size={12} color={subTextColor} />
-              <Text style={[s.balanceSubLabel, { color: subTextColor, fontSize: fs(10) }]}>Gastado</Text>
-              <Text style={[s.balanceSubValue, { color: textColor, fontSize: fs(13) }]}>{formatAmount(gastosMes)}</Text>
-            </View>
-          </View>
-
-          {/* 3-segment breakdown bar */}
-          <View style={s.segBarWrap}>
-            {metricas.porcentajeGastado > 0 && (
-              <View style={[s.segSlice, { flex: metricas.porcentajeGastado, backgroundColor: '#F87171' }]} />
-            )}
-            {metricas.porcentajePendiente > 0 && (
-              <View style={[s.segSlice, { flex: metricas.porcentajePendiente, backgroundColor: '#FBBF24' }]} />
-            )}
-            {metricas.porcentajeLibre > 0 && (
-              <View style={[s.segSlice, { flex: metricas.porcentajeLibre, backgroundColor: 'rgba(255,255,255,0.35)' }]} />
-            )}
-            {metricas.porcentajeGastado === 0 && metricas.porcentajePendiente === 0 && (
-              <View style={[s.segSlice, { flex: 100, backgroundColor: 'rgba(255,255,255,0.35)' }]} />
-            )}
-          </View>
-          <View style={s.segLabelsRow}>
-            <Text style={s.segLabel}>
-              <Text style={{ color: '#F87171' }}>■</Text> Gastado {metricas.porcentajeGastado}%
-            </Text>
-            <Text style={s.segLabel}>
-              <Text style={{ color: '#FBBF24' }}>■</Text> Pendiente {metricas.porcentajePendiente}%
-            </Text>
-            <Text style={s.segLabel}>
-              <Text style={{ color: 'rgba(255,255,255,0.6)' }}>■</Text> Libre {metricas.porcentajeLibre}%
-            </Text>
-          </View>
-
-          {/* Daily budget pill */}
-          <View style={s.dailyPill}>
-            <Icon name="calendar" size={10} color={subTextColor} />
-            <Text style={[s.dailyPillText, { color: subTextColor, fontSize: fs(10) }]}>
-              {formatAmount(metricas.gastoPromedioRecomendadoDia)}/día · {metricas.diasRestantesMes} días restantes
-            </Text>
-          </View>
-
-          {/* CTA when no real income */}
-          {!metricas.esIngresoReal && (
-            <TouchableOpacity style={s.ctaIngreso} onPress={() => abrirQuickAdd('income')} activeOpacity={0.8}>
+          // ── CTA registro ingreso ───────────────────────────────────
+          const ctaIngreso = !metricas.esIngresoReal ? (
+            <TouchableOpacity style={s.ctaIngreso} onPress={() => onNavigate('ingresos')} activeOpacity={0.8}>
               <Icon name="plus-circle" size={12} color="rgba(255,255,255,0.9)" />
               <Text style={s.ctaIngresoText}>Registrar ingreso real</Text>
             </TouchableOpacity>
-          )}
-        </Animated.View>
+          ) : null;
+
+          // ── LAYOUT: CLÁSICA (actual, full) ─────────────────────────
+          if (balanceLayout === 'clasica') {
+            return (
+              <Animated.View style={[s.balanceCard, { backgroundColor: cardBg, borderColor: cardBorder, borderWidth: cardBorderW },
+                { opacity: heroAnim, transform: [{ scale: heroAnim.interpolate({ inputRange: [0,1], outputRange: [0.95,1] }) }] }]}>
+                <Text style={[s.balanceLabel, { color: sub, fontSize: fs(10) }]}>DISPONIBLE AHORA</Text>
+                <Text ref={balanceText} style={[s.balanceAmount, { color: textColor, fontSize: fs(36) }]}>{formatAmount(metricas.balanceDisponible)}</Text>
+                <Text style={[s.balanceMonth, { color: sub, fontSize: fs(12) }]}>{capitalize(getNombreMes(mesActual))} {añoActual}</Text>
+                <View style={s.balanceSubCards}>
+                  <View style={[s.balanceSubCard, { backgroundColor: subCardBg }]}>
+                    <Icon name="arrow-up" size={12} color={sub} />
+                    <Text style={[s.balanceSubLabel, { color: sub, fontSize: fs(10) }]}>Ingresado</Text>
+                    <Text style={[s.balanceSubValue, { color: textColor, fontSize: fs(13) }]}>{formatAmount(metricas.ingresoEfectivo)}</Text>
+                  </View>
+                  <View style={[s.balanceSubCard, { backgroundColor: subCardBg }]}>
+                    <Icon name="arrow-down" size={12} color={sub} />
+                    <Text style={[s.balanceSubLabel, { color: sub, fontSize: fs(10) }]}>Gastado</Text>
+                    <Text style={[s.balanceSubValue, { color: textColor, fontSize: fs(13) }]}>{formatAmount(gastosMes)}</Text>
+                  </View>
+                </View>
+                <View style={s.segBarWrap}>
+                  {metricas.porcentajeGastado > 0 && <View style={[s.segSlice, { flex: metricas.porcentajeGastado, backgroundColor: '#F87171' }]} />}
+                  {metricas.porcentajePendiente > 0 && <View style={[s.segSlice, { flex: metricas.porcentajePendiente, backgroundColor: '#FBBF24' }]} />}
+                  {metricas.porcentajeLibre > 0 && <View style={[s.segSlice, { flex: metricas.porcentajeLibre, backgroundColor: 'rgba(255,255,255,0.35)' }]} />}
+                  {metricas.porcentajeGastado === 0 && metricas.porcentajePendiente === 0 && <View style={[s.segSlice, { flex: 100, backgroundColor: 'rgba(255,255,255,0.35)' }]} />}
+                </View>
+                <View style={s.segLabelsRow}>
+                  <Text style={s.segLabel}><Text style={{ color: '#F87171' }}>■</Text> Gastado {metricas.porcentajeGastado}%</Text>
+                  <Text style={s.segLabel}><Text style={{ color: '#FBBF24' }}>■</Text> Pendiente {metricas.porcentajePendiente}%</Text>
+                  <Text style={s.segLabel}><Text style={{ color: 'rgba(255,255,255,0.6)' }}>■</Text> Libre {metricas.porcentajeLibre}%</Text>
+                </View>
+                <View style={s.dailyPill}>
+                  <Icon name="calendar" size={10} color={sub} />
+                  <Text style={[s.dailyPillText, { color: sub, fontSize: fs(10) }]}>{formatAmount(metricas.gastoPromedioRecomendadoDia)}/día · {metricas.diasRestantesMes} días restantes</Text>
+                </View>
+                {ctaIngreso}
+              </Animated.View>
+            );
+          }
+
+          // ── LAYOUT: COMPACTA ───────────────────────────────────────
+          if (balanceLayout === 'compacta') {
+            return (
+              <Animated.View style={[s.balanceCard, { backgroundColor: cardBg, borderColor: cardBorder, borderWidth: cardBorderW, paddingVertical: 18 },
+                { opacity: heroAnim, transform: [{ scale: heroAnim.interpolate({ inputRange: [0,1], outputRange: [0.95,1] }) }] }]}>
+                <Text style={[s.balanceLabel, { color: sub, fontSize: fs(10) }]}>DISPONIBLE AHORA</Text>
+                <Text ref={balanceText} style={[s.balanceAmount, { color: textColor, fontSize: fs(32), marginBottom: 4 }]}>{formatAmount(metricas.balanceDisponible)}</Text>
+                {/* Barra única de progreso */}
+                <View style={[s.segBarWrap, { marginBottom: 14 }]}>
+                  <View style={[s.segSlice, { flex: pctGastado || 1, backgroundColor: pctGastado > 80 ? '#F87171' : '#4ADE80' }]} />
+                  <View style={[s.segSlice, { flex: Math.max(100 - pctGastado, 0), backgroundColor: 'rgba(255,255,255,0.20)' }]} />
+                </View>
+                {/* 3 stats en fila */}
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {[
+                    { icon: 'arrow-up' as const, label: 'Ingresado', val: formatAmount(metricas.ingresoEfectivo) },
+                    { icon: 'arrow-down' as const, label: 'Gastado', val: formatAmount(gastosMes) },
+                    { icon: 'calendar' as const, label: 'Días rest.', val: String(metricas.diasRestantesMes) },
+                  ].map(item => (
+                    <View key={item.label} style={[s.balanceSubCard, { flex: 1, backgroundColor: subCardBg }]}>
+                      <Icon name={item.icon} size={11} color={sub} />
+                      <Text style={[s.balanceSubLabel, { color: sub, fontSize: fs(9) }]}>{item.label}</Text>
+                      <Text style={[s.balanceSubValue, { color: textColor, fontSize: fs(12) }]}>{item.val}</Text>
+                    </View>
+                  ))}
+                </View>
+                {ctaIngreso}
+              </Animated.View>
+            );
+          }
+
+          // ── LAYOUT: ANILLO ─────────────────────────────────────────
+          if (balanceLayout === 'anillo') {
+            const R = 54; const CIRC = 2 * Math.PI * R;
+            const stroke = CIRC * (1 - pctGastado / 100);
+            return (
+              <Animated.View style={[s.balanceCard, { backgroundColor: cardBg, borderColor: cardBorder, borderWidth: cardBorderW, flexDirection: 'row', alignItems: 'center', gap: 16 },
+                { opacity: heroAnim, transform: [{ scale: heroAnim.interpolate({ inputRange: [0,1], outputRange: [0.95,1] }) }] }]}>
+                {/* Anillo SVG */}
+                <View style={{ width: 124, height: 124, alignItems: 'center', justifyContent: 'center' }}>
+                  {/* Pista de fondo */}
+                  <View style={{ position: 'absolute', width: 124, height: 124, borderRadius: 62, borderWidth: 10, borderColor: 'rgba(255,255,255,0.18)' }} />
+                  {/* Arco de progreso usando border-clip trick */}
+                  <View style={{
+                    position: 'absolute', width: 124, height: 124, borderRadius: 62,
+                    borderWidth: 10,
+                    borderColor: pctGastado > 80 ? '#F87171' : '#4ADE80',
+                    borderTopColor: pctGastado > 25 ? (pctGastado > 80 ? '#F87171' : '#4ADE80') : 'transparent',
+                    borderRightColor: pctGastado > 50 ? (pctGastado > 80 ? '#F87171' : '#4ADE80') : 'transparent',
+                    borderBottomColor: pctGastado > 75 ? (pctGastado > 80 ? '#F87171' : '#4ADE80') : 'transparent',
+                    transform: [{ rotate: '-90deg' }],
+                  }} />
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: fs(11), fontWeight: '800', color: textColor }}>{pctGastado}%</Text>
+                    <Text style={{ fontSize: fs(8), color: sub }}>gastado</Text>
+                  </View>
+                </View>
+                {/* Info derecha */}
+                <View style={{ flex: 1, gap: 8 }}>
+                  <View>
+                    <Text style={[s.balanceLabel, { color: sub, fontSize: fs(9) }]}>DISPONIBLE</Text>
+                    <Text ref={balanceText} style={[s.balanceAmount, { color: textColor, fontSize: fs(24), marginBottom: 0 }]}>{formatAmount(metricas.balanceDisponible)}</Text>
+                    <Text style={[s.balanceMonth, { color: sub, fontSize: fs(10), marginBottom: 0 }]}>{capitalize(getNombreMes(mesActual))}</Text>
+                  </View>
+                  <View style={{ gap: 4 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ color: sub, fontSize: fs(10) }}>↑ {formatAmount(metricas.ingresoEfectivo)}</Text>
+                      <Text style={{ color: sub, fontSize: fs(10) }}>↓ {formatAmount(gastosMes)}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ color: sub, fontSize: fs(10) }}>📅 {metricas.diasRestantesMes} días</Text>
+                      <Text style={{ color: sub, fontSize: fs(10) }}>{formatAmount(metricas.gastoPromedioRecomendadoDia)}/día</Text>
+                    </View>
+                  </View>
+                  {ctaIngreso}
+                </View>
+              </Animated.View>
+            );
+          }
+
+          // ── LAYOUT: HORIZONTAL ─────────────────────────────────────
+          return (
+            <Animated.View style={[s.balanceCard, { backgroundColor: cardBg, borderColor: cardBorder, borderWidth: cardBorderW, flexDirection: 'row', alignItems: 'stretch', gap: 0, padding: 0, overflow: 'hidden' },
+              { opacity: heroAnim, transform: [{ scale: heroAnim.interpolate({ inputRange: [0,1], outputRange: [0.95,1] }) }] }]}>
+              {/* Lado izquierdo — balance principal */}
+              <View style={{ flex: 1.1, padding: 18, justifyContent: 'center', borderRightWidth: 1, borderRightColor: 'rgba(255,255,255,0.15)' }}>
+                <Text style={[s.balanceLabel, { color: sub, fontSize: fs(9), marginBottom: 4 }]}>DISPONIBLE</Text>
+                <Text ref={balanceText} style={[s.balanceAmount, { color: textColor, fontSize: fs(26), marginBottom: 2 }]}>{formatAmount(metricas.balanceDisponible)}</Text>
+                <Text style={{ color: sub, fontSize: fs(10) }}>{capitalize(getNombreMes(mesActual))} {añoActual}</Text>
+                {/* Barra compacta */}
+                <View style={[s.segBarWrap, { marginTop: 12, marginBottom: 4 }]}>
+                  <View style={[s.segSlice, { flex: pctGastado || 1, backgroundColor: pctGastado > 80 ? '#F87171' : '#4ADE80' }]} />
+                  <View style={[s.segSlice, { flex: Math.max(100 - pctGastado, 0), backgroundColor: 'rgba(255,255,255,0.20)' }]} />
+                </View>
+                <Text style={{ color: sub, fontSize: fs(9) }}>{pctGastado}% del presupuesto usado</Text>
+              </View>
+              {/* Lado derecho — métricas */}
+              <View style={{ flex: 0.9, padding: 14, justifyContent: 'space-around' }}>
+                {[
+                  { label: 'Ingresado', val: formatAmount(metricas.ingresoEfectivo), icon: 'arrow-up' as const, c: '#4ADE80' },
+                  { label: 'Gastado',   val: formatAmount(gastosMes),                icon: 'arrow-down' as const, c: '#F87171' },
+                  { label: '/día recomendado', val: formatAmount(metricas.gastoPromedioRecomendadoDia), icon: 'calendar' as const, c: '#FBBF24' },
+                  { label: 'Días restantes',   val: String(metricas.diasRestantesMes),                 icon: 'clock' as const, c: sub },
+                ].map(item => (
+                  <View key={item.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Icon name={item.icon} size={11} color={item.c} />
+                    <View>
+                      <Text style={{ color: textColor, fontSize: fs(11), fontWeight: '700' }}>{item.val}</Text>
+                      <Text style={{ color: sub, fontSize: fs(8) }}>{item.label}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </Animated.View>
           );
         })()}
       </View>
 
       {/* ── SCROLL BODY ───────────────────────────────────────────────── */}
-      <View style={[s.scrollBody, s.scrollContent]}>
+      <View style={[s.scrollBody, s.scrollContent, { backgroundColor: isDark ? colors.background : '#F8F7FF' }]}>
         {/* ── Quick actions ──────────────────────────────────────────── */}
         <View style={s.quickActionsRow}>
           {QUICK_ACTIONS.map((item) => (
@@ -630,10 +711,10 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
               return (
                 <TouchableOpacity
                   key={`${m.mes}-${m.año}`}
-                  style={[s.monthPill, active ? { backgroundColor: THEME.colors.primary } : { backgroundColor: '#F4F3F8' }]}
+                  style={[s.monthPill, active ? { backgroundColor: colors.primary } : { backgroundColor: colors.cardSecondary }]}
                   onPress={() => setMesSeleccionado({ mes: m.mes, año: m.año })}
                 >
-                  <Text style={[s.monthPillText, { color: active ? '#FFFFFF' : '#6B7280', fontWeight: active ? '600' : '400' }]}>
+                  <Text style={[s.monthPillText, { color: active ? '#FFFFFF' : colors.textSecondary, fontWeight: active ? '600' : '400' }]}>
                     {m.label}
                   </Text>
                 </TouchableOpacity>
@@ -1168,14 +1249,13 @@ const s = StyleSheet.create({
     gap: 12,
   },
 
-  // Avatar — 40×40, light indigo
+  // Avatar — 40×40
   avatar: {
     width: 40,
     height: 40,
     borderRadius: THEME.radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EEF0FF',
   },
   avatarLetter: {
     fontSize: 15,
@@ -1353,7 +1433,6 @@ const s = StyleSheet.create({
     marginTop: -16,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    backgroundColor: '#F8F7FF',
   },
   scrollContent: {
     paddingTop: 20,
@@ -1574,7 +1653,6 @@ const s = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
-    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,

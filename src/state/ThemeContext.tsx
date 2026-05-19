@@ -128,6 +128,24 @@ export const CARD_STYLE_LABELS: Record<CardStyleKey, string> = {
   glass:    'Cristal',
 };
 
+// ─── Balance layout ───────────────────────────────────────────────────────────
+
+export type BalanceLayoutKey = 'clasica' | 'compacta' | 'anillo' | 'horizontal';
+
+export const BALANCE_LAYOUT_LABELS: Record<BalanceLayoutKey, string> = {
+  clasica:    'Clásica',
+  compacta:   'Compacta',
+  anillo:     'Anillo',
+  horizontal: 'Horizontal',
+};
+
+export const BALANCE_LAYOUT_ICONS: Record<BalanceLayoutKey, string> = {
+  clasica:    '▦',
+  compacta:   '▬',
+  anillo:     '◎',
+  horizontal: '⊟',
+};
+
 // ─── Context type ─────────────────────────────────────────────────────────────
 
 export type ThemePreference = 'light' | 'dark' | 'system';
@@ -142,7 +160,7 @@ interface ThemeContextType {
   // Accent
   accentKey:     AccentKey;
   setAccentKey:  (k: AccentKey) => void;
-  accentColor:   string; // current primary color (resolved for light/dark)
+  accentColor:   string;
   // Font scale
   fontScaleKey:     FontScaleKey;
   setFontScaleKey:  (k: FontScaleKey) => void;
@@ -154,6 +172,9 @@ interface ThemeContextType {
   // Card style
   cardStyle:        CardStyleKey;
   setCardStyle:     (k: CardStyleKey) => void;
+  // Balance layout
+  balanceLayout:    BalanceLayoutKey;
+  setBalanceLayout: (k: BalanceLayoutKey) => void;
 }
 
 const STORAGE_KEY = '@financy_theme';
@@ -166,6 +187,7 @@ const ThemeContext = createContext<ThemeContextType>({
   fontScaleKey: 'normal', setFontScaleKey: () => {}, fontScale: 1,
   numFormat: 'cop', setNumFormat: () => {}, formatAmount: buildFormatAmount('cop'),
   cardStyle: 'gradient', setCardStyle: () => {},
+  balanceLayout: 'clasica', setBalanceLayout: () => {},
 });
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
@@ -177,8 +199,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [accentKey,     setAccentKeyState]     = useState<AccentKey>('indigo');
   const [fontScaleKey,  setFontScaleKeyState]  = useState<FontScaleKey>('normal');
   const [numFormat,     setNumFormatState]     = useState<NumFormatKey>('cop');
-  const [cardStyle,     setCardStyleState]     = useState<CardStyleKey>('gradient');
-  const [loaded,        setLoaded]             = useState(false);
+  const [cardStyle,      setCardStyleState]     = useState<CardStyleKey>('gradient');
+  const [balanceLayout,  setBalanceLayoutState] = useState<BalanceLayoutKey>('clasica');
+  const [loaded,         setLoaded]             = useState(false);
 
   // ── Load persisted prefs ──────────────────────────────────────────────────
   useEffect(() => {
@@ -195,7 +218,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (p.accentKey    && p.accentKey    in ACCENT_PALETTES)  setAccentKeyState(p.accentKey);
           if (p.fontScaleKey && p.fontScaleKey in FONT_SCALES)      setFontScaleKeyState(p.fontScaleKey);
           if (p.numFormat    && p.numFormat    in NUM_FORMAT_LABELS) setNumFormatState(p.numFormat);
-          if (p.cardStyle    && p.cardStyle    in CARD_STYLE_LABELS) setCardStyleState(p.cardStyle);
+          if (p.cardStyle     && p.cardStyle     in CARD_STYLE_LABELS)     setCardStyleState(p.cardStyle);
+          if (p.balanceLayout && p.balanceLayout in BALANCE_LAYOUT_LABELS) setBalanceLayoutState(p.balanceLayout);
         } catch {}
       }
       setLoaded(true);
@@ -204,7 +228,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // ── Save personalization whenever it changes ──────────────────────────────
   const savePersonalizacion = useCallback(
-    (patch: Partial<{ accentKey: AccentKey; fontScaleKey: FontScaleKey; numFormat: NumFormatKey; cardStyle: CardStyleKey }>) => {
+    (patch: Partial<{ accentKey: AccentKey; fontScaleKey: FontScaleKey; numFormat: NumFormatKey; cardStyle: CardStyleKey; balanceLayout: BalanceLayoutKey }>) => {
       AsyncStorage.getItem(PERSONALIZACION_KEY).then(raw => {
         const current = raw ? JSON.parse(raw) : {};
         AsyncStorage.setItem(PERSONALIZACION_KEY, JSON.stringify({ ...current, ...patch })).catch(() => {});
@@ -243,41 +267,51 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     savePersonalizacion({ cardStyle: k });
   }, [savePersonalizacion]);
 
+  const setBalanceLayout = useCallback((k: BalanceLayoutKey) => {
+    setBalanceLayoutState(k);
+    savePersonalizacion({ balanceLayout: k });
+  }, [savePersonalizacion]);
+
   // ── Derived values ────────────────────────────────────────────────────────
   const isDark = preference === 'dark' || (preference === 'system' && systemScheme === 'dark');
 
   const colors: AppColors = useMemo(() => {
-    const base    = isDark ? DARK_COLORS    : LIGHT_COLORS;
+    // ── Base: light/dark + accent override ───────────────────────────────────
+    const base    = isDark ? DARK_COLORS : LIGHT_COLORS;
     const palette = ACCENT_PALETTES[accentKey];
-    if (accentKey === 'indigo') return base; // default — no override needed
-    if (isDark) {
-      return {
-        ...base,
-        primary:      palette.primaryDark_dm,
-        primaryLight: palette.primaryLight_dm,
-        primaryDark:  palette.primaryDark_dm,
-        primaryText:  palette.primaryText_dm,
-        tabActive:    palette.tabActive_dm,
-        tabActiveBg:  palette.primaryLight_dm,
-        headerBg:     palette.headerBg_dm,
-        ai:           palette.primaryDark_dm,
-        aiLight:      palette.primaryLight_dm,
-        aiText:       palette.primaryText_dm,
-      };
+
+    let themed: AppColors = base;
+    if (accentKey !== 'indigo') {
+      themed = isDark
+        ? {
+            ...base,
+            primary:      palette.primaryDark_dm,
+            primaryLight: palette.primaryLight_dm,
+            primaryDark:  palette.primaryDark_dm,
+            primaryText:  palette.primaryText_dm,
+            tabActive:    palette.tabActive_dm,
+            tabActiveBg:  palette.primaryLight_dm,
+            headerBg:     palette.headerBg_dm,
+            ai:           palette.primaryDark_dm,
+            aiLight:      palette.primaryLight_dm,
+            aiText:       palette.primaryText_dm,
+          }
+        : {
+            ...base,
+            primary:      palette.primary,
+            primaryLight: palette.primaryLight,
+            primaryDark:  palette.primaryDark,
+            primaryText:  palette.primaryText,
+            tabActive:    palette.primary,
+            tabActiveBg:  palette.primaryLight,
+            headerBg:     palette.headerBg,
+            ai:           palette.primary,
+            aiLight:      palette.primaryLight,
+            aiText:       palette.primaryText,
+          };
     }
-    return {
-      ...base,
-      primary:      palette.primary,
-      primaryLight: palette.primaryLight,
-      primaryDark:  palette.primaryDark,
-      primaryText:  palette.primaryText,
-      tabActive:    palette.primary,
-      tabActiveBg:  palette.primaryLight,
-      headerBg:     palette.headerBg,
-      ai:           palette.primary,
-      aiLight:      palette.primaryLight,
-      aiText:       palette.primaryText,
-    };
+
+    return themed;
   }, [isDark, accentKey]);
 
   const accentColor   = colors.primary;
@@ -293,6 +327,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       fontScaleKey, setFontScaleKey, fontScale,
       numFormat, setNumFormat, formatAmount,
       cardStyle, setCardStyle,
+      balanceLayout, setBalanceLayout,
     }}>
       {children}
     </ThemeContext.Provider>

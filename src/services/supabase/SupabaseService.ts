@@ -70,6 +70,7 @@ function rowToTransaction(r: Record<string, any>): Transaction {
     date: r.date as string,
     type: r.type as 'income' | 'expense',
     ...(r.description ? { description: r.description as string } : {}),
+    ...(r.subcategory ? { subcategory: r.subcategory as string } : {}),
   };
 }
 
@@ -85,6 +86,7 @@ function rowToCategory(r: Record<string, any>): Category {
     pagado: (r.pagado as boolean) ?? false,
     ...(r.tipo ? { tipo: r.tipo as Category['tipo'] } : {}),
     ...(r.fecha_creacion ? { fechaCreacion: r.fecha_creacion as string } : {}),
+    ...(r.parent_category_id ? { parentCategoryId: r.parent_category_id as string } : {}),
   };
 }
 
@@ -150,14 +152,15 @@ class SupabaseService {
     validateTransaction(tx);
     // Usa la función RPC que implementa la lógica de conflictos en el servidor
     const { error } = await db.rpc('upsert_transaction_safe', {
-      p_id:          tx.id,
-      p_user_id:     userId,
-      p_amount:      tx.amount,
-      p_category:    tx.category.substring(0, 200),
-      p_date:        tx.date,
-      p_type:        tx.type,
-      p_description: tx.description?.substring(0, 500) ?? null,
-      p_updated_at:  new Date().toISOString(),
+      p_id:           tx.id,
+      p_user_id:      userId,
+      p_amount:       tx.amount,
+      p_category:     tx.category.substring(0, 200),
+      p_date:         tx.date,
+      p_type:         tx.type,
+      p_description:  tx.description?.substring(0, 500) ?? null,
+      p_updated_at:   new Date().toISOString(),
+      p_subcategory:  tx.subcategory?.substring(0, 200) ?? null,
     });
     if (error) throw error;
   }
@@ -258,6 +261,7 @@ class SupabaseService {
       pagado: cat.pagado ?? false,
       tipo: cat.tipo ?? null,
       fecha_creacion: cat.fechaCreacion ?? null,
+      parent_category_id: cat.parentCategoryId ?? null,
       updated_at: new Date().toISOString(),
       deleted_at: null,
     });
@@ -301,6 +305,7 @@ class SupabaseService {
         pagado: c.pagado ?? false,
         tipo: c.tipo ?? null,
         fecha_creacion: c.fechaCreacion ?? null,
+        parent_category_id: c.parentCategoryId ?? null,
         updated_at: new Date().toISOString(),
       }))
     );

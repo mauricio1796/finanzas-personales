@@ -2,14 +2,9 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   TextInput,
-  Pressable,
   View,
-  Text,
   Animated,
   Dimensions,
-  KeyboardAvoidingView,
-  Platform,
-  TouchableWithoutFeedback,
   Keyboard,
   ScrollView,
   BackHandler,
@@ -44,8 +39,10 @@ import { useNotificacionesManager } from '../../src/hooks/useNotificacionesManag
 import { useWidgetSync } from '../../src/hooks/useWidgetSync';
 import * as Notifications from 'expo-notifications';
 
+import { AuthScreen } from '../../src/screens/AuthScreen';
+
 // Screens
-import { FinanzasScreen } from '../../src/screens/FinanzasScreen';
+import { Ingresos } from '../../src/screens/Ingresos';
 import { Gastos } from '../../src/screens/Gastos';
 import { Categorias } from '../../src/screens/Categorias';
 import { CategoriasScreen } from '../../src/screens/CategoriasScreen';
@@ -71,6 +68,9 @@ import {
   OnboardingConfirm,
 } from '../../src/screens/Onboarding';
 import { PermissionsScreen } from '../../src/screens/PermissionsScreen';
+import { PinSetupScreen }   from '../../src/screens/PinSetupScreen';
+import { PinEntryScreen }   from '../../src/screens/PinEntryScreen';
+import { savePin, hasPin, verifyPin, clearPin } from '../../src/services/PinService';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -95,7 +95,7 @@ export default function HomeScreen() {
     addCategory,
     isLoading, importServerData, saldoDisponible, resetAll,
   } = useFinance();
-  const { colors } = useTheme();
+  useTheme(); // keep context subscription
 
   // ==================== NOTIFICATIONS ====================
   useNotificacionesManager();
@@ -103,6 +103,22 @@ export default function HomeScreen() {
 
   // ==================== SPLASH ====================
   const [showSplash, setShowSplash] = useState(true);
+
+  // ==================== PIN ====================
+  const [showPinSetup,  setShowPinSetup]  = useState(false);
+  const [pinExists,     setPinExists]     = useState(false);
+  const [pinChecked,    setPinChecked]    = useState(false); // evita race condition
+  const [isUnlocked,    setIsUnlocked]    = useState(false);
+
+  // Al salir del splash verifica si hay PIN guardado (antes de renderizar nada)
+  useEffect(() => {
+    if (!showSplash) {
+      hasPin().then(exists => {
+        setPinExists(exists);
+        setPinChecked(true);
+      });
+    }
+  }, [showSplash]);
 
   // ==================== PERMISSIONS ====================
   const [showPermissions, setShowPermissions] = useState(false);
@@ -382,6 +398,9 @@ export default function HomeScreen() {
       const locallyOnboarded = isOnboarded;
       const serverData = await supabaseService.pullFromServer(sbUser.id);
 
+      // Verificar si ya tiene PIN guardado (usuario que vuelve a loguear con correo)
+      const alreadyHasPin = await hasPin();
+
       if (serverData?.isOnboarded) {
         // ── Usuario existente: importar datos del servidor ──────────────
         await importServerData(serverData);
@@ -395,14 +414,11 @@ export default function HomeScreen() {
         setUser(finalUser);
       } else if (locallyOnboarded) {
         // ── Usuario nuevo que hizo onboarding offline ─────────────────
-        // NO importar datos vacíos del servidor — conservar los del onboarding
-        // Determinar nombre: profile de Finn > email prefix
         const nombreLocal = profile?.mainFinancialConcern || sbUser.name;
         const finalUser = { ...sbUser, name: nombreLocal };
         setIsOnboarded(true);
         setShowSplash(false);
         setUser(finalUser);
-        // Subir todos los datos locales al servidor en background
         supabaseService.pushAllToServer(sbUser.id, {
           transactions,
           categories,
@@ -422,6 +438,15 @@ export default function HomeScreen() {
         setUser(sbUser);
       }
       setOtpEmail(''); setOtpName(''); setOtpCode(['','','','','','','','']); setOtpStep('email');
+
+      // Si no tiene PIN configurado aún → pedir que cree uno
+      if (!alreadyHasPin) {
+        setShowPinSetup(true);
+      } else {
+        // Ya tiene PIN → la pantalla de entrada lo pedirá (user ya está seteado)
+        setIsUnlocked(false);
+        setPinExists(true);
+      }
     } finally {
       setAuthLoading(false);
       setOtpVerifying(false);
@@ -544,6 +569,11 @@ export default function HomeScreen() {
     if (authService.isReady) {
       try { await authService.signOut(); } catch {}
     }
+    // Limpiar PIN
+    await clearPin();
+    setPinExists(false);
+    setIsUnlocked(false);
+    setShowPinSetup(false);
     // Limpiar todos los datos persistidos
     await resetAll();
     await setIsOnboarded(false);
@@ -629,12 +659,35 @@ export default function HomeScreen() {
     return <MobileShell><SplashScreen onDone={() => setShowSplash(false)} /></MobileShell>;
   }
 
-  // ==================== 0b. LOADING (hydrating AsyncStorage) ====================
-  if (isLoading) {
+  // ==================== 0b. LOADING (AsyncStorage + PIN check) ====================
+  // Esperamos a que hidrate el storage Y a que termine el chequeo del PIN
+  // para evitar la race condition que saltaría el PIN entry
+  if (isLoading || !pinChecked) {
     return <MobileShell><DashboardSkeleton /></MobileShell>;
   }
 
-  // ==================== 0c. PERMISOS (primera vez, antes de onboarding/auth) ====================
+  // ==================== 1. PIN ENTRY (usuario que regresa — antes que todo) ====================
+  // Si el usuario ya está en storage Y tiene PIN → pedirlo antes que nada
+  if (user && pinExists && !isUnlocked) {
+    return (
+      <MobileShell>
+        <PinEntryScreen
+          userName={user.name}
+          userEmail={user.email}
+          onSuccess={() => setIsUnlocked(true)}
+          onForgotPin={async () => {
+            await clearPin();
+            setPinExists(false);
+            setIsUnlocked(false);
+            setUser(null);
+          }}
+          verifyPin={verifyPin}
+        />
+      </MobileShell>
+    );
+  }
+
+  // ==================== 2. PERMISOS (primera vez) ====================
   if (showPermissions) {
     return (
       <MobileShell>
@@ -643,8 +696,7 @@ export default function HomeScreen() {
     );
   }
 
-  // ==================== 1. ONBOARDING (usuario nuevo, antes de auth) ====================
-  // Mostrar onboarding solo si: no está onboarded Y no está en medio de verificar OTP
+  // ==================== 3. ONBOARDING (usuario nuevo) ====================
   if (!isOnboarded && !otpVerifying) {
     const slideX = onboardingAnim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
     const wrapStyle = { flex: 1, opacity: onboardingAnim, transform: [{ translateX: slideX }] };
@@ -662,218 +714,52 @@ export default function HomeScreen() {
     );
   }
 
-  // ==================== 2. AUTH — flujo OTP por correo ====================
+  // ==================== 4. AUTH — flujo OTP por correo ====================
   if (!user) {
     return (
       <MobileShell>
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={styles.authRoot}>
-              {/* Blobs decorativos */}
-              <View style={[styles.blob, styles.blobTR]} />
-              <View style={[styles.blob, styles.blobBL]} />
-              <View style={[styles.blob, styles.blobBR]} />
+        <AuthScreen
+          otpStep={otpStep}
+          setOtpStep={setOtpStep}
+          otpEmail={otpEmail}
+          setOtpEmail={setOtpEmail}
+          otpPassword={otpPassword}
+          setOtpPassword={setOtpPassword}
+          otpConfirm={otpConfirm}
+          setOtpConfirm={setOtpConfirm}
+          otpShowPwd={otpShowPwd}
+          setOtpShowPwd={setOtpShowPwd}
+          otpCode={otpCode}
+          handleOtpDigit={handleOtpDigit}
+          handleOtpKeyPress={handleOtpKeyPress}
+          otpResendSecs={otpResendSecs}
+          authLoading={authLoading}
+          authError={authError}
+          handleSendOtp={handleSendOtp}
+          handleRegisterOtp={handleRegisterOtp}
+          handleVerifyOtp={handleVerifyOtp}
+          otpRefs={otpRefs}
+          otpPwdRef={otpPwdRef}
+          otpCfmRef={otpCfmRef}
+          profileName={profile?.mainFinancialConcern}
+        />
+      </MobileShell>
+    );
+  }
 
-              <ScrollView
-                contentContainerStyle={styles.authScroll}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              >
-                {/* Logo / marca */}
-                <View style={styles.otpLogoWrap}>
-                  <View style={styles.otpLogoCircle}>
-                    <Text style={styles.otpLogoText}>FI</Text>
-                  </View>
-                  <Text style={styles.otpLogoName}>FinancyAI</Text>
-                </View>
-
-                {otpStep === 'email' && (
-                  /* ── Pantalla 1: ingresar correo ── */
-                  <>
-                    <Text style={styles.authBigTitle}>Bienvenido{'\n'}a FinancyAI</Text>
-                    <Text style={styles.otpSubtitle}>
-                      Ingresa tu correo para continuar
-                    </Text>
-
-                    <View style={styles.authFieldRow}>
-                      <View style={[styles.authFieldPill, { flex: 1 }]}>
-                        <Text style={styles.authFieldIcon}>✉</Text>
-                        <TextInput
-                          style={styles.authFieldInput}
-                          placeholder="tucorreo@ejemplo.com"
-                          placeholderTextColor="#BBBBC8"
-                          value={otpEmail}
-                          onChangeText={setOtpEmail}
-                          keyboardType="email-address"
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          returnKeyType="send"
-                          onSubmitEditing={handleSendOtp}
-                        />
-                      </View>
-                      <Pressable
-                        style={[styles.authFab, authLoading && { opacity: 0.6 }]}
-                        onPress={handleSendOtp}
-                        disabled={authLoading}
-                      >
-                        <Text style={styles.authFabIcon}>{authLoading ? '…' : '→'}</Text>
-                      </Pressable>
-                    </View>
-
-                    {authError ? <Text style={styles.authError}>{authError}</Text> : null}
-
-                    <Text style={styles.otpDisclaimer}>
-                      Si ya tienes cuenta recibirás un código.{'\n'}Si eres nuevo, te registraremos.
-                    </Text>
-                  </>
-                )}
-
-                {otpStep === 'register' && (
-                  /* ── Pantalla 2: nuevo usuario — crear contraseña ── */
-                  <>
-                    {/* Saludo personalizado */}
-                    <Text style={styles.authBigTitle}>
-                      {'Hola '}
-                      {(profile?.mainFinancialConcern?.trim().split(' ')[0]) || otpEmail.split('@')[0]}
-                      {'! 👋'}
-                    </Text>
-                    <Text style={[styles.otpSubtitle, { marginBottom: 4 }]}>
-                      Crea una contraseña para{'\n'}
-                      <Text style={{ fontWeight: '700', color: '#111827' }}>{otpEmail}</Text>
-                    </Text>
-
-                    {/* Tips de contraseña */}
-                    <View style={{ backgroundColor: '#F0F9FF', borderRadius: 12, padding: 12, marginBottom: 16, gap: 4 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#0369A1', marginBottom: 2 }}>Tips para una buena contraseña:</Text>
-                      {[
-                        '• Mínimo 6 caracteres',
-                        '• Combina letras y números',
-                        '• Usa mayúsculas y minúsculas',
-                        '• Evita fechas de nacimiento o "1234"',
-                      ].map(tip => (
-                        <Text key={tip} style={{ fontSize: 12, color: '#0369A1' }}>{tip}</Text>
-                      ))}
-                    </View>
-
-                    {/* Contraseña */}
-                    <View style={[styles.authFieldPill, { marginBottom: 12 }]}>
-                      <Text style={styles.authFieldIcon}>🔒</Text>
-                      <TextInput
-                        ref={otpPwdRef}
-                        style={styles.authFieldInput}
-                        placeholder="Contraseña (mín. 6 caracteres)"
-                        placeholderTextColor="#BBBBC8"
-                        value={otpPassword}
-                        onChangeText={setOtpPassword}
-                        secureTextEntry={!otpShowPwd}
-                        autoCapitalize="none"
-                        returnKeyType="next"
-                        autoFocus
-                        onSubmitEditing={() => otpCfmRef.current?.focus()}
-                      />
-                      <Pressable onPress={() => setOtpShowPwd(v => !v)} style={{ paddingHorizontal: 8 }}>
-                        <Text style={{ color: '#9CA3AF', fontSize: 13 }}>{otpShowPwd ? 'Ocultar' : 'Ver'}</Text>
-                      </Pressable>
-                    </View>
-
-                    {/* Confirmar contraseña */}
-                    <View style={styles.authFieldRow}>
-                      <View style={[styles.authFieldPill, { flex: 1 }]}>
-                        <Text style={styles.authFieldIcon}>🔒</Text>
-                        <TextInput
-                          ref={otpCfmRef}
-                          style={styles.authFieldInput}
-                          placeholder="Confirmar contraseña"
-                          placeholderTextColor="#BBBBC8"
-                          value={otpConfirm}
-                          onChangeText={setOtpConfirm}
-                          secureTextEntry={!otpShowPwd}
-                          autoCapitalize="none"
-                          returnKeyType="send"
-                          onSubmitEditing={handleRegisterOtp}
-                        />
-                      </View>
-                      <Pressable
-                        style={[styles.authFab, authLoading && { opacity: 0.6 }]}
-                        onPress={handleRegisterOtp}
-                        disabled={authLoading}
-                      >
-                        <Text style={styles.authFabIcon}>{authLoading ? '…' : '→'}</Text>
-                      </Pressable>
-                    </View>
-
-                    {authError ? <Text style={styles.authError}>{authError}</Text> : null}
-
-                    <Pressable
-                      onPress={() => { setOtpStep('email'); setOtpPassword(''); setOtpConfirm(''); setAuthError(''); }}
-                      style={{ marginTop: 12 }}
-                    >
-                      <Text style={styles.otpChangeEmail}>Cambiar correo</Text>
-                    </Pressable>
-                  </>
-                )}
-
-                {otpStep === 'code' && (
-                  /* ── Pantalla 3: ingresar código ── */
-                  <>
-                    <Text style={styles.authBigTitle}>Código{'\n'}enviado</Text>
-                    <Text style={styles.otpSubtitle}>
-                      Revisá tu correo{'\n'}
-                      <Text style={{ fontWeight: '700', color: '#111827' }}>{otpEmail}</Text>
-                    </Text>
-
-                    {/* 8 cajas OTP */}
-                    <View style={styles.otpBoxRow}>
-                      {otpCode.map((digit, idx) => (
-                        <TextInput
-                          key={idx}
-                          ref={r => { otpRefs.current[idx] = r; }}
-                          style={[
-                            styles.otpBox,
-                            digit ? styles.otpBoxFilled : null,
-                            authLoading ? { opacity: 0.5 } : null,
-                          ]}
-                          value={digit}
-                          onChangeText={t => handleOtpDigit(t, idx)}
-                          onKeyPress={({ nativeEvent }) => handleOtpKeyPress(nativeEvent.key, idx)}
-                          keyboardType="number-pad"
-                          maxLength={1}
-                          selectTextOnFocus
-                          editable={!authLoading}
-                        />
-                      ))}
-                    </View>
-
-                    {authLoading && (
-                      <Text style={styles.otpVerifying}>Verificando…</Text>
-                    )}
-                    {authError ? <Text style={styles.authError}>{authError}</Text> : null}
-
-                    <Pressable
-                      onPress={otpResendSecs === 0 ? handleSendOtp : undefined}
-                      style={styles.otpResendBtn}
-                      disabled={otpResendSecs > 0 || authLoading}
-                    >
-                      <Text style={[styles.otpResendText, otpResendSecs > 0 && { color: '#9CA3AF' }]}>
-                        {otpResendSecs > 0 ? `Reenviar código en ${otpResendSecs}s` : 'Reenviar código'}
-                      </Text>
-                    </Pressable>
-
-                    <Pressable
-                      onPress={() => { setOtpStep('email'); setOtpCode(['','','','','','','','']); setAuthError(''); }}
-                      style={{ marginTop: 8 }}
-                    >
-                      <Text style={styles.otpChangeEmail}>Cambiar correo</Text>
-                    </Pressable>
-                  </>
-                )}
-              </ScrollView>
-            </View>
-          </TouchableWithoutFeedback>
-        </KeyboardAvoidingView>
+  // ==================== 5. PIN SETUP (primera vez tras verificar OTP) ====================
+  if (showPinSetup) {
+    return (
+      <MobileShell>
+        <PinSetupScreen
+          userName={user?.name}
+          onDone={async (pin) => {
+            await savePin(pin, user?.id ?? '');
+            setPinExists(true);
+            setIsUnlocked(true);
+            setShowPinSetup(false);
+          }}
+        />
       </MobileShell>
     );
   }
@@ -898,7 +784,14 @@ export default function HomeScreen() {
               }}
             />
           )}
-          {currentScreen === 'ingresos' && <FinanzasScreen onBack={volver} />}
+          {currentScreen === 'ingresos' && (
+            <Ingresos
+              transactions={transactions}
+              onAddIncome={addIncome}
+              onDeleteTransaction={deleteTransaction}
+              onBack={volver}
+            />
+          )}
           {currentScreen === 'gastos' && (
             <Gastos
               transactions={transactions}

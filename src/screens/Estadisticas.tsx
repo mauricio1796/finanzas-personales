@@ -1,23 +1,24 @@
-import React, { useMemo, useRef, useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Animated, Alert, Dimensions,
+  StyleSheet, Dimensions, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import Svg, {
-  Rect, Circle, Path, Line,
-  Text as SvgText, Defs, LinearGradient, Stop, G,
+  Rect, Circle, Path, Line, Defs,
+  LinearGradient as SvgGradient, Stop,
+  Text as SvgText, G,
 } from 'react-native-svg';
-import { getCategoryIcon } from '../components/ui/Icon';
 
 import { useFinance } from '../state';
 import { useTheme } from '../state/ThemeContext';
 import { Icon } from '../components/ui/Icon';
+import { getCategoryIcon } from '../components/ui/Icon';
 import { calcularMetricasFinancieras } from '../utils/ingresoUtils';
-import { THEME } from '../constants/theme';
 import {
   getMesLabel, getMesLabelLargo, getDiaLabel,
-  getBarData, getAreaData, getHeatmapData, getDonutData, getTreemapData,
+  getBarData, getAreaData, getHeatmapData, getTreemapData,
   getResumenMetricas, buildSmoothPath,
   getHeatIntensity, getHeatColor,
   type HeatCell,
@@ -33,1186 +34,957 @@ const fmtShort = (n: number) => {
 };
 function capitalize(s: string) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
-const { width: SCREEN_W } = Dimensions.get('window');
-const CARD_PADDING = 16;
-const CHART_W = SCREEN_W - 32 - CARD_PADDING * 2;
-const C = 251.3; // circumference r=40
+const { width: SW } = Dimensions.get('window');
+const CHART_W = SW - 64;
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+const CAT_COLORS = [
+  '#6366F1', '#10B981', '#F59E0B', '#EF4444',
+  '#8B5CF6', '#14B8A6', '#EC4899', '#0EA5E9',
+  '#F97316', '#84CC16', '#06B6D4', '#A855F7',
+];
+
+type Tab = 'resumen' | 'tendencia' | 'calor' | 'distribucion';
 type PeriodoBars = 3 | 6 | 12;
 
-// ── Props ──────────────────────────────────────────────────────────────────────
 interface Props {
   onBack?: () => void;
   onNavigate?: (screen: string) => void;
-  // legacy props (ignored, data comes from context)
   transactions?: any[];
   monthlySalary?: number;
 }
 
-// ── Component ──────────────────────────────────────────────────────────────────
+// ── Component ─────────────────────────────────────────────────────────────────
 export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
   const insets = useSafeAreaInsets();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, accentColor } = useTheme();
   const { transactions, categories, profile, goal } = useFinance();
 
-  // ── State ──────────────────────────────────────────────────────────────────
-  const now = useMemo(() => new Date(), []);
-  const [mesSeleccionado, setMesSeleccionado] = useState({
-    mes: now.getMonth(),
-    año: now.getFullYear(),
-  });
-  const [periodoBars, setPeriodoBars] = useState<PeriodoBars>(3);
+  const now    = useMemo(() => new Date(), []);
+  const [tab,  setTab]  = useState<Tab>('resumen');
+  const [mes,  setMes]  = useState(now.getMonth());
+  const [año,  setAño]  = useState(now.getFullYear());
+  const [periodoBars, setPeriodoBars] = useState<PeriodoBars>(6);
   const [selectedHeatCell, setSelectedHeatCell] = useState<HeatCell | null>(null);
 
-  // Animated values
-  const barProgress  = useRef(new Animated.Value(0)).current;
-  const areaOpacity  = useRef(new Animated.Value(0)).current;
-  const heatOpacity  = useRef(new Animated.Value(0)).current;
-  const treemapAnim  = useRef(new Animated.Value(0)).current;
+  // No animations — static professional charts
 
-  // Donut: individual Animated.Values per segment
-  const donutAnimRef = useRef<Animated.Value[]>([]);
-  const [donutDashes, setDonutDashes] = useState<number[]>([]);
-
-  // Bar heights driven by barProgress listener
-  const [barHCurr, setBarHCurr] = useState<number[]>([]);
-  const [barHPrev, setBarHPrev] = useState<number[]>([]);
-
-  // ── Memos ──────────────────────────────────────────────────────────────────
-  const { mes, año } = mesSeleccionado;
   const salary = profile?.monthlySalary ?? 0;
 
+  const txnCount = useMemo(() =>
+    transactions.filter(t => {
+      const d = new Date(t.date);
+      return d.getMonth() === mes && d.getFullYear() === año;
+    }).length,
+  [transactions, mes, año]);
+
+  // ── Memos ──────────────────────────────────────────────────────────────────
   const metricas = useMemo(
     () => getResumenMetricas(transactions, mes, año, salary),
     [transactions, mes, año, salary],
   );
-
   const metricasIngreso = useMemo(
     () => calcularMetricasFinancieras(transactions, categories as any, salary, mes, año),
     [transactions, categories, salary, mes, año],
   );
+  const barData = useMemo(() => getBarData(transactions, periodoBars), [transactions, periodoBars]);
+  const areaData = useMemo(() => getAreaData(transactions, 6, salary), [transactions, salary]);
+  const heatData = useMemo(() => getHeatmapData(transactions, mes, año), [transactions, mes, año]);
+  const treemapData = useMemo(() => getTreemapData(transactions, mes, año), [transactions, mes, año]);
 
-  const barData = useMemo(
-    () => getBarData(transactions, periodoBars),
-    [transactions, periodoBars],
-  );
+  const maxBarMonto  = useMemo(() => Math.max(...barData.flatMap(d => [d.gastoActual, d.gastoAnterior]), 1), [barData]);
+  const maxHeatMonto = useMemo(() => Math.max(...heatData.map(c => c.monto), 1), [heatData]);
+  const maxAreaMonto = useMemo(() => Math.max(...areaData.map(d => d.ahorro), goal?.targetAmount ?? 1, 1), [areaData, goal]);
 
-  const areaData = useMemo(
-    () => getAreaData(transactions, 6, salary),
-    [transactions, salary],
-  );
-
-  const heatData = useMemo(
-    () => getHeatmapData(transactions, mes, año),
-    [transactions, mes, año],
-  );
-
-  const treemapData = useMemo(
-    () => getTreemapData(transactions, mes, año),
-    [transactions, mes, año],
-  );
-
-  const donutData = useMemo(
-    () => getDonutData(transactions, mes, año, salary, colors.primary, colors.income, colors.warning),
-    [transactions, mes, año, salary, colors.primary, colors.income, colors.warning],
-  );
-
-  const maxHeatMonto = useMemo(
-    () => Math.max(...heatData.map(c => c.monto), 1),
-    [heatData],
-  );
-
-  const maxBarMonto = useMemo(
-    () => Math.max(...barData.flatMap(d => [d.gastoActual, d.gastoAnterior]), 1),
-    [barData],
-  );
-
-  const maxAreaMonto = useMemo(
-    () => Math.max(...areaData.map(d => d.ahorro), goal?.targetAmount ?? 1, 1),
-    [areaData, goal],
-  );
-
-  const mesesDisponibles = useMemo(() =>
-    Array.from({ length: 12 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
-      return {
-        mes: d.getMonth(),
-        año: d.getFullYear(),
-        label: capitalize(getMesLabel(d.getMonth())),
-        labelLargo: getMesLabelLargo(d.getMonth(), d.getFullYear()),
-      };
-    }),
-  [now]);
-
-  // ── Chart constants ────────────────────────────────────────────────────────
-  const BAR_AREA_H = 110;
-  const GROUP_W = CHART_W / Math.max(barData.length, 1);
-  const BAR_W = Math.max(GROUP_W * 0.28, 4);
-  const BAR_GAP = BAR_W * 0.4;
-
-  const barH = (monto: number) =>
-    maxBarMonto > 0 ? Math.max(monto > 0 ? 3 : 0, (monto / maxBarMonto) * BAR_AREA_H) : 0;
-
-  // Area chart
-  const AREA_H = 140;
-  const AREA_PAD_TOP = 16;
-  const AREA_PAD_BOTTOM = 20;
-  const DRAW_H = AREA_H - AREA_PAD_TOP - AREA_PAD_BOTTOM;
-
-  const areaPoints = useMemo(() =>
-    areaData.map((d, i) => ({
-      x: areaData.length > 1 ? (i / (areaData.length - 1)) * CHART_W : CHART_W / 2,
-      y: AREA_PAD_TOP + DRAW_H - (maxAreaMonto > 0 ? (d.ahorro / maxAreaMonto) * DRAW_H : 0),
-      ...d,
-    })),
-  [areaData, maxAreaMonto, CHART_W, DRAW_H]);
-
-  const linePath  = useMemo(() => buildSmoothPath(areaPoints), [areaPoints]);
-  const areaPath  = useMemo(() => {
-    if (areaPoints.length < 2) return '';
-    const last = areaPoints[areaPoints.length - 1];
-    const first = areaPoints[0];
-    return `${linePath} L ${last.x.toFixed(1)},${(AREA_H - AREA_PAD_BOTTOM).toFixed(1)} L ${first.x.toFixed(1)},${(AREA_H - AREA_PAD_BOTTOM).toFixed(1)} Z`;
-  }, [linePath, areaPoints, AREA_H, AREA_PAD_BOTTOM]);
-
-  // ── Animations ─────────────────────────────────────────────────────────────
-
-  // Bar animation via barProgress listener
-  useEffect(() => {
-    const id = barProgress.addListener(({ value }) => {
-      setBarHCurr(barData.map(d => barH(d.gastoActual) * value));
-      setBarHPrev(barData.map(d => barH(d.gastoAnterior) * value));
-    });
-    return () => barProgress.removeListener(id);
-  }, [barData, maxBarMonto]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Animate all sections on mount / month change
-  useEffect(() => {
-    initDonutAnims();
-    barProgress.setValue(0);
-    Animated.timing(barProgress, { toValue: 1, duration: 700, useNativeDriver: false }).start();
-    areaOpacity.setValue(0);
-    Animated.timing(areaOpacity, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-    heatOpacity.setValue(0);
-    Animated.timing(heatOpacity, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-    treemapAnim.setValue(0);
-    Animated.spring(treemapAnim, { toValue: 1, tension: 50, friction: 9, useNativeDriver: true }).start();
-  }, [mesSeleccionado]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function initDonutAnims() {
-    // Clean up old listeners
-    donutAnimRef.current.forEach(a => a.removeAllListeners());
-    // Create new anims
-    donutAnimRef.current = donutData.map(() => new Animated.Value(0));
-    setDonutDashes(donutData.map(() => 0));
-    // Add listeners
-    donutAnimRef.current.forEach((anim, i) => {
-      anim.addListener(({ value }) => {
-        const dash = (donutData[i]?.dashLength ?? 0) * value;
-        setDonutDashes(prev => {
-          const next = [...prev];
-          next[i] = dash;
-          return next;
-        });
-      });
-    });
-    // Start staggered
-    Animated.stagger(
-      150,
-      donutAnimRef.current.map(a =>
-        Animated.timing(a, { toValue: 1, duration: 800, useNativeDriver: false }),
-      ),
-    ).start();
-  }
-
-  // Initial animation
-  useEffect(() => {
-    initDonutAnims();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Render helpers ─────────────────────────────────────────────────────────
-
-  const card = (children: React.ReactNode, extra?: object) => (
-    <View style={[s.card, extra]}>
-      {children}
-    </View>
-  );
-
-  // ── TAB: RESUMEN ───────────────────────────────────────────────────────────
-
-  const renderResumen = () => {
-    // ── Per-category donut data ───────────────────────────────────────────────
-    const CAT_COLORS = [
-      '#1E88C7', '#00B89F', '#F45B69', '#9B5DE5',
-      '#F5A623', '#E91E8C', '#43AA8B', '#577590',
-      '#FF6B6B', '#4ECDC4', '#FFE66D', '#A8DADC',
-    ];
-
-    const gastoPorCat: Record<string, number> = {};
+  // Gastado por categoría este mes
+  const gastoPorCat = useMemo(() => {
+    const map: Record<string, number> = {};
     transactions
       .filter(t => {
         const d = new Date(t.date);
         return t.type === 'expense' && d.getMonth() === mes && d.getFullYear() === año;
       })
-      .forEach(t => { gastoPorCat[t.category] = (gastoPorCat[t.category] ?? 0) + t.amount; });
+      .forEach(t => { map[t.category] = (map[t.category] ?? 0) + t.amount; });
+    return map;
+  }, [transactions, mes, año]);
 
-    const totalGastos = Object.values(gastoPorCat).reduce((a, b) => a + b, 0);
+  const totalGastos  = Object.values(gastoPorCat).reduce((a, b) => a + b, 0);
+  const totalIngresos = useMemo(() =>
+    transactions
+      .filter(t => { const d = new Date(t.date); return t.type === 'income' && d.getMonth() === mes && d.getFullYear() === año; })
+      .reduce((s, t) => s + t.amount, 0),
+    [transactions, mes, año],
+  );
+  const balance = totalIngresos - totalGastos;
 
-    // Build slices sorted desc by amount, group tiny ones as "Otros"
+  // Donut slices
+  const donutSlices = useMemo(() => {
     const sorted = Object.entries(gastoPorCat)
       .map(([name, amount]) => ({ name, amount }))
       .sort((a, b) => b.amount - a.amount);
-
-    const mainSlices = sorted.filter(s => s.amount / Math.max(totalGastos, 1) >= 0.04);
-    const otrosTotal = sorted.filter(s => s.amount / Math.max(totalGastos, 1) < 0.04)
+    const main   = sorted.filter(s => totalGastos > 0 && s.amount / totalGastos >= 0.03);
+    const otros  = sorted.filter(s => totalGastos > 0 && s.amount / totalGastos < 0.03)
       .reduce((a, s) => a + s.amount, 0);
-
-    const rawSlices = [
-      ...mainSlices,
-      ...(otrosTotal > 0 ? [{ name: 'Otros', amount: otrosTotal }] : []),
-    ].map((s, idx) => ({
+    return [
+      ...main,
+      ...(otros > 0 ? [{ name: 'Otros', amount: otros }] : []),
+    ].map((s, i) => ({
       ...s,
-      color: CAT_COLORS[idx % CAT_COLORS.length],
+      color: CAT_COLORS[i % CAT_COLORS.length],
       pct: totalGastos > 0 ? Math.round((s.amount / totalGastos) * 100) : 0,
     }));
+  }, [gastoPorCat, totalGastos]);
 
-    // Donut geometry
-    const DSVG  = Math.min(SCREEN_W - 32, 290);
-    const CX    = DSVG / 2;
-    const CY    = DSVG / 2;
-    const R     = DSVG * 0.315;
-    const SW    = DSVG * 0.10;
-    const CIRC  = 2 * Math.PI * R;
-    const GAP   = (3 / 360) * CIRC; // 3° gap between slices
+  // Area chart geometry
+  const AREA_H = 160;
+  const AREA_PAD_T = 16;
+  const AREA_PAD_B = 24;
+  const DRAW_H = AREA_H - AREA_PAD_T - AREA_PAD_B;
 
-    // Compute cumulative offsets
+  const areaPoints = useMemo(() =>
+    areaData.map((d, i) => ({
+      x: areaData.length > 1 ? (i / (areaData.length - 1)) * CHART_W : CHART_W / 2,
+      y: AREA_PAD_T + DRAW_H - (maxAreaMonto > 0 ? (d.ahorro / maxAreaMonto) * DRAW_H : 0),
+      ...d,
+    })),
+  [areaData, maxAreaMonto]);
+
+  const linePath = useMemo(() => buildSmoothPath(areaPoints), [areaPoints]);
+  const areaPath = useMemo(() => {
+    if (areaPoints.length < 2) return '';
+    const last = areaPoints[areaPoints.length - 1];
+    const first = areaPoints[0];
+    return `${linePath} L ${last.x.toFixed(1)},${(AREA_H - AREA_PAD_B).toFixed(1)} L ${first.x.toFixed(1)},${(AREA_H - AREA_PAD_B).toFixed(1)} Z`;
+  }, [linePath, areaPoints]);
+
+  // Bar geometry
+  const BAR_H  = 120;
+  const GRP_W  = CHART_W / Math.max(barData.length, 1);
+  const BAR_W  = Math.max(GRP_W * 0.25, 6);
+
+
+  const mesesDisponibles = useMemo(() =>
+    Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+      return { mes: d.getMonth(), año: d.getFullYear(), label: capitalize(getMesLabel(d.getMonth())) };
+    }),
+  [now]);
+
+  // ── Color helpers ──────────────────────────────────────────────────────────
+  const bg       = colors.background;
+  const card     = colors.card;
+  const cardSec  = colors.cardSecondary;
+  const txt      = colors.textPrimary;
+  const txts     = colors.textSecondary;
+  const txtT     = colors.textTertiary;
+  const bdr      = colors.border;
+  const primary  = colors.primary;
+  const income   = colors.income ?? '#10B981';
+  const expense  = colors.expense ?? '#EF4444';
+
+  // ── Tab: RESUMEN ───────────────────────────────────────────────────────────
+  const renderResumen = () => {
+    const DSVG = Math.min(SW - 48, 260);
+    const CX   = DSVG / 2;
+    const CY   = DSVG / 2;
+    const R    = DSVG * 0.33;
+    const STROKE = DSVG * 0.11;
+    const CIRC = 2 * Math.PI * R;
+    const GAP  = (2 / 360) * CIRC;
+
     let cumulative = 0;
-    const slices = rawSlices.map(s => {
-      const dashLength = (s.pct / 100) * CIRC;
-      const offset     = cumulative;
-      cumulative += dashLength;
-      return { ...s, dashLength, offset };
+    const slices = donutSlices.map(s => {
+      const dash = (s.pct / 100) * CIRC;
+      const off  = cumulative;
+      cumulative += dash;
+      return { ...s, dash, off };
     });
 
-    // Label position (midpoint of each arc, outside the ring)
-    const labelPos = (offset: number, dashLength: number) => {
-      const midFrac = (offset + dashLength / 2) / CIRC;
-      const angle   = midFrac * 2 * Math.PI - Math.PI / 2;
-      const lr      = R + SW / 2 + 22;
-      return { x: CX + lr * Math.cos(angle), y: CY + lr * Math.sin(angle) };
-    };
-
-    // Category grid (all selected categories)
-    const catGrid = (categories as any[]).filter(c => c.isSelected).slice(0, 9);
+    const catGrid = (categories as any[]).filter(c => c.isSelected).slice(0, 8);
 
     return (
-      <>
-        {/* ── Hero donut card ── */}
-        <View style={[s.card, { alignItems: 'center', paddingTop: 24, paddingBottom: 24 }]}>
-          <Text style={[s.cardTitle, { marginBottom: 2, textAlign: 'center' }]}>
-            Gastos por categoría
-          </Text>
-          <Text style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 20 }}>
-            {capitalize(getMesLabelLargo(mes, año))}
-          </Text>
+      <View>
+        {/* ── Donut card ── */}
+        <View style={[cs.card, { backgroundColor: card }]}>
+          <View style={cs.cardHeader}>
+            <Text style={[cs.cardTitle, { color: txt }]}>Gastos por categoría</Text>
+            <Text style={[cs.cardSub, { color: txtT }]}>{capitalize(getMesLabelLargo(mes, año))}</Text>
+          </View>
 
           {totalGastos === 0 ? (
-            <View style={s.emptyWrap}>
-              <Icon name="pie-chart" size={32} color={colors.textTertiary} />
-              <Text style={[s.emptyText, { color: colors.textSecondary }]}>
-                Sin gastos registrados este mes
-              </Text>
-            </View>
+            <Empty icon="pie-chart" text="Sin gastos registrados este mes" />
           ) : (
-            <Svg width={DSVG} height={DSVG}>
-              {/* Background track */}
-              <Circle cx={CX} cy={CY} r={R} fill="none" stroke="#F0EFFF" strokeWidth={SW} />
+            <>
+              {/* Donut */}
+              <View style={{ alignItems: 'center', marginVertical: 8 }}>
+                <Svg width={DSVG} height={DSVG}>
+                  {/* Track */}
+                  <Circle cx={CX} cy={CY} r={R} fill="none" stroke={isDark ? '#2A2A35' : '#F1F0FF'} strokeWidth={STROKE} />
 
-              {/* One circle per category slice */}
-              {slices.map((sl, i) => {
-                const dash = Math.max(0, sl.dashLength - GAP);
-                const gap  = Math.max(0, CIRC - dash);
-                return (
-                  <Circle
-                    key={i}
-                    cx={CX} cy={CY} r={R}
-                    fill="none"
-                    stroke={sl.color}
-                    strokeWidth={SW}
-                    strokeLinecap="butt"
-                    strokeDasharray={`${dash.toFixed(2)} ${gap.toFixed(2)}`}
-                    strokeDashoffset={`${(-(sl.offset) + GAP / 2).toFixed(2)}`}
-                    transform={`rotate(-90 ${CX} ${CY})`}
-                  />
-                );
-              })}
+                  {slices.map((sl, i) => {
+                    const d = Math.max(0, sl.dash - GAP);
+                    const g = Math.max(0, CIRC - d);
+                    return (
+                      <Circle
+                        key={i} cx={CX} cy={CY} r={R}
+                        fill="none" stroke={sl.color} strokeWidth={STROKE}
+                        strokeLinecap="round"
+                        strokeDasharray={`${d.toFixed(2)} ${g.toFixed(2)}`}
+                        strokeDashoffset={`${(-sl.off + GAP / 2).toFixed(2)}`}
+                        transform={`rotate(-90 ${CX} ${CY})`}
+                      />
+                    );
+                  })}
 
-              {/* Percentage labels outside ring — only for slices ≥ 7% */}
-              {slices.filter(sl => sl.pct >= 7).map((sl, i) => {
-                const { x, y } = labelPos(sl.offset, sl.dashLength);
-                return (
-                  <SvgText
-                    key={i}
-                    x={x} y={y + 4}
-                    textAnchor="middle"
-                    fontSize={11}
-                    fontWeight="700"
-                    fill={sl.color}
-                  >
-                    {sl.pct}%
+                  {/* Center */}
+                  <SvgText x={CX} y={CY - 10} textAnchor="middle" fontSize={Math.round(DSVG * 0.07)} fontWeight="800" fill={txt}>
+                    {fmtShort(totalGastos)}
                   </SvgText>
-                );
-              })}
+                  <SvgText x={CX} y={CY + 8} textAnchor="middle" fontSize={10} fill={txtT}>
+                    total gastado
+                  </SvgText>
+                  {salary > 0 && (
+                    <SvgText x={CX} y={CY + 24} textAnchor="middle" fontSize={11} fontWeight="700" fill={primary}>
+                      {metricasIngreso.porcentajeGastado}% del salario
+                    </SvgText>
+                  )}
+                </Svg>
+              </View>
 
-              {/* Center: total gastos */}
-              <SvgText
-                x={CX} y={CY - 12}
-                textAnchor="middle"
-                fontSize={Math.round(DSVG * 0.065)}
-                fontWeight="800"
-                fill="#111827"
-              >
-                {fmtCOP(totalGastos)}
-              </SvgText>
-              <SvgText
-                x={CX} y={CY + 8}
-                textAnchor="middle"
-                fontSize={10}
-                fill="#9CA3AF"
-              >
-                total gastado
-              </SvgText>
-              {salary > 0 && (
-                <SvgText
-                  x={CX} y={CY + 24}
-                  textAnchor="middle"
-                  fontSize={11}
-                  fontWeight="700"
-                  fill="#6156E8"
-                >
-                  {metricasIngreso.porcentajeGastado}% del salario
-                </SvgText>
-              )}
-            </Svg>
-          )}
-
-          {/* Legend chips */}
-          {totalGastos > 0 && (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 16 }}>
-              {slices.map((sl, i) => (
-                <View key={i} style={{
-                  flexDirection: 'row', alignItems: 'center', gap: 5,
-                  backgroundColor: sl.color + '18', borderRadius: 100,
-                  paddingHorizontal: 10, paddingVertical: 4,
-                }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: sl.color }} />
-                  <Text style={{ fontSize: 11, color: '#374151', fontWeight: '500' }}>
-                    {sl.name}
-                  </Text>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: sl.color }}>
-                    {sl.pct}%
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Change badge */}
-          {metricas.cambioPctVsMesAnterior !== 0 && (
-            <View style={[s.changeBadge, {
-              marginTop: 14, alignSelf: 'center',
-              backgroundColor: metricas.cambioPctVsMesAnterior < 0 ? colors.incomeLight : colors.expenseLight,
-            }]}>
-              <Icon
-                name={metricas.cambioPctVsMesAnterior < 0 ? 'trending-down' : 'trending-up'}
-                size={11}
-                color={metricas.cambioPctVsMesAnterior < 0 ? colors.income : colors.expense}
-              />
-              <Text style={[s.changeText, { color: metricas.cambioPctVsMesAnterior < 0 ? colors.income : colors.expense }]}>
-                {Math.abs(metricas.cambioPctVsMesAnterior)}% vs mes anterior
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* ── Quick metrics ── */}
-        <View style={s.metricGrid}>
-          {[
-            { val: fmtCOP(metricasIngreso.totalGastado),    label: 'Total gastado', color: THEME.colors.expense },
-            { val: fmtCOP(metricasIngreso.balanceFinal),    label: 'Balance final', color: THEME.colors.income  },
-            { val: `${metricasIngreso.porcentajeGastado}%`, label: 'Gastado',       color: '#6156E8' },
-          ].map(m => (
-            <View key={m.label} style={s.metricCell}>
-              <Text style={[s.metricVal, { color: m.color }]} numberOfLines={1}>{m.val}</Text>
-              <Text style={s.metricLabel}>{m.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={[s.metricGrid, { marginTop: 8 }]}>
-          {[
-            { val: fmtCOP(metricasIngreso.gastoPromedioRecomendadoDia), label: 'Presup. diario' },
-            { val: metricas.categoriaMayorGasto,                         label: 'Mayor categoría' },
-          ].map(m => (
-            <View key={m.label} style={s.metricCell2}>
-              <Text style={s.metricVal2} numberOfLines={1}>{m.val}</Text>
-              <Text style={s.metricLabel}>{m.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* ── Category icon grid ── */}
-        <View style={[s.card, { marginTop: 16 }]}>
-          <Text style={s.cardTitle}>Mis categorías</Text>
-          <View style={dg.grid}>
-            {catGrid.map((cat: any, idx: number) => {
-              const accent   = CAT_COLORS[idx % CAT_COLORS.length];
-              const iconName = (cat.icon as any) || getCategoryIcon(cat.name);
-              return (
-                <View key={cat.id} style={dg.cell}>
-                  <View style={[dg.circle, { backgroundColor: accent + '18' }]}>
-                    <Icon name={iconName} size={24} color={accent} />
+              {/* Legend with progress bars */}
+              <View style={cs.legendList}>
+                {slices.map((sl, i) => (
+                  <View key={i} style={cs.legendRow}>
+                    <View style={[cs.legendDot, { backgroundColor: sl.color }]} />
+                    <Text style={[cs.legendName, { color: txt }]} numberOfLines={1}>{sl.name}</Text>
+                    <View style={[cs.legendTrack, { backgroundColor: isDark ? '#2A2A35' : '#F3F4F6' }]}>
+                      <View style={[cs.legendFill, { width: `${sl.pct}%`, backgroundColor: sl.color }]} />
+                    </View>
+                    <Text style={[cs.legendPct, { color: sl.color }]}>{sl.pct}%</Text>
+                    <Text style={[cs.legendAmt, { color: txtT }]}>{fmtShort(sl.amount)}</Text>
                   </View>
-                  <Text style={dg.label} numberOfLines={1}>{cat.name}</Text>
+                ))}
+              </View>
+
+              {/* Change badge */}
+              {metricas.cambioPctVsMesAnterior !== 0 && (
+                <View style={[cs.badge, {
+                  backgroundColor: metricas.cambioPctVsMesAnterior < 0
+                    ? income + '18' : expense + '18',
+                  alignSelf: 'center', marginTop: 12,
+                }]}>
+                  <Icon
+                    name={metricas.cambioPctVsMesAnterior < 0 ? 'trending-down' : 'trending-up'}
+                    size={11}
+                    color={metricas.cambioPctVsMesAnterior < 0 ? income : expense}
+                  />
+                  <Text style={[cs.badgeText, {
+                    color: metricas.cambioPctVsMesAnterior < 0 ? income : expense,
+                  }]}>
+                    {Math.abs(metricas.cambioPctVsMesAnterior)}% vs mes anterior
+                  </Text>
                 </View>
-              );
-            })}
+              )}
+            </>
+          )}
+        </View>
+
+        {/* ── KPI row ── */}
+        <View style={cs.kpiRow}>
+          <KpiCard label="Gastado" value={fmtShort(metricasIngreso.totalGastado)} color={expense} icon="arrow-down-circle" bg={expense + '15'} />
+          <KpiCard label="Balance" value={fmtShort(metricasIngreso.balanceFinal)} color={income} icon="check-circle" bg={income + '15'} />
+          <KpiCard label="% Usado" value={`${metricasIngreso.porcentajeGastado}%`} color={primary} icon="percent" bg={primary + '15'} />
+        </View>
+
+        {/* ── Budget diario ── */}
+        <View style={[cs.card, { backgroundColor: card }]}>
+          <View style={cs.cardHeader}>
+            <Text style={[cs.cardTitle, { color: txt }]}>Presupuesto diario</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+            <View style={[cs.bigNumWrap, { backgroundColor: primary + '12' }]}>
+              <Icon name="calendar" size={18} color={primary} />
+              <Text style={[cs.bigNum, { color: primary }]}>
+                {fmtShort(metricasIngreso.gastoPromedioRecomendadoDia)}
+              </Text>
+              <Text style={[cs.bigNumLabel, { color: txtT }]}>/ día</Text>
+            </View>
+            <View style={{ flex: 1, gap: 6 }}>
+              <StatLine label="Mayor categoría" value={metricas.categoriaMayorGasto || '—'} color={txt} sub={txtT} />
+              <StatLine label="Txn este mes" value={`${txnCount} movimientos`} color={txt} sub={txtT} />
+            </View>
           </View>
         </View>
-      </>
+
+        {/* ── Category grid ── */}
+        {catGrid.length > 0 && (
+          <View style={[cs.card, { backgroundColor: card }]}>
+            <View style={cs.cardHeader}>
+              <Text style={[cs.cardTitle, { color: txt }]}>Mis categorías</Text>
+            </View>
+            <View style={cs.catGrid}>
+              {catGrid.map((cat: any, idx: number) => {
+                const accent   = CAT_COLORS[idx % CAT_COLORS.length];
+                const gasto    = gastoPorCat[cat.name] ?? 0;
+                const iconName = (cat.icon as any) || getCategoryIcon(cat.name);
+                return (
+                  <View key={cat.id} style={cs.catCell}>
+                    <View style={[cs.catCircle, { backgroundColor: accent + '18' }]}>
+                      <Icon name={iconName} size={22} color={accent} />
+                    </View>
+                    <Text style={[cs.catName, { color: txts }]} numberOfLines={1}>{cat.name}</Text>
+                    {gasto > 0 && (
+                      <Text style={[cs.catAmt, { color: accent }]}>{fmtShort(gasto)}</Text>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+      </View>
     );
   };
 
-  // ── TAB: COMPARATIVO ───────────────────────────────────────────────────────
-
-  const renderComparativo = () => {
-    const hasDatos = barData.some(d => d.gastoActual > 0 || d.gastoAnterior > 0);
+  // ── Tab: TENDENCIA ─────────────────────────────────────────────────────────
+  const renderTendencia = () => {
+    const hasBars = barData.some(d => d.gastoActual > 0 || d.gastoAnterior > 0);
+    const maxG    = Math.max(...barData.map(d => d.gastoActual), 0);
     const conDatos = barData.filter(d => d.gastoActual > 0);
-    const maxG = Math.max(...barData.map(d => d.gastoActual), 0);
-    const minG = conDatos.length > 0 ? Math.min(...conDatos.map(d => d.gastoActual)) : 0;
     const promedio = conDatos.length > 0
-      ? conDatos.reduce((s, d) => s + d.gastoActual, 0) / conDatos.length
-      : 0;
+      ? conDatos.reduce((s, d) => s + d.gastoActual, 0) / conDatos.length : 0;
+    const minG = conDatos.length > 0 ? Math.min(...conDatos.map(d => d.gastoActual)) : 0;
+    const sinAhorro = areaData.every(d => d.ahorro === 0);
+    const goalAmt   = goal?.targetAmount ?? 0;
+    const goalY     = goalAmt > 0
+      ? AREA_PAD_T + DRAW_H - (goalAmt / maxAreaMonto) * DRAW_H : null;
 
     return (
-      <>
-        {/* Period selector */}
-        <View style={s.periodoRow}>
+      <View>
+        {/* Period pills */}
+        <View style={cs.pillRow}>
           {([3, 6, 12] as PeriodoBars[]).map(p => (
             <TouchableOpacity
               key={p}
-              style={[
-                s.periodoPill,
-                periodoBars === p
-                  ? { backgroundColor: '#6156E8' }
-                  : { backgroundColor: '#FFFFFF', borderWidth: 0.5, borderColor: '#E5E7EB' },
-              ]}
+              style={[cs.pill, periodoBars === p ? { backgroundColor: primary } : { backgroundColor: card, borderWidth: 1, borderColor: bdr }]}
               onPress={() => setPeriodoBars(p)}
             >
-              <Text style={[s.periodoPillText, { color: periodoBars === p ? '#FFFFFF' : '#6B7280' }]}>
-                {p} meses
-              </Text>
+              <Text style={[cs.pillText, { color: periodoBars === p ? '#fff' : txts }]}>{p}m</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {card(
-          <>
-            {!hasDatos ? (
-              <View style={s.emptyWrap}>
-                <Icon name="bar-chart-2" size={28} color={colors.textTertiary} />
-                <Text style={[s.emptyText, { color: colors.textSecondary }]}>Sin datos en este período</Text>
-              </View>
-            ) : (
-              <>
-                <Svg width={CHART_W} height={BAR_AREA_H + 30}>
-                  {/* Grid lines */}
-                  {[0, 0.5, 1].map((pct, gi) => {
-                    const y = BAR_AREA_H - pct * BAR_AREA_H;
-                    return (
-                      <React.Fragment key={gi}>
-                        <Line
-                          x1={0} y1={y} x2={CHART_W} y2={y}
-                          stroke={colors.borderSubtle}
-                          strokeWidth={0.5}
-                        />
-                        <SvgText
-                          x={0} y={y - 3}
-                          fontSize={8}
-                          fill={colors.textTertiary}
-                        >
-                          {pct === 0 ? '$0' : fmtShort(maxBarMonto * pct)}
-                        </SvgText>
-                      </React.Fragment>
-                    );
-                  })}
-
-                  {/* Bars */}
-                  {barData.map((d, i) => {
-                    const cx = i * GROUP_W + GROUP_W / 2;
-                    const hCurr = barHCurr[i] ?? 0;
-                    const hPrev = barHPrev[i] ?? 0;
-                    return (
-                      <React.Fragment key={i}>
-                        {/* Previous year bar */}
-                        {hPrev > 0 && (
-                          <Rect
-                            x={cx - BAR_GAP / 2 - BAR_W}
-                            y={BAR_AREA_H - hPrev}
-                            width={BAR_W}
-                            height={hPrev}
-                            rx={3}
-                            fill={colors.primary}
-                            opacity={0.35}
-                          />
-                        )}
-                        {/* Current year bar */}
-                        {hCurr > 0 && (
-                          <Rect
-                            x={cx + BAR_GAP / 2}
-                            y={BAR_AREA_H - hCurr}
-                            width={BAR_W}
-                            height={hCurr}
-                            rx={3}
-                            fill={colors.primary}
-                          />
-                        )}
-                        {/* X label */}
-                        <SvgText
-                          x={cx}
-                          y={BAR_AREA_H + 18}
-                          textAnchor="middle"
-                          fontSize={9}
-                          fill={colors.textTertiary}
-                        >
-                          {d.label}
-                        </SvgText>
-                      </React.Fragment>
-                    );
-                  })}
-                </Svg>
-
-                {/* Legend */}
-                <View style={s.barLegend}>
-                  <View style={s.legendRow}>
-                    <View style={[s.legendDot, { backgroundColor: colors.primary, opacity: 0.35 }]} />
-                    <Text style={[s.legendLabel, { color: colors.textSecondary }]}>Año anterior</Text>
-                  </View>
-                  <View style={s.legendRow}>
-                    <View style={[s.legendDot, { backgroundColor: colors.primary }]} />
-                    <Text style={[s.legendLabel, { color: colors.textSecondary }]}>Este año</Text>
-                  </View>
-                </View>
-              </>
-            )}
-          </>,
-        )}
-
-        {/* Stats row */}
-        {hasDatos && (
-          <View style={[s.metricGrid, { marginTop: 12 }]}>
-            {[
-              { val: fmtCOP(maxG),     label: 'Mayor gasto' },
-              { val: fmtCOP(minG),     label: 'Menor gasto' },
-              { val: fmtCOP(promedio), label: 'Promedio' },
-            ].map(m => (
-              <View key={m.label} style={s.metricCell}>
-                <Text style={[s.metricVal, { color: '#6156E8' }]} numberOfLines={1}>{m.val}</Text>
-                <Text style={s.metricLabel}>{m.label}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </>
-    );
-  };
-
-  // ── TAB: AHORRO ────────────────────────────────────────────────────────────
-
-  const renderAhorro = () => {
-    const totalAhorro = areaData[areaData.length - 1]?.ahorro ?? 0;
-    const sinDatos = areaData.every(d => d.ahorro === 0);
-    const goalAmt = goal?.targetAmount ?? 0;
-    const goalY = goalAmt > 0
-      ? AREA_PAD_TOP + DRAW_H - (goalAmt / maxAreaMonto) * DRAW_H
-      : null;
-
-    return (
-      <>
-        {card(
-          <>
-            <Text style={s.cardTitle}>Ahorro acumulado</Text>
-            {sinDatos ? (
-              <View style={s.emptyWrap}>
-                <Icon name="trending-up" size={28} color={colors.textTertiary} />
-                <Text style={[s.emptyText, { color: colors.textSecondary }]}>
-                  Registra transacciones para ver tu progreso de ahorro
-                </Text>
-              </View>
-            ) : (
-              <Animated.View style={{ opacity: areaOpacity }}>
-                <Svg width={CHART_W} height={AREA_H}>
-                  <Defs>
-                    <LinearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                      <Stop offset="0%"   stopColor={colors.primary} stopOpacity={0.4} />
-                      <Stop offset="100%" stopColor={colors.primary} stopOpacity={0.02} />
-                    </LinearGradient>
-                  </Defs>
-
-                  {/* Grid lines */}
-                  {[0, 0.5, 1].map((pct, gi) => {
-                    const y = AREA_PAD_TOP + DRAW_H - pct * DRAW_H;
-                    return (
-                      <React.Fragment key={gi}>
-                        <Line x1={0} y1={y} x2={CHART_W} y2={y} stroke={colors.borderSubtle} strokeWidth={0.5} />
-                        <SvgText x={0} y={y - 3} fontSize={8} fill={colors.textTertiary}>
-                          {fmtShort(maxAreaMonto * pct)}
-                        </SvgText>
-                      </React.Fragment>
-                    );
-                  })}
-
-                  {/* Goal line */}
-                  {goalY !== null && (
-                    <>
-                      <Line
-                        x1={0} y1={goalY} x2={CHART_W} y2={goalY}
-                        stroke={colors.income}
-                        strokeDasharray="4 3"
-                        strokeWidth={1}
-                        opacity={0.6}
-                      />
-                      <SvgText x={CHART_W - 26} y={goalY - 4} fontSize={8} fill={colors.income}>
-                        Meta
-                      </SvgText>
-                    </>
-                  )}
-
-                  {/* Area fill */}
-                  {areaPath && (
-                    <Path d={areaPath} fill="url(#areaGrad)" />
-                  )}
-                  {/* Line */}
-                  {linePath && (
-                    <Path d={linePath} stroke={colors.primary} strokeWidth={2} fill="none" />
-                  )}
-
-                  {/* Points */}
-                  {areaPoints.map((pt, i) => {
-                    const isLast = i === areaPoints.length - 1;
-                    return (
-                      <React.Fragment key={i}>
-                        {isLast && (
-                          <Circle cx={pt.x} cy={pt.y} r={8} fill={colors.primary} opacity={0.2} />
-                        )}
-                        <Circle cx={pt.x} cy={pt.y} r={isLast ? 5 : 3.5} fill={colors.primary} />
-                      </React.Fragment>
-                    );
-                  })}
-
-                  {/* X labels */}
-                  {areaData.map((d, i) => (
-                    <SvgText
-                      key={i}
-                      x={areaData.length > 1 ? (i / (areaData.length - 1)) * CHART_W : CHART_W / 2}
-                      y={AREA_H - 4}
-                      textAnchor="middle"
-                      fontSize={9}
-                      fill={colors.textTertiary}
-                    >
-                      {d.label}
-                    </SvgText>
-                  ))}
-                </Svg>
-              </Animated.View>
-            )}
-
-            {/* Footer */}
-            <View style={s.areaFooter}>
-              <View>
-                <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Acumulado</Text>
-                <Text style={[s.areaFooterVal, { color: colors.primary }]}>{fmtCOP(totalAhorro)}</Text>
-              </View>
-              {goalAmt > 0 && (
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Meta anual</Text>
-                  <Text style={[s.areaFooterVal, { color: colors.income }]}>{fmtCOP(goalAmt)}</Text>
-                </View>
-              )}
+        {/* Bar chart */}
+        <View style={[cs.card, { backgroundColor: card }]}>
+          <View style={cs.cardHeader}>
+            <Text style={[cs.cardTitle, { color: txt }]}>Gastos mensuales</Text>
+            <View style={cs.legendRow}>
+              <View style={[cs.legendDot, { backgroundColor: primary, opacity: 0.35 }]} />
+              <Text style={[cs.legendName, { color: txts, fontSize: 10 }]}>Ant.</Text>
+              <View style={[cs.legendDot, { backgroundColor: primary }]} />
+              <Text style={[cs.legendName, { color: txts, fontSize: 10 }]}>Act.</Text>
             </View>
-          </>,
-        )}
-      </>
-    );
-  };
+          </View>
 
-  // ── TAB: CALOR ─────────────────────────────────────────────────────────────
+          {!hasBars ? (
+            <Empty icon="bar-chart-2" text="Sin datos en este período" />
+          ) : (
+            <>
+              <Svg width={CHART_W} height={BAR_H + 36}>
+                <Defs>
+                  <SvgGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                    <Stop offset="0%" stopColor={primary} stopOpacity={1} />
+                    <Stop offset="100%" stopColor={primary} stopOpacity={0.5} />
+                  </SvgGradient>
+                  <SvgGradient id="barGradPrev" x1="0" y1="0" x2="0" y2="1">
+                    <Stop offset="0%" stopColor={primary} stopOpacity={0.4} />
+                    <Stop offset="100%" stopColor={primary} stopOpacity={0.1} />
+                  </SvgGradient>
+                </Defs>
 
-  const renderCalor = () => {
-    const CELL = 28;
-    const GAP  = 3;
-    const LABEL_W = 22;
-    const GRID_W = LABEL_W + 7 * (CELL + GAP);
-    const GRID_H = 4 * (CELL + GAP) + 24;
-    const DIA_LABELS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
-
-    const diaMaxCell = heatData.reduce((max, c) => c.monto > max.monto ? c : max, heatData[0] ?? { semana: 0, dia: 0, monto: 0, count: 0 });
-    const sinGasto   = heatData.filter(c => c.monto === 0).length;
-
-    return (
-      <>
-        <Text style={[s.heatExplain, { color: colors.textTertiary }]}>
-          Intensidad de gasto por día de la semana
-        </Text>
-
-        {card(
-          <>
-            <Animated.View style={{ opacity: heatOpacity }}>
-              <Svg width={GRID_W} height={GRID_H}>
-                {/* Day labels */}
-                {DIA_LABELS.map((lbl, di) => (
-                  <SvgText
-                    key={di}
-                    x={LABEL_W + di * (CELL + GAP) + CELL / 2}
-                    y={13}
-                    textAnchor="middle"
-                    fontSize={9}
-                    fill={colors.textTertiary}
-                  >
-                    {lbl}
-                  </SvgText>
-                ))}
-
-                {/* Week labels */}
-                {['S1', 'S2', 'S3', 'S4'].map((lbl, wi) => (
-                  <SvgText
-                    key={wi}
-                    x={0}
-                    y={22 + wi * (CELL + GAP) + CELL / 2}
-                    fontSize={8}
-                    fill={colors.textTertiary}
-                  >
-                    {lbl}
-                  </SvgText>
-                ))}
-
-                {/* Cells */}
-                {heatData.map((cell, idx) => {
-                  const intensity = getHeatIntensity(cell.monto, maxHeatMonto);
-                  const fillColor = getHeatColor(intensity, isDark);
-                  const cx = LABEL_W + cell.dia * (CELL + GAP);
-                  const cy = 20 + cell.semana * (CELL + GAP);
+                {/* Grid */}
+                {[0, 0.5, 1].map((pct, gi) => {
+                  const y = BAR_H - pct * BAR_H;
                   return (
-                    <Rect
-                      key={idx}
-                      x={cx} y={cy}
-                      width={CELL} height={CELL}
-                      rx={5}
-                      fill={fillColor}
-                    />
+                    <React.Fragment key={gi}>
+                      <Line x1={0} y1={y} x2={CHART_W} y2={y} stroke={bdr} strokeWidth={0.5} strokeDasharray={gi > 0 ? '3 3' : undefined} />
+                      {pct > 0 && (
+                        <SvgText x={2} y={y - 3} fontSize={8} fill={txtT}>{fmtShort(maxBarMonto * pct)}</SvgText>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+
+                {/* Bars */}
+                {barData.map((d, i) => {
+                  const cx     = i * GRP_W + GRP_W / 2;
+                  const hCurr  = maxBarMonto > 0 ? Math.max(d.gastoActual > 0 ? 4 : 0, (d.gastoActual / maxBarMonto) * BAR_H) : 0;
+                  const hPrev  = maxBarMonto > 0 ? Math.max(d.gastoAnterior > 0 ? 4 : 0, (d.gastoAnterior / maxBarMonto) * BAR_H) : 0;
+                  const gap    = BAR_W * 0.35;
+                  return (
+                    <G key={i}>
+                      {hPrev > 0 && (
+                        <Rect
+                          x={cx - gap / 2 - BAR_W} y={BAR_H - hPrev}
+                          width={BAR_W} height={hPrev}
+                          rx={4} fill="url(#barGradPrev)"
+                        />
+                      )}
+                      {hCurr > 0 && (
+                        <Rect
+                          x={cx + gap / 2} y={BAR_H - hCurr}
+                          width={BAR_W} height={hCurr}
+                          rx={4} fill="url(#barGrad)"
+                        />
+                      )}
+                      <SvgText x={cx} y={BAR_H + 14} textAnchor="middle" fontSize={9} fill={txtT}>
+                        {d.label}
+                      </SvgText>
+                    </G>
                   );
                 })}
               </Svg>
-            </Animated.View>
 
-            {/* Tappable overlay for heat cells */}
-            <View style={[StyleSheet.absoluteFill, { top: 0, left: CARD_PADDING, width: GRID_W }]}>
+              {/* Stats */}
+              <View style={[cs.statStrip, { backgroundColor: cardSec, marginTop: 12 }]}>
+                {[
+                  { label: 'Máximo', value: fmtShort(maxG), color: expense },
+                  { label: 'Promedio', value: fmtShort(promedio), color: primary },
+                  { label: 'Mínimo', value: fmtShort(minG), color: income },
+                ].map(m => (
+                  <View key={m.label} style={cs.statStripCell}>
+                    <Text style={[cs.statStripVal, { color: m.color }]}>{m.value}</Text>
+                    <Text style={[cs.statStripLabel, { color: txtT }]}>{m.label}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* Area chart — ahorro */}
+        <View style={[cs.card, { backgroundColor: card }]}>
+          <View style={cs.cardHeader}>
+            <Text style={[cs.cardTitle, { color: txt }]}>Ahorro acumulado</Text>
+            {goalAmt > 0 && (
+              <View style={[cs.badge, { backgroundColor: income + '18' }]}>
+                <Text style={[cs.badgeText, { color: income }]}>Meta: {fmtShort(goalAmt)}</Text>
+              </View>
+            )}
+          </View>
+
+          {sinAhorro ? (
+            <Empty icon="trending-up" text="Registra transacciones para ver tu progreso" />
+          ) : (
+            <>
+              <Svg width={CHART_W} height={AREA_H}>
+                <Defs>
+                  <SvgGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <Stop offset="0%" stopColor={income} stopOpacity={0.35} />
+                    <Stop offset="100%" stopColor={income} stopOpacity={0.02} />
+                  </SvgGradient>
+                </Defs>
+
+                {[0, 0.5, 1].map((pct, gi) => {
+                  const y = AREA_PAD_T + DRAW_H - pct * DRAW_H;
+                  return (
+                    <React.Fragment key={gi}>
+                      <Line x1={0} y1={y} x2={CHART_W} y2={y} stroke={bdr} strokeWidth={0.5} strokeDasharray={gi > 0 ? '3 3' : undefined} />
+                      {pct > 0 && <SvgText x={2} y={y - 3} fontSize={8} fill={txtT}>{fmtShort(maxAreaMonto * pct)}</SvgText>}
+                    </React.Fragment>
+                  );
+                })}
+
+                {goalY !== null && (
+                  <>
+                    <Line x1={0} y1={goalY} x2={CHART_W} y2={goalY} stroke={income} strokeDasharray="5 3" strokeWidth={1.5} opacity={0.7} />
+                    <SvgText x={CHART_W - 30} y={goalY - 4} fontSize={9} fill={income} fontWeight="600">Meta</SvgText>
+                  </>
+                )}
+
+                {areaPath && <Path d={areaPath} fill="url(#areaGrad)" />}
+                {linePath && <Path d={linePath} stroke={income} strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
+
+                {areaPoints.map((pt, i) => {
+                  const isLast = i === areaPoints.length - 1;
+                  return (
+                    <React.Fragment key={i}>
+                      {isLast && <Circle cx={pt.x} cy={pt.y} r={10} fill={income} opacity={0.15} />}
+                      <Circle cx={pt.x} cy={pt.y} r={isLast ? 5 : 3} fill={income} stroke="#fff" strokeWidth={1.5} />
+                    </React.Fragment>
+                  );
+                })}
+
+                {areaData.map((d, i) => (
+                  <SvgText
+                    key={i}
+                    x={areaData.length > 1 ? (i / (areaData.length - 1)) * CHART_W : CHART_W / 2}
+                    y={AREA_H - 4} textAnchor="middle" fontSize={9} fill={txtT}
+                  >
+                    {d.label}
+                  </SvgText>
+                ))}
+              </Svg>
+
+              <View style={[cs.statStrip, { backgroundColor: cardSec, marginTop: 12 }]}>
+                <View style={cs.statStripCell}>
+                  <Text style={[cs.statStripVal, { color: income }]}>{fmtShort(areaData[areaData.length - 1]?.ahorro ?? 0)}</Text>
+                  <Text style={[cs.statStripLabel, { color: txtT }]}>Acumulado</Text>
+                </View>
+                {goalAmt > 0 && (
+                  <View style={cs.statStripCell}>
+                    <Text style={[cs.statStripVal, { color: primary }]}>
+                      {Math.min(100, Math.round(((areaData[areaData.length - 1]?.ahorro ?? 0) / goalAmt) * 100))}%
+                    </Text>
+                    <Text style={[cs.statStripLabel, { color: txtT }]}>Progreso meta</Text>
+                  </View>
+                )}
+              </View>
+            </>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  // ── Tab: CALOR ─────────────────────────────────────────────────────────────
+  const renderCalor = () => {
+    const CELL     = 32;
+    const GAP      = 4;
+    const LABEL_W  = 24;
+    const GRID_W   = LABEL_W + 7 * (CELL + GAP);
+    const GRID_H   = 4 * (CELL + GAP) + 28;
+    const DAYS     = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+    const diaMax   = heatData.reduce((m, c) => c.monto > m.monto ? c : m, heatData[0] ?? { semana: 0, dia: 0, monto: 0, count: 0 });
+    const sinGasto = heatData.filter(c => c.monto === 0).length;
+
+    return (
+      <View>
+        <View style={[cs.card, { backgroundColor: card }]}>
+          <View style={cs.cardHeader}>
+            <Text style={[cs.cardTitle, { color: txt }]}>Intensidad de gasto</Text>
+            <Text style={[cs.cardSub, { color: txtT }]}>{capitalize(getMesLabelLargo(mes, año))}</Text>
+          </View>
+
+          <View style={{ alignItems: 'center' }}>
+            <Svg width={GRID_W} height={GRID_H}>
+              {DAYS.map((lbl, di) => (
+                <SvgText key={di} x={LABEL_W + di * (CELL + GAP) + CELL / 2} y={14}
+                  textAnchor="middle" fontSize={10} fontWeight="600" fill={txtT}>{lbl}</SvgText>
+              ))}
+              {['S1', 'S2', 'S3', 'S4'].map((lbl, wi) => (
+                <SvgText key={wi} x={0} y={26 + wi * (CELL + GAP) + CELL / 2}
+                  fontSize={9} fill={txtT}>{lbl}</SvgText>
+              ))}
+              {heatData.map((cell, idx) => {
+                const intensity = getHeatIntensity(cell.monto, maxHeatMonto);
+                const fill      = getHeatColor(intensity, isDark);
+                const cx = LABEL_W + cell.dia * (CELL + GAP);
+                const cy = 22 + cell.semana * (CELL + GAP);
+                return <Rect key={idx} x={cx} y={cy} width={CELL} height={CELL} rx={7} fill={fill} />;
+              })}
+            </Svg>
+
+            {/* Tap overlay */}
+            <View style={[StyleSheet.absoluteFill, { top: 44 }]}>
               {heatData.map((cell, idx) => (
                 <TouchableOpacity
                   key={idx}
-                  style={[
-                    StyleSheet.absoluteFill,
-                    {
-                      left: LABEL_W + cell.dia * (CELL + GAP),
-                      top: 20 + cell.semana * (CELL + GAP),
-                      width: CELL,
-                      height: CELL,
-                      position: 'absolute',
-                    },
-                  ]}
-                  onPress={() => setSelectedHeatCell(prev =>
-                    prev?.semana === cell.semana && prev.dia === cell.dia ? null : cell
+                  style={{
+                    position: 'absolute',
+                    left: LABEL_W + cell.dia * (CELL + GAP),
+                    top: 22 + cell.semana * (CELL + GAP) - 44,
+                    width: CELL, height: CELL,
+                  }}
+                  onPress={() => setSelectedHeatCell(p =>
+                    p?.semana === cell.semana && p.dia === cell.dia ? null : cell
                   )}
                 />
               ))}
             </View>
+          </View>
 
-            {/* Tooltip */}
-            {selectedHeatCell !== null && (
-              <View style={[s.tooltip, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[s.tooltipTitle, { color: colors.textPrimary }]}>
-                  {getDiaLabel(selectedHeatCell.dia)} — Semana {selectedHeatCell.semana + 1}
-                </Text>
-                <Text style={[s.tooltipVal, { color: colors.primary }]}>
-                  {selectedHeatCell.monto > 0 ? fmtCOP(selectedHeatCell.monto) : 'Sin gastos'}
-                </Text>
-                {selectedHeatCell.count > 0 && (
-                  <Text style={[s.tooltipSub, { color: colors.textTertiary }]}>
-                    {selectedHeatCell.count} transacción{selectedHeatCell.count !== 1 ? 'es' : ''}
-                  </Text>
-                )}
-              </View>
-            )}
-
-            {/* Legend */}
-            <View style={s.heatLegend}>
-              <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Menos</Text>
-              {[0, 0.1, 0.3, 0.6, 1.0].map((v, i) => (
-                <View key={i} style={[s.heatLegendCell, { backgroundColor: getHeatColor(v, isDark) }]} />
-              ))}
-              <Text style={[s.metricLabel, { color: colors.textTertiary }]}>Más</Text>
-            </View>
-          </>,
-        )}
-
-        {/* Insights */}
-        <View style={[s.insightRow, { marginTop: 12 }]}>
-          {diaMaxCell.monto > 0 && (
-            <View style={[s.insightPill, { backgroundColor: colors.cardSecondary }]}>
-              <Icon name="activity" size={12} color={colors.warning} />
-              <Text style={[s.insightPillText, { color: colors.textSecondary }]}>
-                Mayor gasto: {getDiaLabel(diaMaxCell.dia)} · {fmtCOP(diaMaxCell.monto)}
+          {/* Tooltip */}
+          {selectedHeatCell && (
+            <View style={[cs.tooltip, { backgroundColor: cardSec, borderColor: bdr }]}>
+              <Text style={[cs.tooltipTitle, { color: txt }]}>
+                {getDiaLabel(selectedHeatCell.dia)} — Semana {selectedHeatCell.semana + 1}
               </Text>
+              <Text style={[cs.tooltipVal, { color: primary }]}>
+                {selectedHeatCell.monto > 0 ? fmtCOP(selectedHeatCell.monto) : 'Sin gastos'}
+              </Text>
+              {selectedHeatCell.count > 0 && (
+                <Text style={[cs.tooltipSub, { color: txtT }]}>
+                  {selectedHeatCell.count} transacción{selectedHeatCell.count !== 1 ? 'es' : ''}
+                </Text>
+              )}
             </View>
           )}
-          <View style={[s.insightPill, { backgroundColor: colors.cardSecondary }]}>
-            <Icon name="check-circle" size={12} color={colors.income} />
-            <Text style={[s.insightPillText, { color: colors.textSecondary }]}>
-              {sinGasto} días sin gastos
-            </Text>
+
+          {/* Legend */}
+          <View style={cs.heatLegend}>
+            <Text style={[{ fontSize: 10, color: txtT }]}>Menos</Text>
+            {[0, 0.2, 0.4, 0.7, 1.0].map((v, i) => (
+              <View key={i} style={[cs.heatCell, { backgroundColor: getHeatColor(v, isDark) }]} />
+            ))}
+            <Text style={[{ fontSize: 10, color: txtT }]}>Más</Text>
           </View>
         </View>
-      </>
+
+        {/* Insights */}
+        <View style={[cs.card, { backgroundColor: card }]}>
+          <View style={cs.cardHeader}>
+            <Text style={[cs.cardTitle, { color: txt }]}>Patrones detectados</Text>
+          </View>
+          <View style={{ gap: 10 }}>
+            {diaMax.monto > 0 && (
+              <InsightRow
+                icon="zap" iconColor="#F59E0B"
+                text={`Mayor actividad los ${getDiaLabel(diaMax.dia)} con ${fmtCOP(diaMax.monto)}`}
+                bg="#FEF3C7" card={card} txt={txts}
+              />
+            )}
+            <InsightRow
+              icon="shield" iconColor={income}
+              text={`${sinGasto} días sin ningún gasto registrado`}
+              bg={income + '15'} card={card} txt={txts}
+            />
+            {txnCount > 0 && (
+              <InsightRow
+                icon="activity" iconColor={primary}
+                text={`${txnCount} transacciones en ${capitalize(getMesLabel(mes))}`}
+                bg={primary + '12'} card={card} txt={txts}
+              />
+            )}
+          </View>
+        </View>
+      </View>
     );
   };
 
-  // ── TAB: TREEMAP ───────────────────────────────────────────────────────────
-
-  const renderTreemap = () => {
-    const sinDatos = treemapData.length === 0;
-    const mesLabel = capitalize(getMesLabel(mes));
-    const allNodes = treemapData.flatMap(row => row.nodes);
+  // ── Tab: DISTRIBUCIÓN ──────────────────────────────────────────────────────
+  const renderDistribucion = () => {
+    const sinDatos  = treemapData.length === 0;
+    const allNodes  = treemapData.flatMap(row => row.nodes);
 
     return (
-      <>
-        {sinDatos ? (
-          <View style={[s.emptyWrap, { paddingVertical: 40 }]}>
-            <Icon name="pie-chart" size={32} color={colors.textTertiary} />
-            <Text style={[s.emptyText, { color: colors.textSecondary }]}>
-              Sin gastos registrados en {mesLabel}
-            </Text>
-            <TouchableOpacity onPress={() => onNavigate?.('gastos')}>
-              <Text style={[s.emptyAction, { color: colors.primary }]}>Agregar gasto</Text>
-            </TouchableOpacity>
+      <View>
+        <View style={[cs.card, { backgroundColor: card }]}>
+          <View style={cs.cardHeader}>
+            <Text style={[cs.cardTitle, { color: txt }]}>Distribución de gastos</Text>
+            <Text style={[cs.cardSub, { color: txtT }]}>{capitalize(getMesLabel(mes))}</Text>
           </View>
-        ) : (
-          <>
-            <Animated.View
-              style={{
-                opacity: treemapAnim,
-                transform: [{ scale: treemapAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) }],
-              }}
-            >
+
+          {sinDatos ? (
+            <>
+              <Empty icon="grid" text={`Sin gastos en ${capitalize(getMesLabel(mes))}`} />
+              <TouchableOpacity onPress={() => onNavigate?.('gastos')} style={[cs.ctaBtn, { backgroundColor: primary }]}>
+                <Text style={cs.ctaBtnText}>Registrar gasto</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View>
               {treemapData.map((row, ri) => (
-                <View key={ri} style={[s.treemapRow, { height: row.height }]}>
+                <View key={ri} style={[cs.treemapRow, { height: row.height }]}>
                   {row.nodes.map((node, ni) => (
                     <TouchableOpacity
                       key={ni}
-                      style={[s.treemapNode, { flex: node.flex, height: row.height, backgroundColor: node.color }]}
-                      onPress={() =>
-                        Alert.alert(node.name, `${fmtCOP(node.amount)} · ${node.percentage}% del total`)
-                      }
+                      style={[cs.treemapNode, { flex: node.flex, height: row.height, backgroundColor: node.color }]}
+                      onPress={() => Alert.alert(node.name, `${fmtCOP(node.amount)}\n${node.percentage}% del total`)}
                     >
-                      <Text style={s.treemapName} numberOfLines={1}>
+                      <Text style={cs.treemapName} numberOfLines={1}>
                         {node.flex < 0.15 ? node.name.slice(0, 3) : node.name}
                       </Text>
-                      {row.height >= 70 && (
-                        <Text style={s.treemapAmount}>{fmtShort(node.amount)}</Text>
+                      {row.height >= 64 && (
+                        <Text style={cs.treemapAmt}>{fmtShort(node.amount)}</Text>
                       )}
                       {node.flex >= 0.2 && (
-                        <Text style={s.treemapPct}>{node.percentage}%</Text>
+                        <Text style={cs.treemapPct}>{node.percentage}%</Text>
                       )}
                     </TouchableOpacity>
                   ))}
                 </View>
               ))}
-            </Animated.View>
+            </View>
+          )}
+        </View>
 
-            {/* Color legend */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ marginTop: 12 }}
-              contentContainerStyle={s.treemapLegend}
-            >
-              {allNodes.map((node, i) => (
-                <View key={i} style={s.treemapLegendItem}>
-                  <View style={[s.treemapLegendDot, { backgroundColor: node.color }]} />
-                  <Text style={[s.treemapLegendText, { color: colors.textSecondary }]}>
-                    {node.name}
-                  </Text>
+        {/* Category breakdown list */}
+        {!sinDatos && (
+          <View style={[cs.card, { backgroundColor: card }]}>
+            <View style={cs.cardHeader}>
+              <Text style={[cs.cardTitle, { color: txt }]}>Desglose por categoría</Text>
+            </View>
+            {allNodes.map((node, i) => (
+              <View key={i} style={[cs.breakdownRow, i > 0 && { borderTopWidth: 1, borderTopColor: bdr }]}>
+                <View style={[cs.breakdownDot, { backgroundColor: node.color }]} />
+                <Text style={[cs.breakdownName, { color: txt }]}>{node.name}</Text>
+                <View style={{ flex: 1 }}>
+                  <View style={[cs.legendTrack, { backgroundColor: isDark ? '#2A2A35' : '#F3F4F6', height: 6 }]}>
+                    <View style={[cs.legendFill, { width: `${node.percentage}%`, backgroundColor: node.color, height: 6 }]} />
+                  </View>
                 </View>
-              ))}
-            </ScrollView>
-          </>
+                <Text style={[cs.breakdownAmt, { color: node.color }]}>{fmtShort(node.amount)}</Text>
+                <Text style={[cs.breakdownPct, { color: txtT }]}>{node.percentage}%</Text>
+              </View>
+            ))}
+          </View>
         )}
-      </>
+      </View>
     );
   };
 
-  // ── MAIN RENDER ────────────────────────────────────────────────────────────
+  // ── Tabs config ────────────────────────────────────────────────────────────
+  const TABS: { key: Tab; label: string; icon: string }[] = [
+    { key: 'resumen',       label: 'Resumen',  icon: 'pie-chart' },
+    { key: 'tendencia',     label: 'Tendencia', icon: 'trending-up' },
+    { key: 'calor',         label: 'Calor',    icon: 'activity' },
+    { key: 'distribucion',  label: 'Mapa',     icon: 'grid' },
+  ];
+
+  // ── Main render ────────────────────────────────────────────────────────────
   return (
-    <View style={[s.root, { backgroundColor: '#F8F7FF' }]}>
-      {/* Header */}
-      <View style={[s.header, { backgroundColor: '#F8F7FF', paddingTop: insets.top + 12 }]}>
-        <Text style={s.headerTitle}>Estadísticas</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={s.monthBadge}>
-            <Text style={s.monthBadgeText}>
-              {capitalize(getMesLabelLargo(mes, año))}
-            </Text>
+    <View style={[cs.root, { backgroundColor: bg }]}>
+
+      {/* ── Gradient hero header ── */}
+      <LinearGradient
+        colors={isDark
+          ? [accentColor + 'CC', accentColor + '88', bg]
+          : [accentColor, accentColor + 'DD', accentColor + '22']}
+        style={[cs.hero, { paddingTop: insets.top + 12 }]}
+      >
+        <View style={cs.heroRow}>
+          {onBack && (
+            <TouchableOpacity onPress={onBack} style={cs.heroBack} hitSlop={12}>
+              <Icon name="arrow-left" size={20} color="#fff" />
+            </TouchableOpacity>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={cs.heroTitle}>Estadísticas</Text>
+            <Text style={cs.heroSub}>{capitalize(getMesLabelLargo(mes, año))}</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => onNavigate?.('exportar')}
-            style={[s.downloadBtn, { backgroundColor: THEME.colors.primaryLight }]}
-          >
-            <Icon name="download" size={16} color={THEME.colors.primary} />
+          <TouchableOpacity onPress={() => onNavigate?.('exportar')} style={cs.heroAction}>
+            <Icon name="download" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
+
+        {/* Hero KPI strip */}
+        <View style={cs.heroStrip}>
+          <HeroKpi label="Ingresos" value={fmtShort(totalIngresos)} positive />
+          <View style={cs.heroStripDivider} />
+          <HeroKpi label="Gastos" value={fmtShort(totalGastos)} positive={false} />
+          <View style={cs.heroStripDivider} />
+          <HeroKpi label="Balance" value={fmtShort(balance)} positive={balance >= 0} />
+        </View>
+      </LinearGradient>
+
+      {/* ── Month pill scroller ── */}
+      <View style={[cs.monthBar, { backgroundColor: card, borderBottomColor: bdr }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={cs.monthBarContent}>
+          {mesesDisponibles.map((m, i) => {
+            const active = m.mes === mes && m.año === año;
+            return (
+              <TouchableOpacity
+                key={i}
+                style={[cs.monthPill, active
+                  ? { backgroundColor: primary }
+                  : { backgroundColor: cardSec }]}
+                onPress={() => { setMes(m.mes); setAño(m.año); }}
+              >
+                <Text style={[cs.monthPillText, { color: active ? '#fff' : txts }]}>{m.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
-      {/* Month selector */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[s.monthScroll, { backgroundColor: '#F8F7FF' }]}
-        contentContainerStyle={s.monthScrollContent}
-      >
-        {mesesDisponibles.map((m, i) => {
-          const active = m.mes === mes && m.año === año;
+      {/* ── Tab bar ── */}
+      <View style={[cs.tabBar, { backgroundColor: card, borderBottomColor: bdr }]}>
+        {TABS.map(t => {
+          const active = tab === t.key;
           return (
             <TouchableOpacity
-              key={i}
-              style={[
-                s.monthPill,
-                active
-                  ? { backgroundColor: '#6156E8' }
-                  : { backgroundColor: '#FFFFFF', borderWidth: 0.5, borderColor: '#E5E7EB' },
-              ]}
-              onPress={() => setMesSeleccionado({ mes: m.mes, año: m.año })}
+              key={t.key}
+              style={[cs.tabItem, active && [cs.tabItemActive, { borderBottomColor: primary }]]}
+              onPress={() => setTab(t.key)}
             >
-              <Text style={[s.monthPillText, { color: active ? '#FFFFFF' : '#6B7280', fontWeight: active ? '600' : '400' }]}>
-                {m.label}
+              <Icon name={t.icon as any} size={14} color={active ? primary : txtT} />
+              <Text style={[cs.tabLabel, { color: active ? primary : txtT, fontWeight: active ? '700' : '400' }]}>
+                {t.label}
               </Text>
             </TouchableOpacity>
           );
         })}
-      </ScrollView>
+      </View>
 
-      {/* Single scrollable content — all sections stacked */}
+      {/* ── Tab content ── */}
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[s.tabContent, { paddingBottom: 56 + insets.bottom + 24 }]}
+        contentContainerStyle={[cs.content, { paddingBottom: 56 + insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Resumen ── */}
-        <Text style={s.sectionHeading}>RESUMEN</Text>
-        {renderResumen()}
-
-        {/* ── Comparativo ── */}
-        <Text style={[s.sectionHeading, { marginTop: 8 }]}>COMPARATIVO</Text>
-        {renderComparativo()}
-
-        {/* ── Ahorro ── */}
-        <Text style={[s.sectionHeading, { marginTop: 8 }]}>AHORRO</Text>
-        {renderAhorro()}
-
-        {/* ── Mapa de calor ── */}
-        <Text style={[s.sectionHeading, { marginTop: 8 }]}>MAPA DE CALOR</Text>
-        {renderCalor()}
-
-        {/* ── Treemap ── */}
-        <Text style={[s.sectionHeading, { marginTop: 8 }]}>DISTRIBUCIÓN</Text>
-        {renderTreemap()}
+        {tab === 'resumen'      && renderResumen()}
+        {tab === 'tendencia'    && renderTendencia()}
+        {tab === 'calor'        && renderCalor()}
+        {tab === 'distribucion' && renderDistribucion()}
       </ScrollView>
     </View>
   );
 };
 
-// Backward-compat export
-export const Estadisticas = EstadisticasScreen;
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+const HeroKpi: React.FC<{ label: string; value: string; positive: boolean }> = ({ label, value, positive }) => (
+  <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
+    <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</Text>
+    <Text style={{ fontSize: 16, color: '#fff', fontWeight: '800', letterSpacing: -0.5 }}>{value}</Text>
+    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: positive ? '#34D399' : '#FCA5A5' }} />
+  </View>
+);
+
+const KpiCard: React.FC<{ label: string; value: string; color: string; icon: string; bg: string }> = ({ label, value, color, icon, bg }) => (
+  <View style={[cs.kpiCard, { backgroundColor: bg }]}>
+    <Icon name={icon as any} size={16} color={color} />
+    <Text style={[cs.kpiVal, { color }]}>{value}</Text>
+    <Text style={[cs.kpiLabel, { color: color + 'AA' }]}>{label}</Text>
+  </View>
+);
+
+const StatLine: React.FC<{ label: string; value: string; color: string; sub: string }> = ({ label, value, color, sub }) => (
+  <View>
+    <Text style={{ fontSize: 10, color: sub }}>{label}</Text>
+    <Text style={{ fontSize: 13, color, fontWeight: '700' }} numberOfLines={1}>{value}</Text>
+  </View>
+);
+
+const InsightRow: React.FC<{ icon: string; iconColor: string; text: string; bg: string; card: string; txt: string }> = ({ icon, iconColor, text, bg, txt }) => (
+  <View style={[cs.insightRow, { backgroundColor: bg }]}>
+    <Icon name={icon as any} size={14} color={iconColor} />
+    <Text style={[cs.insightText, { color: txt }]}>{text}</Text>
+  </View>
+);
+
+const Empty: React.FC<{ icon: string; text: string }> = ({ icon, text }) => (
+  <View style={cs.empty}>
+    <Icon name={icon as any} size={28} color="#9CA3AF" />
+    <Text style={cs.emptyText}>{text}</Text>
+  </View>
+);
 
 // ── Styles ────────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
+export const Estadisticas = EstadisticasScreen;
+
+const cs = StyleSheet.create({
   root: { flex: 1 },
 
-  // Header — light themed
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  monthBadge: {
-    backgroundColor: THEME.colors.primaryLight,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  monthBadgeText: { fontSize: 12, color: '#6156E8', fontWeight: '500' },
-  downloadBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  // Hero
+  hero: { paddingHorizontal: 20, paddingBottom: 20 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  heroBack: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 12 },
+  heroTitle: { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  heroSub: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
+  heroAction: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 12 },
+  heroStrip: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 16, padding: 14, alignItems: 'center' },
+  heroStripDivider: { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.25)' },
 
-  // Month scroll
-  monthScroll:        { maxHeight: 50, flexShrink: 0 },
-  monthScrollContent: { paddingHorizontal: 16, paddingVertical: 8, gap: 6 },
-  monthPill:          { borderRadius: 100, paddingHorizontal: 14, height: 34, justifyContent: 'center' },
-  monthPillText:      { fontSize: 12 },
+  // Month bar
+  monthBar: { borderBottomWidth: 1 },
+  monthBarContent: { paddingHorizontal: 16, paddingVertical: 8, gap: 6, flexDirection: 'row' },
+  monthPill: { borderRadius: 100, paddingHorizontal: 14, paddingVertical: 6 },
+  monthPillText: { fontSize: 12, fontWeight: '500' },
 
-  // Section heading
-  sectionHeading: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-    marginTop: 4,
-    color: '#9CA3AF',
-  },
+  // Tab bar
+  tabBar: { flexDirection: 'row', borderBottomWidth: 1 },
+  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, gap: 3, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabItemActive: { borderBottomWidth: 2 },
+  tabLabel: { fontSize: 10, letterSpacing: 0.2 },
 
-  tabContent: { paddingHorizontal: 16, paddingTop: 12, gap: 0 },
+  // Content
+  content: { padding: 16, gap: 0 },
 
-  // Card — white, rounded, shadow
+  // Card
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 3,
+    borderRadius: 20, padding: 18, marginBottom: 14,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
   },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 16,
-  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  cardTitle: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
+  cardSub: { fontSize: 11, fontWeight: '400' },
 
-  // Metric grids
-  metricGrid:  { flexDirection: 'row', gap: 8 },
-  metricCell:  {
-    flex: 1,
-    borderRadius: 12,
-    padding: 12,
-    gap: 4,
-    backgroundColor: '#F8F7FF',
-  },
-  metricCell2: {
-    flex: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    gap: 4,
-    backgroundColor: '#F8F7FF',
-  },
-  metricVal:   { fontSize: 22, fontWeight: '700', color: '#6156E8' },
-  metricVal2:  { fontSize: 15, fontWeight: '700', color: '#6156E8' },
-  metricLabel: { fontSize: 11, fontWeight: '400', color: '#9CA3AF' },
+  // KPI row
+  kpiRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  kpiCard: { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center', gap: 4 },
+  kpiVal: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },
+  kpiLabel: { fontSize: 10, fontWeight: '500' },
 
-  // Donut
-  donutRow:       { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  donutLegend:    { flex: 1, gap: 10 },
-  legendItem:     { gap: 4 },
-  legendRow:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot:      { width: 8, height: 8, borderRadius: 2 },
-  legendLabel:    { flex: 1, fontSize: 11 },
-  legendPct:      { fontSize: 11, fontWeight: '500' },
-  legendBarTrack: { height: 3, borderRadius: 2, overflow: 'hidden' },
-  legendBarFill:  { height: 3, borderRadius: 2 },
-  changeBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: THEME.radius.sm, paddingHorizontal: 8, paddingVertical: 4, marginTop: 4 },
-  changeText:     { fontSize: 10, fontWeight: '500' },
+  // Donut legend
+  legendList: { gap: 8, marginTop: 4 },
+  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  legendDot: { width: 9, height: 9, borderRadius: 2.5 },
+  legendName: { fontSize: 12, fontWeight: '500', width: 90 },
+  legendTrack: { flex: 1, height: 5, borderRadius: 3, overflow: 'hidden' },
+  legendFill: { height: 5, borderRadius: 3 },
+  legendPct: { fontSize: 11, fontWeight: '700', width: 32, textAlign: 'right' },
+  legendAmt: { fontSize: 10, width: 44, textAlign: 'right' },
 
-  // Comparativo
-  periodoRow:      { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  periodoPill:     { borderRadius: 100, paddingHorizontal: 18, height: 34, justifyContent: 'center' },
-  periodoPillText: { fontSize: 12, fontWeight: '500' },
-  barLegend:       { flexDirection: 'row', gap: 16, marginTop: 8, justifyContent: 'center' },
+  // Badge
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4 },
+  badgeText: { fontSize: 11, fontWeight: '600' },
 
-  // Ahorro
-  areaFooter:    { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
-  areaFooterVal: { fontSize: 15, fontWeight: '700' },
+  // Period pills
+  pillRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  pill: { borderRadius: 100, paddingHorizontal: 16, paddingVertical: 7 },
+  pillText: { fontSize: 12, fontWeight: '600' },
 
-  // Calor
-  heatExplain:     { fontSize: 11, marginBottom: 8, color: '#9CA3AF' },
-  heatLegend:      { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 12 },
-  heatLegendCell:  { width: 14, height: 14, borderRadius: 3 },
-  insightRow:      { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  insightPill:     { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FFFFFF' },
-  insightPillText: { fontSize: 11, color: '#6B7280' },
+  // Stat strip
+  statStrip: { flexDirection: 'row', borderRadius: 12, padding: 12 },
+  statStripCell: { flex: 1, alignItems: 'center', gap: 3 },
+  statStripVal: { fontSize: 14, fontWeight: '800', letterSpacing: -0.3 },
+  statStripLabel: { fontSize: 10 },
 
-  // Tooltip
-  tooltip:      { marginTop: 10, borderRadius: 12, borderWidth: 0.5, borderColor: '#E5E7EB', padding: 12, gap: 2, backgroundColor: '#FFFFFF' },
-  tooltipTitle: { fontSize: 11, fontWeight: '500', color: '#111827' },
-  tooltipVal:   { fontSize: 14, fontWeight: '700', color: '#6156E8' },
-  tooltipSub:   { fontSize: 10, color: '#9CA3AF' },
+  // Big number
+  bigNumWrap: { borderRadius: 14, padding: 14, alignItems: 'center', gap: 4, minWidth: 100 },
+  bigNum: { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
+  bigNumLabel: { fontSize: 11 },
+
+  // Category grid
+  catGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  catCell: { width: '25%', alignItems: 'center', paddingVertical: 14, gap: 6 },
+  catCircle: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
+  catName: { fontSize: 11, fontWeight: '500', textAlign: 'center', maxWidth: 72 },
+  catAmt: { fontSize: 10, fontWeight: '700' },
+
+  // Heatmap
+  heatLegend: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16 },
+  heatCell: { width: 18, height: 18, borderRadius: 4 },
+  tooltip: { marginTop: 12, borderRadius: 14, borderWidth: 1, padding: 14, gap: 3 },
+  tooltipTitle: { fontSize: 12, fontWeight: '600' },
+  tooltipVal: { fontSize: 16, fontWeight: '800' },
+  tooltipSub: { fontSize: 11 },
+
+  // Insight
+  insightRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, padding: 12 },
+  insightText: { fontSize: 13, flex: 1, lineHeight: 18 },
 
   // Treemap
-  treemapRow:        { flexDirection: 'row', gap: 3, marginBottom: 3 },
-  treemapNode:       { borderRadius: 8, overflow: 'hidden', padding: 8, justifyContent: 'flex-end' },
-  treemapName:       { fontSize: 10, fontWeight: '500', color: 'rgba(255,255,255,0.9)' },
-  treemapAmount:     { fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
-  treemapPct:        { fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 1 },
-  treemapLegend:     { gap: 8, paddingRight: 8 },
-  treemapLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  treemapLegendDot:  { width: 10, height: 10, borderRadius: 2 },
-  treemapLegendText: { fontSize: 10, color: '#6B7280' },
+  treemapRow: { flexDirection: 'row', gap: 3, marginBottom: 3 },
+  treemapNode: { borderRadius: 10, overflow: 'hidden', padding: 10, justifyContent: 'flex-end' },
+  treemapName: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.95)' },
+  treemapAmt: { fontSize: 10, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+  treemapPct: { fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 1 },
+
+  // Breakdown list
+  breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
+  breakdownDot: { width: 10, height: 10, borderRadius: 5 },
+  breakdownName: { fontSize: 13, fontWeight: '500', width: 90 },
+  breakdownAmt: { fontSize: 12, fontWeight: '700' },
+  breakdownPct: { fontSize: 11, width: 36, textAlign: 'right' },
+
+  // CTA
+  ctaBtn: { borderRadius: 14, padding: 14, alignItems: 'center', marginTop: 12 },
+  ctaBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
   // Empty
-  emptyWrap:   { alignItems: 'center', paddingVertical: 24, gap: 8 },
-  emptyText:   { fontSize: 13, textAlign: 'center', color: '#6B7280' },
-  emptyAction: { fontSize: 13, fontWeight: '600', color: '#6156E8' },
-});
-
-// ── Category grid styles ──────────────────────────────────────────────────────
-const dg = StyleSheet.create({
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 0,
-  },
-  cell: {
-    width: '33.33%',
-    alignItems: 'center',
-    paddingVertical: 16,
-    gap: 8,
-  },
-  circle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#6B7280',
-    textAlign: 'center',
-    maxWidth: 80,
-  },
+  empty: { alignItems: 'center', paddingVertical: 28, gap: 10 },
+  emptyText: { fontSize: 13, color: '#9CA3AF', textAlign: 'center', lineHeight: 20 },
 });

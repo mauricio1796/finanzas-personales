@@ -188,7 +188,7 @@ function esOffTopic(mensaje: string): boolean {
 
 const RESPUESTA_OFFTOPIC: RespuestaIA = {
   texto: 'Soy Finn, tu asistente financiero 💰 Solo puedo ayudarte con temas de finanzas personales y la app FinancyAI. ¿Hay algo de tu dinero en lo que te pueda ayudar?',
-  tipo: 'info',
+  exito: true,
 };
 
 // ── Función principal ─────────────────────────────────────────────────────────

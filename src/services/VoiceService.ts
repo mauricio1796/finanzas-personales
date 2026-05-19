@@ -1,5 +1,6 @@
 import { Audio } from 'expo-av';
 import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 import { CONFIG } from '../constants/config';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -63,12 +64,45 @@ export async function iniciarGrabacion(): Promise<boolean> {
   }
 }
 
-export async function detenerGrabacion(): Promise<void> {
+export async function detenerGrabacion(): Promise<string | null> {
   const rec = activeRecording;
-  activeRecording = null; // limpiar referencia primero para evitar doble-stop
-  if (!rec) return;
-  try { await rec.stopAndUnloadAsync(); } catch { /* ignore */ }
-  try { await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: false }); } catch { /* ignore */ }
+  activeRecording = null;
+  if (!rec) return null;
+  try {
+    await rec.stopAndUnloadAsync();
+    const uri = rec.getURI() ?? null;
+    try { await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: false }); } catch { /* ignore */ }
+    return uri;
+  } catch {
+    try { await Audio.setAudioModeAsync({ allowsRecordingIOS: false }); } catch { /* ignore */ }
+    return null;
+  }
+}
+
+export async function transcribirAudio(uri: string): Promise<string> {
+  const base64 = await FileSystem.readAsStringAsync(uri, {
+    encoding: 'base64',
+  });
+
+  // Limpiar el archivo temporal
+  FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+
+  const controller = new AbortController();
+  const timeoutId  = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    const response = await fetch(`${CONFIG.WORKER_URL}/transcribe`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ audio: base64 }),
+      signal:  controller.signal,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json() as any;
+    return typeof data.transcript === 'string' ? data.transcript : '';
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 // ── Parse via Worker ──────────────────────────────────────────────────────────

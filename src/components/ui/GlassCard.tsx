@@ -1,73 +1,102 @@
 import React from 'react';
-import { View, StyleSheet, Platform, ViewStyle } from 'react-native';
+import { View, StyleSheet, ViewStyle, Platform } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../../state/ThemeContext';
+
+// ─── GlassCard — superficie sólida sin blur ───────────────────────────────────
 
 interface GlassCardProps {
-  children: React.ReactNode;
-  style?: ViewStyle | ViewStyle[];
-  strength?: 'light' | 'medium' | 'strong';
-  radius?: number;
-  padding?: number;
+  children:      React.ReactNode;
+  style?:        ViewStyle | ViewStyle[];
+  intensity?:    number;
+  borderRadius?: number;
+  accentTint?:   boolean;
+  shimmer?:      boolean;
+  elevated?:     boolean;
 }
-
-const BG = {
-  light:  'rgba(255, 255, 255, 0.08)',
-  medium: 'rgba(255, 255, 255, 0.13)',
-  strong: 'rgba(255, 255, 255, 0.20)',
-};
-
-const BORDER = {
-  light:  'rgba(255, 255, 255, 0.18)',
-  medium: 'rgba(255, 255, 255, 0.22)',
-  strong: 'rgba(255, 255, 255, 0.30)',
-};
-
-const webBlur = Platform.OS === 'web' ? {
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-} as Record<string, string> : {};
-
-const webShadow = Platform.OS === 'web' ? {
-  boxShadow: '0 8px 32px rgba(0,0,0,0.37), inset 0 1px 0 rgba(255,255,255,0.15)',
-} as Record<string, string> : {};
 
 export const GlassCard: React.FC<GlassCardProps> = ({
   children,
   style,
-  strength = 'light',
-  radius = 24,
-  padding,
+  borderRadius = 20,
+  elevated = false,
 }) => {
-  const dynamicStyle: ViewStyle = {
-    backgroundColor: BG[strength],
-    borderRadius: radius,
-    borderWidth: 1,
-    borderColor: BORDER[strength],
-    ...(Platform.OS !== 'web' ? {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.35,
-      shadowRadius: 24,
-      elevation: 10,
-    } : {}),
-    ...(padding !== undefined ? { padding } : {}),
-  };
+  const { isDark, colors } = useTheme();
+
+  const shadow: ViewStyle = elevated
+    ? {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.18,
+        shadowRadius: 16,
+        elevation: 12,
+      }
+    : {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: isDark ? 0.25 : 0.08,
+        shadowRadius: 8,
+        elevation: 4,
+      };
 
   return (
-    <View
-      style={[
-        styles.base,
-        dynamicStyle,
-        ...(Platform.OS === 'web' ? [webBlur as ViewStyle, webShadow as ViewStyle] : []),
-        ...(Array.isArray(style) ? style : style ? [style] : []),
-      ]}
-    >
+    <View style={[
+      { borderRadius, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+      shadow,
+      style,
+    ]}>
       {children}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  base: {
-    overflow: 'hidden',
-  },
-});
+// ─── GlassBalanceCard — tarjeta de balance sin blur ──────────────────────────
+
+interface GlassBalanceCardProps {
+  children:   React.ReactNode;
+  style?:     ViewStyle | ViewStyle[];
+  intensity?: number;
+}
+
+export const GlassBalanceCard: React.FC<GlassBalanceCardProps> = ({
+  children, style,
+}) => {
+  // Sin glass mode activo, simplemente renderiza los children directamente
+  return <>{children}</>;
+};
+
+// ─── GlassTabBar — barra inferior sin blur ────────────────────────────────────
+
+interface GlassTabBarProps {
+  children: React.ReactNode;
+  style?:   ViewStyle | ViewStyle[];
+}
+
+export const GlassTabBar: React.FC<GlassTabBarProps> = ({ children, style }) => {
+  const { isDark, colors } = useTheme();
+
+  return (
+    <View style={[{
+      backgroundColor: isDark ? colors.card : '#FFFFFF',
+      borderTopWidth: 0.5,
+      borderTopColor: colors.border,
+    }, style]}>
+      {children}
+    </View>
+  );
+};
+
+// ─── GlassBackground — fondo plano sin blobs ni blur ─────────────────────────
+
+interface GlassBackgroundProps {
+  children: React.ReactNode;
+}
+
+export const GlassBackground: React.FC<GlassBackgroundProps> = ({ children }) => {
+  const { isDark } = useTheme();
+  return (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? '#0a0a14' : '#f0eeff' }]}>
+      {children}
+    </View>
+  );
+};

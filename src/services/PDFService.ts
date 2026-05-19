@@ -1,6 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
+const documentDirectory: string = (FileSystem as any).documentDirectory ?? '';
 import { generarHTMLReporte, type DatosReporte } from '../utils/pdfUtils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -35,7 +36,7 @@ export async function generarYCompartirPDF(
 
     onEstado?.('guardando');
     const nombre  = nombreArchivo(datos.config.mes, datos.config.año);
-    const destUri = `${FileSystem.documentDirectory}${nombre}`;
+    const destUri = `${documentDirectory}${nombre}`;
     await FileSystem.moveAsync({ from: uri, to: destUri });
 
     onEstado?.('listo');
@@ -64,7 +65,7 @@ export async function guardarPDFLocal(
 
   onEstado?.('guardando');
   const nombre  = nombreArchivo(datos.config.mes, datos.config.año);
-  const destUri = `${FileSystem.documentDirectory}${nombre}`;
+  const destUri = `${documentDirectory}${nombre}`;
   await FileSystem.moveAsync({ from: uri, to: destUri });
 
   onEstado?.('listo');
@@ -78,7 +79,7 @@ export async function imprimirReporte(datos: DatosReporte): Promise<void> {
 
 export async function listarReportesGuardados(): Promise<ReporteGuardado[]> {
   try {
-    const dir = FileSystem.documentDirectory;
+    const dir = documentDirectory;
     if (!dir) return [];
 
     const files = await FileSystem.readDirectoryAsync(dir);

@@ -13,12 +13,14 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import * as FileSystem from 'expo-file-system';
 import { useTheme } from '../../state/ThemeContext';
 import { THEME } from '../../constants/theme';
 import { Icon } from './Icon';
 import {
   iniciarGrabacion,
   detenerGrabacion,
+  transcribirAudio,
   parsearTextoATransaccion,
   iniciarSpeechRecognitionWeb,
   type ParsedTransaction,
@@ -80,15 +82,26 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({ onParsed, size = 'norm
     }
   };
 
-  // ── Detener y pasar a confirmación ───────────────────────────────────────
+  // ── Detener, transcribir y pasar a confirmación ──────────────────────────
   const detenerYConfirmar = useCallback(async () => {
     clearAutoStop();
     if (stopWebRef.current) {
       stopWebRef.current();
       stopWebRef.current = null;
-      return; // Web STT resolves via callbacks
+      return; // Web STT resuelve por callbacks
     }
-    await detenerGrabacion();
+    const uri = await detenerGrabacion();
+    setVoiceState('processing');
+    if (uri) {
+      try {
+        const texto = await transcribirAudio(uri);
+        setTranscript(texto);
+      } catch {
+        setErrorMsg('No pude procesar el audio. Verifica tu conexión e intenta de nuevo.');
+      }
+    } else {
+      setErrorMsg('No se pudo capturar el audio. Intenta de nuevo.');
+    }
     setVoiceState('confirming');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
   }, []);
@@ -129,7 +142,11 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({ onParsed, size = 'norm
   const cancelar = useCallback(async () => {
     clearAutoStop();
     if (stopWebRef.current) { stopWebRef.current(); stopWebRef.current = null; }
-    await detenerGrabacion();
+    const uri = await detenerGrabacion();
+    // Limpiar archivo temporal si quedó alguno
+    if (uri) {
+      FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+    }
     setVoiceState('idle');
     setTranscript('');
     setErrorMsg(null);

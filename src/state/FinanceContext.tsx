@@ -67,8 +67,8 @@ interface FinanceContextType {
   addTransaction: (tx: Transaction) => void;
   deleteTransaction: (id: string) => void;
   updateTransaction: (id: string, update: Partial<Transaction>) => void;
-  addIncome: (amount: number, category: string, date: Date, description?: string) => void;
-  addExpense: (amount: number, category: string, date: Date, description?: string) => void;
+  addIncome: (amount: number, category: string, date: Date, description?: string, subcategory?: string) => void;
+  addExpense: (amount: number, category: string, date: Date, description?: string, subcategory?: string) => void;
   updateUserSalary: (salary: number) => void;
   resetAll: () => Promise<void>;
 
@@ -364,7 +364,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }));
   };
 
-  const addIncome = (amount: number, category: string, date: Date, description?: string) => {
+  const addIncome = (amount: number, category: string, date: Date, description?: string, subcategory?: string) => {
     addTransaction({
       id: Date.now().toString(),
       amount,
@@ -372,10 +372,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       type: 'income',
       date: date.toISOString(),
       ...(description?.trim() ? { description: description.trim() } : {}),
+      ...(subcategory ? { subcategory } : {}),
     });
   };
 
-  const addExpense = (amount: number, category: string, date: Date, description?: string) => {
+  const addExpense = (amount: number, category: string, date: Date, description?: string, subcategory?: string) => {
     addTransaction({
       id: Date.now().toString(),
       amount,
@@ -383,6 +384,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       type: 'expense',
       date: date.toISOString(),
       ...(description?.trim() ? { description: description.trim() } : {}),
+      ...(subcategory ? { subcategory } : {}),
     });
   };
 
@@ -646,7 +648,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return t.type === 'expense' && d.getMonth() === mes && d.getFullYear() === año;
       })
       .reduce((s, t) => s + t.amount, 0);
-    return Math.max(0, ingresoTotal - gastosMes);
+    // No cortamos en 0: si hay déficit se muestra negativo para que el usuario lo vea
+    return ingresoTotal - gastosMes;
   }, [transactions, profile?.monthlySalary]);
 
   const value: FinanceContextType = {

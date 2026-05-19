@@ -203,7 +203,7 @@ const ConfirmacionCategorias: React.FC<ConfirmacionCategoriasProps> = ({
 
 export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
   const { colors } = useTheme();
-  const { profile, goal, categories, addCategory, updateCategory, addTransaction, deleteTransaction, updateTransaction, setGoal } = useFinance();
+  const { profile, goal, categories, addCategory, updateCategory, deleteCategory, addTransaction, deleteTransaction, updateTransaction, setGoal } = useFinance();
   const insets = useSafeAreaInsets();
 
   const [messages, setMessages]   = useState<Message[]>([]);
@@ -279,7 +279,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
       transactions:    transactions as any,
       categories:      categories as any,
       goal:            goal as any,
-      addTransaction, deleteTransaction, updateTransaction, updateCategory, addCategory, setGoal,
+      addTransaction, deleteTransaction, updateTransaction, updateCategory, addCategory, deleteCategory, setGoal,
     };
     const result: FinnToolResult = ejecutarHerramienta(action.toolCall, agentCtx);
 
@@ -293,7 +293,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
     Haptics.notificationAsync(
       result.exito ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error,
     ).catch(() => {});
-  }, [transactions, categories, goal, addTransaction, deleteTransaction, updateTransaction, updateCategory, addCategory, setGoal]);
+  }, [transactions, categories, goal, addTransaction, deleteTransaction, updateTransaction, updateCategory, addCategory, deleteCategory, setGoal]);
 
   // ── Enviar mensaje ────────────────────────────────────────────────────────
   const handleSend = useCallback(async (texto?: string) => {

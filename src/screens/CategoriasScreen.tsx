@@ -18,6 +18,8 @@ import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesSer
 import { CATALOGO_CATEGORIAS, catalogoItemToCategory, getPaletaItem } from '../constants/catalogoCategorias';
 import { THEME } from '../constants/theme';
 import { Category, Transaction } from '../types';
+import { SubcategoriasScreen } from './SubcategoriasScreen';
+import { PlanificarMesScreen } from './PlanificarMesScreen';
 import {
   getGastoTotalMes,
   getPresupuestoTotal,
@@ -34,7 +36,7 @@ import {
 const fmtCOP = (n: number) =>
   '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
 
-type FiltroTab = 'todas' | 'gastos' | 'ingresos' | 'pendientes' | 'pagadas';
+type FiltroTab = 'todas' | 'gastos' | 'ingresos' | 'sin_presupuesto';
 type OrdenType = 'gasto' | 'presupuesto' | 'nombre';
 
 const ICONOS_DISPONIBLES = [
@@ -48,18 +50,19 @@ const ICONOS_DISPONIBLES = [
 interface CategoriaCardProps {
   categoria: Category & { gastado: number; pct: number; estado: EstadoCategoria };
   txCount: number;
+  subcategoriaCount: number;
   expandida: boolean;
   onToggleExpand: () => void;
-  onPagar: () => void;
   onEditar: () => void;
   onEliminar: () => void;
+  onSubcategorias: () => void;
   colors: any;
   isDark: boolean;
 }
 
 const CategoriaCard: React.FC<CategoriaCardProps> = React.memo(({
-  categoria, txCount, expandida, onToggleExpand,
-  onPagar, onEditar, onEliminar, colors, isDark,
+  categoria, txCount, subcategoriaCount, expandida, onToggleExpand,
+  onEditar, onEliminar, onSubcategorias, colors, isDark,
 }) => {
   const expandAnim = useRef(new Animated.Value(0)).current;
   const barAnim    = useRef(new Animated.Value(0)).current;
@@ -86,35 +89,31 @@ const CategoriaCard: React.FC<CategoriaCardProps> = React.memo(({
   const budget = categoria.budget ?? 0;
 
   const borderColor =
-    categoria.estado === 'paid'    ? colors.income  :
     categoria.estado === 'over'    ? colors.expense  :
     categoria.estado === 'warning' ? colors.warning  :
     colors.border;
 
-  const subtitulo = categoria.pagado
-    ? `Pagado este mes`
-    : categoria.diaPago && !categoria.pagado
-    ? `Día de pago: ${categoria.diaPago}`
+  const subtitulo =
+    categoria.diaPago
+    ? `Vence día ${categoria.diaPago} · ${txCount} transacción${txCount !== 1 ? 'es' : ''}`
     : categoria.estado === 'no_budget'
     ? 'Sin presupuesto asignado'
     : categoria.estado === 'over'
-    ? 'Excedido este mes'
+    ? `Excedido · ${txCount} transacción${txCount !== 1 ? 'es' : ''}`
     : `${txCount} transacción${txCount !== 1 ? 'es' : ''} este mes`;
 
   const subtituloColor =
-    categoria.pagado                    ? colors.income   :
-    categoria.estado === 'over'         ? colors.expense  :
-    categoria.estado === 'no_budget'    ? colors.primary  :
+    categoria.estado === 'over'      ? colors.expense :
+    categoria.estado === 'no_budget' ? colors.primary :
     colors.textTertiary;
 
   const ACCIONES = [
-    { label: 'Editar',   icon: 'edit-2',  bg: colors.cardSecondary, color: colors.textSecondary, onPress: onEditar  },
-    { label: 'Ajustar',  icon: 'sliders', bg: colors.primaryLight,  color: colors.primary,       onPress: onEditar  },
-    { label: 'Pagar',    icon: 'check',   bg: colors.incomeLight,   color: colors.income,        onPress: onPagar,  hide: categoria.pagado },
-    { label: 'Eliminar', icon: 'trash-2', bg: colors.expenseLight,  color: colors.expense,       onPress: onEliminar },
+    { label: 'Subcategorías', icon: 'list',    bg: colors.primaryLight,  color: colors.primary,       onPress: onSubcategorias },
+    { label: 'Editar',        icon: 'edit-2',  bg: colors.cardSecondary, color: colors.textSecondary, onPress: onEditar  },
+    { label: 'Eliminar',      icon: 'trash-2', bg: colors.expenseLight,  color: colors.expense,       onPress: onEliminar },
   ];
 
-  return (
+  const cardContent = (
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={() => {
@@ -130,9 +129,20 @@ const CategoriaCard: React.FC<CategoriaCardProps> = React.memo(({
         </View>
 
         <View style={s.cardInfo}>
-          <Text style={[s.cardName, { color: colors.textPrimary }]} numberOfLines={1}>
-            {categoria.name}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={[s.cardName, { color: colors.textPrimary }]} numberOfLines={1}>
+              {categoria.name}
+            </Text>
+            {subcategoriaCount > 0 && (
+              <TouchableOpacity
+                onPress={onSubcategorias}
+                style={[s.subBadge, { backgroundColor: colors.primaryLight }]}
+              >
+                <Icon name="list" size={9} color={colors.primary} />
+                <Text style={[s.subBadgeText, { color: colors.primary }]}>{subcategoriaCount}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <Text style={[s.cardSub, { color: subtituloColor }]} numberOfLines={1}>
             {subtitulo}
           </Text>
@@ -141,20 +151,15 @@ const CategoriaCard: React.FC<CategoriaCardProps> = React.memo(({
         <View style={s.cardRight}>
           {budget > 0 ? (
             <>
-              {/* Remaining = budget - spent (hero value) */}
               <Text style={[s.cardGastado, {
-                color: categoria.estado === 'over'
-                  ? colors.expense
-                  : categoria.estado === 'paid' || (budget - categoria.gastado) > 0
-                  ? colors.income
-                  : colors.textPrimary,
+                color: categoria.estado === 'over' ? colors.expense : colors.income,
               }]}>
                 {categoria.estado === 'over'
                   ? `−${fmtCOP(categoria.gastado - budget)}`
                   : fmtCOP(Math.max(0, budget - categoria.gastado))}
               </Text>
               <Text style={[s.cardBudget, { color: colors.textTertiary }]}>
-                gastado {fmtCOP(categoria.gastado)}
+                de {fmtCOP(budget)}
               </Text>
             </>
           ) : (
@@ -189,7 +194,7 @@ const CategoriaCard: React.FC<CategoriaCardProps> = React.memo(({
       {/* Footer row */}
       <View style={s.cardFooter}>
         <Text style={[s.estadoLabel, { color: estadoColor }]}>
-          {budget > 0 && !categoria.pagado
+          {budget > 0
             ? categoria.estado === 'over'
               ? `Excedido ${categoria.pct}% del presupuesto`
               : budget - categoria.gastado > 0
@@ -201,30 +206,13 @@ const CategoriaCard: React.FC<CategoriaCardProps> = React.memo(({
           {categoria.estado === 'no_budget' && (
             <TouchableOpacity onPress={onEditar} style={[s.footerBtn, { backgroundColor: colors.primaryLight }]}>
               <Icon name="plus" size={11} color={colors.primary} />
-              <Text style={[s.footerBtnText, { color: colors.primary }]}>Asignar</Text>
+              <Text style={[s.footerBtnText, { color: colors.primary }]}>Asignar presupuesto</Text>
             </TouchableOpacity>
           )}
-          {categoria.estado === 'paid' && (
-            <View style={[s.paidBadge, { backgroundColor: colors.incomeLight }]}>
-              <Icon name="check" size={11} color={colors.income} />
-              <Text style={[s.footerBtnText, { color: colors.income }]}>Pagado</Text>
-            </View>
-          )}
-          {(categoria.estado === 'ok' || categoria.estado === 'warning' || categoria.estado === 'over') && (
-            <>
-              {categoria.diaPago && (
-                <TouchableOpacity
-                  onPress={onPagar}
-                  style={[s.footerBtn, { backgroundColor: colors.incomeLight }]}
-                >
-                  <Icon name="check-circle" size={11} color={colors.income} />
-                  <Text style={[s.footerBtnText, { color: colors.income }]}>Pagar</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity onPress={onEditar}>
-                <Icon name="edit-2" size={14} color={colors.textTertiary} />
-              </TouchableOpacity>
-            </>
+          {categoria.estado !== 'no_budget' && (
+            <TouchableOpacity onPress={onEditar}>
+              <Icon name="edit-2" size={14} color={colors.textTertiary} />
+            </TouchableOpacity>
           )}
         </View>
       </View>
@@ -258,6 +246,8 @@ const CategoriaCard: React.FC<CategoriaCardProps> = React.memo(({
       </Animated.View>
     </TouchableOpacity>
   );
+
+  return cardContent;
 });
 
 // ── CategoriasScreen ──────────────────────────────────────────────────────────
@@ -270,7 +260,7 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
   const { colors, isDark } = useTheme();
   const {
     transactions, categories, profile,
-    updateCategory, addCategory, deleteCategory, markCategoryPaid,
+    updateCategory, addCategory, deleteCategory,
   } = useFinance();
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -284,10 +274,13 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
   const [mostrarBusqueda, setMostrarBusqueda] = useState(false);
   const [expandidaId, setExpandidaId] = useState<string | null>(null);
 
+  // Subcategorías
+  const [subcatParent, setSubcatParent] = useState<Category | null>(null);
+  const [planificarVisible, setPlanificarVisible] = useState(false);
+
   // Modales
   const [modalFormVisible, setModalFormVisible] = useState(false);
   const [modalEditar, setModalEditar] = useState<Category | null>(null);
-  const [modalPagar, setModalPagar] = useState<Category | null>(null);
 
   // Form state
   const [formNombre, setFormNombre] = useState('');
@@ -297,8 +290,6 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
   const [formIcono, setFormIcono] = useState('tag');
   const [errores, setErrores] = useState<Record<string, string>>({});
 
-  // Pay modal
-  const [montoPago, setMontoPago] = useState('');
 
   // Catalog modal
   const [modalCatalogo, setModalCatalogo] = useState(false);
@@ -311,6 +302,14 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
   const lastScrollY = useRef(0);
 
   // ── Memos ──────────────────────────────────────────────────────────────────
+
+  // Mapa id→nombre para resolver transacciones que guardan el ID de categoría
+  const idToName = useMemo(() => {
+    const map: Record<string, string> = {};
+    categories.forEach(c => { map[c.id] = c.name; });
+    return map;
+  }, [categories]);
+
   const gastosPorCategoria = useMemo(() => {
     const result: Record<string, number> = {};
     transactions
@@ -318,9 +317,13 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
         const d = new Date(t.date);
         return t.type === 'expense' && d.getMonth() === mesActual && d.getFullYear() === añoActual;
       })
-      .forEach(t => { result[t.category] = (result[t.category] || 0) + t.amount; });
+      .forEach(t => {
+        // t.category puede ser un ID (desde Gastos.tsx) o un nombre (desde Finn / imports)
+        const nombre = idToName[t.category] ?? t.category;
+        result[nombre] = (result[nombre] || 0) + t.amount;
+      });
     return result;
-  }, [transactions, mesActual, añoActual]);
+  }, [transactions, idToName, mesActual, añoActual]);
 
   const txCountPorCategoria = useMemo(() => {
     const result: Record<string, number> = {};
@@ -329,18 +332,30 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
         const d = new Date(t.date);
         return t.type === 'expense' && d.getMonth() === mesActual && d.getFullYear() === añoActual;
       })
-      .forEach(t => { result[t.category] = (result[t.category] || 0) + 1; });
+      .forEach(t => {
+        const nombre = idToName[t.category] ?? t.category;
+        result[nombre] = (result[nombre] || 0) + 1;
+      });
     return result;
-  }, [transactions, mesActual, añoActual]);
+  }, [transactions, idToName, mesActual, añoActual]);
+
+  const subcatCountPorPadre = useMemo(() => {
+    const result: Record<string, number> = {};
+    categories.filter(c => c.parentCategoryId).forEach(c => {
+      const pid = c.parentCategoryId!;
+      result[pid] = (result[pid] ?? 0) + 1;
+    });
+    return result;
+  }, [categories]);
 
   const categoriasEnriquecidas = useMemo(() => {
     return categories
-      .filter(c => c.isSelected)
+      .filter(c => c.isSelected && !c.parentCategoryId)
       .map(c => {
         const gastado = gastosPorCategoria[c.name] ?? 0;
         const budget = c.budget ?? 0;
         const pct = budget > 0 ? Math.round((gastado / budget) * 100) : 0;
-        const estado = getEstadoCategoria(gastado, budget, c.pagado ?? false);
+        const estado = getEstadoCategoria(gastado, budget, false);
         return { ...c, gastado, pct, estado };
       });
   }, [categories, gastosPorCategoria]);
@@ -348,10 +363,9 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
   const categoriasFiltradas = useMemo(() => {
     let result = [...categoriasEnriquecidas];
     switch (filtro) {
-      case 'gastos':     result = result.filter(c => c.tipo === 'gasto' || c.tipo === 'variable'); break;
-      case 'ingresos':   result = result.filter(c => c.tipo === 'ingreso'); break;
-      case 'pendientes': result = result.filter(c => !(c.pagado) && c.diaPago && (c.tipo === 'gasto' || c.tipo === 'variable' || c.tipo === 'fijo')); break;
-      case 'pagadas':    result = result.filter(c => c.pagado); break;
+      case 'gastos':          result = result.filter(c => c.tipo === 'gasto' || c.tipo === 'variable' || c.tipo === 'fijo'); break;
+      case 'ingresos':        result = result.filter(c => c.tipo === 'ingreso'); break;
+      case 'sin_presupuesto': result = result.filter(c => !c.budget || c.budget === 0); break;
     }
     if (busqueda.trim()) {
       result = result.filter(c => c.name.toLowerCase().includes(busqueda.toLowerCase()));
@@ -378,11 +392,10 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
   const pctTotal         = metricasIngreso.porcentajeGastado;
 
   const FILTROS = useMemo(() => [
-    { key: 'todas'      as FiltroTab, label: 'Todas',      count: categoriasEnriquecidas.length },
-    { key: 'gastos'     as FiltroTab, label: 'Gastos',     count: categoriasEnriquecidas.filter(c => c.tipo === 'gasto' || c.tipo === 'variable' || c.tipo === 'fijo').length },
-    { key: 'ingresos'   as FiltroTab, label: 'Ingresos',   count: categoriasEnriquecidas.filter(c => c.tipo === 'ingreso').length },
-    { key: 'pendientes' as FiltroTab, label: 'Pendientes', count: categoriasEnriquecidas.filter(c => !(c.pagado) && c.diaPago).length },
-    { key: 'pagadas'    as FiltroTab, label: 'Pagadas',    count: categoriasEnriquecidas.filter(c => c.pagado).length },
+    { key: 'todas'          as FiltroTab, label: 'Todas',           count: categoriasEnriquecidas.length },
+    { key: 'gastos'         as FiltroTab, label: 'Gastos',          count: categoriasEnriquecidas.filter(c => c.tipo === 'gasto' || c.tipo === 'variable' || c.tipo === 'fijo').length },
+    { key: 'ingresos'       as FiltroTab, label: 'Ingresos',        count: categoriasEnriquecidas.filter(c => c.tipo === 'ingreso').length },
+    { key: 'sin_presupuesto' as FiltroTab, label: 'Sin presupuesto', count: categoriasEnriquecidas.filter(c => !c.budget || c.budget === 0).length },
   ], [categoriasEnriquecidas]);
 
   // ── Catalog memos ──────────────────────────────────────────────────────────
@@ -445,10 +458,6 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
     setModalFormVisible(true);
   }, []);
 
-  const abrirPagar = useCallback((cat: Category) => {
-    setModalPagar(cat);
-    setMontoPago(cat.budget ? String(Math.round(cat.budget)) : '');
-  }, []);
 
   const validarFormulario = useCallback((): boolean => {
     const errs: Record<string, string> = {};
@@ -503,17 +512,6 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
     setModalEditar(null);
   }, [validarFormulario, formPresupuesto, formDiaPago, formNombre, formTipo, formIcono, modalEditar, updateCategory, addCategory, categories]);
 
-  const confirmarPago = useCallback(() => {
-    if (!modalPagar) return;
-    // markCategoryPaid handles: marking paid, adding transaction, adding XP
-    markCategoryPaid(modalPagar.id);
-    reprogramarTodasLasNotificaciones(
-      categories.map(c => c.id === modalPagar.id ? { ...c, pagado: true } : c)
-    ).catch(() => {});
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    setModalPagar(null);
-    setMontoPago('');
-  }, [modalPagar, markCategoryPaid, categories]);
 
   const confirmarEliminar = useCallback((cat: Category) => {
     Alert.alert(
@@ -552,11 +550,12 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
       key={cat.id}
       categoria={cat}
       txCount={txCountPorCategoria[cat.name] ?? 0}
+      subcategoriaCount={subcatCountPorPadre[cat.id] ?? 0}
       expandida={expandidaId === cat.id}
       onToggleExpand={() => setExpandidaId(prev => prev === cat.id ? null : cat.id)}
-      onPagar={() => abrirPagar(cat)}
       onEditar={() => abrirEditar(cat)}
       onEliminar={() => confirmarEliminar(cat)}
+      onSubcategorias={() => setSubcatParent(cat)}
       colors={colors}
       isDark={isDark}
     />
@@ -715,86 +714,6 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
     </Modal>
   );
 
-  // ── Pay modal ──────────────────────────────────────────────────────────────
-  const renderPayModal = () => {
-    if (!modalPagar) return null;
-    const budget = modalPagar.budget ?? 0;
-    const montoNum = parseFloat(montoPago.replace(/\./g, '').replace(',', '.')) || 0;
-    const diferencia = montoNum - budget;
-    const { bg: iconBg, color: iconColor } = getBgIconoCategoria(modalPagar.name, isDark);
-    const iconName = (modalPagar.icon as any) || getIconoCategoria(modalPagar.name);
-
-    return (
-      <Modal
-        visible={!!modalPagar}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => { setModalPagar(null); setMontoPago(''); }}
-      >
-        <View style={[s.modalContent, { flex: 1, backgroundColor: colors.background }]}>
-          <View style={s.modalHeader}>
-            <Text style={[s.modalTitle, { color: colors.textPrimary }]}>Confirmar pago</Text>
-            <TouchableOpacity
-              onPress={() => { setModalPagar(null); setMontoPago(''); }}
-              style={[s.closeBtn, { backgroundColor: colors.cardSecondary }]}
-            >
-              <Icon name="x" size={16} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Avatar */}
-          <View style={s.payAvatarWrap}>
-            <View style={[s.payAvatar, { backgroundColor: iconBg }]}>
-              <Icon name={iconName} size={28} color={iconColor} />
-            </View>
-            <Text style={[s.payTitle, { color: colors.textPrimary }]}>{modalPagar.name}</Text>
-            <Text style={[s.paySub, { color: colors.textSecondary }]}>
-              Presupuesto asignado: {fmtCOP(budget)}
-            </Text>
-          </View>
-
-          {/* Monto */}
-          <View style={s.fieldGroup}>
-            <Text style={[s.fieldLabel, { color: colors.textSecondary }]}>MONTO PAGADO</Text>
-            <View style={[s.inputWrap, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-              <Text style={[s.inputPrefix, { color: colors.textTertiary, fontSize: 18 }]}>$</Text>
-              <TextInput
-                value={montoPago}
-                onChangeText={setMontoPago}
-                keyboardType="numeric"
-                style={[s.input, { color: colors.textPrimary, fontSize: 22, fontWeight: '500' }]}
-                placeholder={String(Math.round(budget))}
-                placeholderTextColor={colors.textTertiary}
-              />
-            </View>
-            {montoPago && budget > 0 && montoNum > 0 && (
-              <Text style={[s.difText, { color: diferencia > 0 ? colors.expense : colors.income }]}>
-                {diferencia > 0
-                  ? `+${fmtCOP(diferencia)} sobre el presupuesto`
-                  : `${fmtCOP(-diferencia)} bajo el presupuesto`}
-              </Text>
-            )}
-          </View>
-
-          <View style={s.payBtnRow}>
-            <TouchableOpacity
-              style={[s.payBtnCancel, { borderColor: colors.border }]}
-              onPress={() => { setModalPagar(null); setMontoPago(''); }}
-            >
-              <Text style={[s.payBtnCancelText, { color: colors.textSecondary }]}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.payBtnConfirm, { backgroundColor: colors.primary }]}
-              onPress={confirmarPago}
-            >
-              <Icon name="check" size={16} color={THEME.colors.surface} />
-              <Text style={s.payBtnConfirmText}>Confirmar pago</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    );
-  };
 
   // ── Empty state ────────────────────────────────────────────────────────────
   const renderEmpty = () => (
@@ -803,14 +722,15 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
         <Icon name="tag" size={28} color={colors.textTertiary} />
       </View>
       <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>
-        {filtro === 'pendientes' ? 'Sin pagos pendientes' :
-         filtro === 'pagadas'    ? 'Sin categorías pagadas' :
-         busqueda                ? `Sin resultados para "${busqueda}"` :
+        {filtro === 'sin_presupuesto' ? 'Todas tienen presupuesto' :
+         busqueda                     ? `Sin resultados para "${busqueda}"` :
          'Sin categorías aún'}
       </Text>
       <Text style={[s.emptySub, { color: colors.textSecondary }]}>
         {filtro === 'todas' && !busqueda
           ? 'Agrega tu primera categoría para empezar a controlar tus gastos'
+          : filtro === 'sin_presupuesto'
+          ? '¡Todas tus categorías ya tienen presupuesto asignado!'
           : 'Cambia el filtro para ver otras categorías'}
       </Text>
       {filtro === 'todas' && !busqueda && (
@@ -833,6 +753,13 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
         <View style={s.headerTop}>
           <Text style={s.headerTitle}>Categorías</Text>
           <View style={s.headerBtns}>
+            <TouchableOpacity
+              style={[s.headerBtn, s.headerBtnCatalog]}
+              onPress={() => setPlanificarVisible(true)}
+            >
+              <Icon name="calendar" size={13} color={THEME.colors.surface} />
+              <Text style={s.headerBtnCatalogText}>Planificar</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[s.headerBtn, s.headerBtnCatalog]}
               onPress={() => { setSeleccionNueva(new Set()); setModalCatalogo(true); }}
@@ -988,7 +915,21 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
 
       {/* ── Modals ────────────────────────────────────────────────────────── */}
       {renderForm()}
-      {renderPayModal()}
+
+      {/* ── Subcategorías modal ───────────────────────────────────────────── */}
+      {subcatParent && (
+        <SubcategoriasScreen
+          parentCategory={subcatParent}
+          visible={!!subcatParent}
+          onClose={() => setSubcatParent(null)}
+        />
+      )}
+
+      {/* ── Planificar Mes modal ──────────────────────────────────────────── */}
+      <PlanificarMesScreen
+        visible={planificarVisible}
+        onClose={() => setPlanificarVisible(false)}
+      />
 
       {/* ── Catalog modal ─────────────────────────────────────────────────── */}
       <Modal
@@ -1270,6 +1211,13 @@ const s = StyleSheet.create({
   accionesRow: { flexDirection: 'row', gap: 6, paddingTop: 8 },
   accionBtn:   { flex: 1, borderRadius: 10, paddingVertical: 10, alignItems: 'center', gap: 4 },
   accionLabel: { fontSize: 11, fontWeight: '500' },
+
+  // Subcategory badge
+  subBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    paddingHorizontal: 5, paddingVertical: 2, borderRadius: 6,
+  },
+  subBadgeText: { fontSize: 10, fontWeight: '700' },
 
   // FAB
   fab:    { position: 'absolute', right: 16 },

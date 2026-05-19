@@ -1,24 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  StyleSheet,
-  TextInput,
-  Pressable,
-  View,
-  Text,
-  ScrollView,
-  FlatList,
-  useWindowDimensions,
-  Platform,
+  StyleSheet, TextInput, Pressable, View, Text,
+  ScrollView, Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { Transaction } from '@/src/core/financeEngine';
 import { useFinance } from '@/src/core/context/FinanceContext';
 import { SwipeableRow } from '@/src/components/ui/SwipeableRow';
-import { THEME } from '@/src/constants/theme';
-import { Icon, getCategoryIcon } from '@/src/components/ui/Icon';
+import { Icon } from '@/src/components/ui/Icon';
+import { useTheme } from '@/src/state/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getBgIconoCategoria, getIconoCategoria } from '@/src/utils/categoryUtils';
 
-const formatCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
+const parseCOP  = (s: string) => parseInt(s.replace(/\./g, '').replace(/[^0-9]/g, ''), 10);
+const fmtCOP    = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
+const fmtInput  = (raw: string) => {
+  const d = raw.replace(/\./g, '').replace(/[^0-9]/g, '');
+  const n = parseInt(d, 10);
+  return isNaN(n) ? '' : n.toLocaleString('es-CO').replace(/,/g, '.');
+};
 
+// ── Expense tips ──────────────────────────────────────────────────────────────
+const TIPS = [
+  { icon: '🛑', text: 'Antes de pagar pregúntate: ¿lo necesito o solo lo quiero?' },
+  { icon: '📊', text: 'Registrar cada gasto te da control total de tu dinero.' },
+  { icon: '⏰', text: 'Espera 24 h antes de compras impulsivas mayores a $100k.' },
+  { icon: '🧾', text: 'Compara precios antes de pagar servicios recurrentes.' },
+  { icon: '📱', text: 'Revisa tus suscripciones mensuales — elimina las que no usas.' },
+];
+
+// ── Props ─────────────────────────────────────────────────────────────────────
 interface GastosProps {
   transactions: Transaction[];
   onAddExpense: (amount: number, category: string, date: Date, description?: string) => void;
@@ -26,394 +38,414 @@ interface GastosProps {
   onBack?: () => void;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
 export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack }: GastosProps) {
-  const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const { categories } = useFinance();
-  const [amount, setAmount] = useState('');
+
+  // Only top-level expense categories
+  const topCats = useMemo(
+    () => categories.filter(c => !c.parentCategoryId && c.tipo !== 'ingreso'),
+    [categories],
+  );
+
+  // ── Form state ────────────────────────────────────────────────────────────
+  const [amount,      setAmount]      = useState('');
   const [description, setDescription] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(categories[0]?.id || null);
-  const [error, setError] = useState('');
-  const [showCategoryList, setShowCategoryList] = useState(false);
-  const [amountFocused, setAmountFocused] = useState(false);
+  const [selCatId,    setSelCatId]    = useState<string | null>(topCats[0]?.id ?? null);
+  const [selSubId,    setSelSubId]    = useState<string | null>(null);
+  const [error,       setError]       = useState('');
+  const [amtFocused,  setAmtFocused]  = useState(false);
   const [descFocused, setDescFocused] = useState(false);
+  const [tipIdx]                      = useState(() => Math.floor(Math.random() * TIPS.length));
 
-  const isSmall = width < 768;
-  const expenseTransactions = transactions
-    .filter(t => t.type === 'expense')
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const selectedCategoryObj = categories.find(c => c.id === selectedCategory);
-  const selectedCategoryName = selectedCategoryObj
-    ? `${selectedCategoryObj.icon} ${selectedCategoryObj.name}`
-    : 'Seleccionar categoría';
+  // ── Derived ───────────────────────────────────────────────────────────────
+  const expList = useMemo(
+    () => transactions.filter(t => t.type === 'expense').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [transactions],
+  );
+  const totalThisMonth = useMemo(() => {
+    const now = new Date();
+    return expList
+      .filter(t => { const d = new Date(t.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); })
+      .reduce((s, t) => s + t.amount, 0);
+  }, [expList]);
 
-  const validate = (v: string) => parseInt(v.replace(/\./g, ''), 10) > 0;
+  const subcats = useMemo(
+    () => selCatId ? categories.filter(c => c.parentCategoryId === selCatId) : [],
+    [categories, selCatId],
+  );
 
-  const handleAddExpense = () => {
+  const selCat = topCats.find(c => c.id === selCatId);
+  const selSub = subcats.find(c => c.id === selSubId);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const handleAdd = () => {
     setError('');
-    if (!amount.trim() || !validate(amount)) { setError('Ingresa un monto válido'); return; }
-    if (!selectedCategory) { setError('Selecciona una categoría'); return; }
-    onAddExpense(parseInt(amount.replace(/\./g, ''), 10), selectedCategory, new Date(), description);
+    const n = parseCOP(amount);
+    if (isNaN(n) || n <= 0) { setError('Ingresa un monto válido'); return; }
+    if (!selCat) { setError('Selecciona una categoría'); return; }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    const addFn = onAddExpense as any;
+    addFn(n, selCat.name, new Date(), description || undefined, selSubId ?? undefined);
     setAmount('');
     setDescription('');
-    setShowCategoryList(false);
+    setSelSubId(null);
   };
 
-  const renderItem = ({ item, index }: { item: Transaction; index: number }) => {
-    const cat = categories.find(c => c.id === item.category);
-    return (
-      <SwipeableRow onDelete={() => onDeleteTransaction(item.id)}>
-        <View style={[styles.txItem, index < expenseTransactions.length - 1 && styles.txItemBorder]}>
-          <View style={styles.txLeft}>
-            <View style={styles.txIconCircle}>
-              <Icon name={getCategoryIcon(item.category)} size={16} color={THEME.colors.expense} />
-            </View>
-            <View>
-              <Text style={styles.txCategory}>{cat?.name ?? item.category}</Text>
-              {item.description ? (
-                <Text style={styles.txDesc} numberOfLines={1}>{item.description}</Text>
-              ) : null}
-              <Text style={styles.txDate}>{new Date(item.date).toLocaleDateString('es-CO')}</Text>
-            </View>
-          </View>
-          <View style={styles.txRight}>
-            <Text style={styles.expenseAmount}>-{formatCOP(item.amount)}</Text>
-          </View>
-        </View>
-      </SwipeableRow>
-    );
-  };
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <ScrollView
-      style={[styles.scroll, { paddingTop: insets.top }]}
-      contentContainerStyle={[styles.content, { paddingHorizontal: isSmall ? 20 : 28 }]}
+      style={[s.root, { backgroundColor: isDark ? colors.background : '#FFF5F5' }]}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
     >
-      {/* Header */}
-      <View style={styles.header}>
+      {/* ── Hero header ────────────────────────────────────────────────── */}
+      <LinearGradient
+        colors={['#DC2626', '#EF4444', '#F87171']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[s.hero, { paddingTop: insets.top + 20 }]}
+      >
         {onBack && (
-          <Pressable onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.backBtn}>
-            <Icon name="arrow-left" size={20} color={THEME.colors.textPrimary} />
+          <Pressable onPress={onBack} style={s.backBtn} hitSlop={12}>
+            <Icon name="arrow-left" size={20} color="#fff" />
           </Pressable>
         )}
-        <Text style={styles.headerLabel}>FINANZAS</Text>
-        <Text style={styles.headerTitle}>Registrar Gastos</Text>
-      </View>
+        <Text style={s.heroLabel}>GASTOS</Text>
+        <Text style={s.heroAmount}>{fmtCOP(totalThisMonth)}</Text>
+        <Text style={s.heroSub}>gastado este mes</Text>
 
-      {/* Form card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Nuevo Gasto</Text>
-
-        {error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
+        {/* Stats row */}
+        <View style={s.statsRow}>
+          <View style={s.statBox}>
+            <Text style={s.statVal}>{expList.length}</Text>
+            <Text style={s.statLabel}>transacciones</Text>
           </View>
-        ) : null}
-
-        <Text style={styles.fieldLabel}>MONTO</Text>
-        <TextInput
-          style={[styles.input, amountFocused && styles.inputFocused]}
-          placeholder="Ej: 1.250.000"
-          placeholderTextColor={THEME.colors.textTertiary}
-          keyboardType="numeric"
-          value={amount}
-          onChangeText={(txt) => { const d = txt.replace(/\./g, '').replace(/[^0-9]/g, ''); const n = parseInt(d, 10); setAmount(isNaN(n) ? '' : n.toLocaleString('es-CO').replace(/,/g, '.')); }}
-          onFocus={() => setAmountFocused(true)}
-          onBlur={() => setAmountFocused(false)}
-        />
-
-        <Text style={[styles.fieldLabel, { marginTop: 16 }]}>DESCRIPCIÓN (opcional)</Text>
-        <TextInput
-          style={[styles.input, descFocused && styles.inputFocused]}
-          placeholder="Ej: Supermercado, Netflix, Gasolina..."
-          placeholderTextColor={THEME.colors.textTertiary}
-          value={description}
-          onChangeText={setDescription}
-          onFocus={() => setDescFocused(true)}
-          onBlur={() => setDescFocused(false)}
-          maxLength={80}
-        />
-
-        <Text style={[styles.fieldLabel, { marginTop: 16 }]}>CATEGORÍA</Text>
-        <Pressable
-          style={[styles.categorySelector, showCategoryList && styles.categorySelectorOpen]}
-          onPress={() => setShowCategoryList(!showCategoryList)}
-        >
-          <Text style={styles.categorySelectorText}>{selectedCategoryName}</Text>
-          <Text style={styles.dropdownIcon}>{showCategoryList ? '▲' : '▼'}</Text>
-        </Pressable>
-
-        {showCategoryList && (
-          <View style={styles.categoryList}>
-            {categories.map((cat, i) => (
-              <Pressable
-                key={cat.id}
-                style={[
-                  styles.categoryOption,
-                  i < categories.length - 1 && styles.categoryOptionBorder,
-                  selectedCategory === cat.id && styles.categoryOptionActive,
-                ]}
-                onPress={() => { setSelectedCategory(cat.id); setShowCategoryList(false); }}
-              >
-                <Text style={[
-                  styles.categoryOptionText,
-                  selectedCategory === cat.id && styles.categoryOptionTextActive,
-                ]}>
-                  {cat.icon} {cat.name}
-                </Text>
-                {selectedCategory === cat.id && (
-                  <Text style={styles.categoryCheckmark}>✓</Text>
-                )}
-              </Pressable>
-            ))}
+          <View style={s.statDivider} />
+          <View style={s.statBox}>
+            <Text style={s.statVal}>{expList.length > 0 ? fmtCOP(Math.round(totalThisMonth / (new Date().getDate()))) : '$0'}</Text>
+            <Text style={s.statLabel}>gasto/día</Text>
           </View>
-        )}
+          <View style={s.statDivider} />
+          <View style={s.statBox}>
+            <Text style={s.statVal}>{expList.length > 0 ? fmtCOP(Math.round(totalThisMonth / expList.length)) : '$0'}</Text>
+            <Text style={s.statLabel}>promedio</Text>
+          </View>
+        </View>
+      </LinearGradient>
 
-        <Pressable style={styles.addBtn} onPress={handleAddExpense}>
-          <Text style={styles.addBtnText}>+ Agregar Gasto</Text>
-        </Pressable>
-      </View>
+      <View style={s.body}>
 
-      {/* List */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Últimos Gastos</Text>
-        {expenseTransactions.length > 0 ? (
-          <FlatList
-            data={expenseTransactions}
-            renderItem={renderItem}
-            keyExtractor={item => item.id}
-            scrollEnabled={false}
+        {/* ── Tip card ────────────────────────────────────────────────── */}
+        <View style={[s.tipCard, { backgroundColor: isDark ? '#3B0A0A' : '#FFF5F5', borderColor: '#FCA5A5' }]}>
+          <Text style={s.tipIcon}>{TIPS[tipIdx].icon}</Text>
+          <Text style={[s.tipText, { color: isDark ? '#FCA5A5' : '#991B1B' }]}>{TIPS[tipIdx].text}</Text>
+        </View>
+
+        {/* ── Form card ────────────────────────────────────────────────── */}
+        <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={s.cardHeader}>
+            <View style={[s.cardIconBox, { backgroundColor: '#FEE2E2' }]}>
+              <Icon name="minus-circle" size={16} color="#EF4444" />
+            </View>
+            <View>
+              <Text style={[s.cardTitle, { color: colors.textPrimary }]}>Nuevo gasto</Text>
+              <Text style={[s.cardSub, { color: colors.textTertiary }]}>¿En qué gastaste hoy?</Text>
+            </View>
+          </View>
+
+          {error ? (
+            <View style={s.errorBox}>
+              <Icon name="alert-circle" size={14} color="#EF4444" />
+              <Text style={s.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          {/* Amount */}
+          <Text style={[s.fieldLabel, { color: colors.textTertiary }]}>MONTO</Text>
+          <View style={[s.amountInputWrap, {
+            borderColor: amtFocused ? '#EF4444' : colors.border,
+            borderWidth: amtFocused ? 2 : 1,
+            backgroundColor: isDark ? '#2D0808' : '#FFF5F5',
+          }]}>
+            <Text style={[s.currSign, { color: amtFocused ? '#EF4444' : colors.textTertiary }]}>$</Text>
+            <TextInput
+              style={[s.amountInput, { color: colors.textPrimary }]}
+              placeholder="0"
+              placeholderTextColor={colors.textTertiary}
+              keyboardType="numeric"
+              value={amount}
+              onChangeText={t => setAmount(fmtInput(t))}
+              onFocus={() => setAmtFocused(true)}
+              onBlur={() => setAmtFocused(false)}
+              selectTextOnFocus
+            />
+          </View>
+
+          {/* Category grid */}
+          <Text style={[s.fieldLabel, { color: colors.textTertiary, marginTop: 18 }]}>CATEGORÍA</Text>
+          <View style={s.catGrid}>
+            {topCats.map(c => {
+              const active = selCatId === c.id;
+              const { bg, color } = getBgIconoCategoria(c.name, isDark);
+              const iconName = (c.icon as string) || getIconoCategoria(c.name);
+              return (
+                <Pressable
+                  key={c.id}
+                  style={[s.catCell, {
+                    backgroundColor: active ? '#EF4444' : (isDark ? colors.cardSecondary : bg),
+                    borderColor: active ? '#EF4444' : colors.border,
+                  }]}
+                  onPress={() => {
+                    setSelCatId(c.id);
+                    setSelSubId(null);
+                    Haptics.selectionAsync().catch(() => {});
+                  }}
+                >
+                  <Icon name={iconName as any} size={18} color={active ? '#fff' : color} />
+                  <Text style={[s.catCellLabel, { color: active ? '#fff' : color }]} numberOfLines={1}>{c.name}</Text>
+                  {active && <View style={s.catCellCheck}><Text style={{ fontSize: 8, color: '#fff' }}>✓</Text></View>}
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Subcategory chips */}
+          {subcats.length > 0 && (
+            <>
+              <Text style={[s.fieldLabel, { color: colors.textTertiary, marginTop: 18 }]}>ETIQUETA (opcional)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsContent}>
+                {subcats.map(sub => {
+                  const active = selSubId === sub.id;
+                  return (
+                    <Pressable
+                      key={sub.id}
+                      style={[s.chip, {
+                        backgroundColor: active ? '#EF4444' : (isDark ? colors.cardSecondary : '#FEE2E2'),
+                        borderColor: active ? '#EF4444' : '#FCA5A5',
+                      }]}
+                      onPress={() => setSelSubId(active ? null : sub.id)}
+                    >
+                      <Text style={[s.chipText, { color: active ? '#fff' : '#EF4444' }]}>
+                        {sub.icon ? `${sub.icon} ` : ''}{sub.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </>
+          )}
+
+          {/* Description */}
+          <Text style={[s.fieldLabel, { color: colors.textTertiary, marginTop: 18 }]}>NOTA (opcional)</Text>
+          <TextInput
+            style={[s.descInput, {
+              borderColor: descFocused ? '#EF4444' : colors.border,
+              borderWidth: descFocused ? 2 : 1,
+              backgroundColor: isDark ? colors.cardSecondary : '#F9FAFB',
+              color: colors.textPrimary,
+            }]}
+            placeholder="Ej: Supermercado, Netflix, gasolina…"
+            placeholderTextColor={colors.textTertiary}
+            value={description}
+            onChangeText={setDescription}
+            onFocus={() => setDescFocused(true)}
+            onBlur={() => setDescFocused(false)}
+            maxLength={80}
           />
-        ) : (
-          <Text style={styles.emptyText}>No hay gastos registrados</Text>
-        )}
-      </View>
 
-      <View style={{ height: 16 }} />
+          {/* Budget feedback */}
+          {selCat && selCat.budget && selCat.budget > 0 && (
+            <View style={[s.budgetBar, { backgroundColor: isDark ? '#2D0808' : '#FFF5F5' }]}>
+              <View style={s.budgetBarRow}>
+                <Text style={[s.budgetBarLabel, { color: colors.textTertiary }]}>Presupuesto {selCat.name}</Text>
+                <Text style={[s.budgetBarLabel, { color: '#EF4444', fontWeight: '700' }]}>{fmtCOP(selCat.budget)}</Text>
+              </View>
+              <View style={[s.budgetTrack, { backgroundColor: colors.border }]}>
+                <View style={[s.budgetFill, {
+                  flex: Math.min(totalThisMonth / selCat.budget, 1),
+                  backgroundColor: totalThisMonth >= selCat.budget ? '#EF4444' : '#F87171',
+                }]} />
+              </View>
+            </View>
+          )}
+
+          {/* CTA */}
+          <Pressable style={s.addBtn} onPress={handleAdd}>
+            <Icon name="arrow-down-circle" size={20} color="#fff" />
+            <Text style={s.addBtnText}>Registrar gasto</Text>
+          </Pressable>
+        </View>
+
+        {/* ── History ─────────────────────────────────────────────────── */}
+        <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[s.cardHeader, { marginBottom: 4 }]}>
+            <View style={[s.cardIconBox, { backgroundColor: '#FEE2E2' }]}>
+              <Icon name="clock" size={16} color="#EF4444" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.cardTitle, { color: colors.textPrimary }]}>Historial</Text>
+            </View>
+            <Text style={[s.txCount, { color: colors.textTertiary }]}>{expList.length} registros</Text>
+          </View>
+
+          {expList.length === 0 ? (
+            <View style={s.emptyBox}>
+              <Text style={s.emptyIcon}>🎉</Text>
+              <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Sin gastos este mes</Text>
+              <Text style={[s.emptyDesc, { color: colors.textTertiary }]}>¡Excelente control financiero!</Text>
+            </View>
+          ) : (
+            expList.map((item, idx) => {
+              const cat = categories.find(c => c.id === item.category || c.name === item.category);
+              const sub = item.subcategory ? categories.find(c => c.id === item.subcategory) : null;
+              const catName = cat?.name ?? item.category;
+              const { bg: iconBg, color: iconColor } = getBgIconoCategoria(catName, isDark);
+              const iconName = (cat?.icon as string) || getIconoCategoria(catName);
+              return (
+                <SwipeableRow key={item.id} onDelete={() => onDeleteTransaction(item.id)}>
+                  <View style={[s.txItem, idx < expList.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+                    <View style={[s.txIcon, { backgroundColor: isDark ? '#2D0808' : iconBg }]}>
+                      <Icon name={iconName as any} size={16} color={iconColor} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.txCat, { color: colors.textPrimary }]}>
+                        {catName}{sub ? <Text style={{ color: colors.textSecondary, fontWeight: '500' }}> · {sub.name}</Text> : null}
+                      </Text>
+                      {item.description ? <Text style={[s.txDesc, { color: colors.textSecondary }]} numberOfLines={1}>{item.description}</Text> : null}
+                      <Text style={[s.txDate, { color: colors.textTertiary }]}>
+                        {new Date(item.date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </Text>
+                    </View>
+                    <Text style={[s.txAmount, { color: '#EF4444' }]}>-{fmtCOP(item.amount)}</Text>
+                  </View>
+                </SwipeableRow>
+              );
+            })
+          )}
+        </View>
+
+      </View>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
-  },
-  content: {
-    paddingTop: 20,
-    gap: 16,
-  },
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  root: { flex: 1 },
 
-  header: {
-    marginBottom: 4,
+  hero: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
   },
-  backBtn: { marginBottom: 8 },
-  headerLabel: {
-    fontSize: 11,
-    color: THEME.colors.textTertiary,
-    fontWeight: '700',
-    letterSpacing: 1.2,
+  backBtn: { marginBottom: 12 },
+  heroLabel: {
+    fontSize: 11, fontWeight: '700', letterSpacing: 2,
+    color: 'rgba(255,255,255,0.75)', marginBottom: 8,
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
+  heroAmount: { fontSize: 42, fontWeight: '800', color: '#fff', letterSpacing: -1 },
+  heroSub: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginBottom: 20 },
+  statsRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 16, padding: 16, gap: 8,
   },
+  statBox: { flex: 1, alignItems: 'center' },
+  statVal: { fontSize: 13, fontWeight: '800', color: '#fff' },
+  statLabel: { fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
+  statDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.25)' },
+
+  body: { padding: 16, gap: 14 },
+
+  tipCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderRadius: 14, borderWidth: 1, padding: 14,
+  },
+  tipIcon: { fontSize: 22 },
+  tipText: { flex: 1, fontSize: 13, fontWeight: '500', lineHeight: 18 },
 
   card: {
-    backgroundColor: THEME.colors.surface,
-    borderRadius: THEME.radius.lg,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    padding: 20,
-    ...(Platform.OS !== 'web' ? { ...THEME.shadow.card } : {}),
+    borderRadius: 18, borderWidth: 1, padding: 20,
+    ...(Platform.OS !== 'web' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3 } : {}),
   },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: THEME.colors.textPrimary,
-    marginBottom: 16,
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  cardIconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  cardTitle: { fontSize: 15, fontWeight: '700' },
+  cardSub: { fontSize: 12, marginTop: 1 },
+
+  fieldLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10 },
+
+  amountInputWrap: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12,
+  },
+  currSign: { fontSize: 18, fontWeight: '700', marginRight: 4 },
+  amountInput: { flex: 1, fontSize: 28, fontWeight: '800', padding: 0 },
+
+  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  catCell: {
+    flexBasis: '22%', flexGrow: 1,
+    paddingVertical: 12, paddingHorizontal: 8,
+    borderRadius: 14, borderWidth: 1.5,
+    alignItems: 'center', gap: 6, position: 'relative',
+  },
+  catCellLabel: { fontSize: 10, fontWeight: '700', textAlign: 'center' },
+  catCellCheck: {
+    position: 'absolute', top: 4, right: 4,
+    width: 14, height: 14, borderRadius: 7,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+    alignItems: 'center', justifyContent: 'center',
   },
 
-  fieldLabel: {
-    fontSize: 11,
-    color: THEME.colors.textTertiary,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    marginBottom: 8,
+  chipsContent: { gap: 8, paddingVertical: 4 },
+  chip: {
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 20, borderWidth: 1,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    backgroundColor: THEME.colors.surface,
-    padding: 14,
-    borderRadius: THEME.radius.sm,
-    fontSize: 16,
-    color: THEME.colors.textPrimary,
-    fontWeight: '600',
-  },
-  inputFocused: {
-    borderColor: THEME.colors.expense,
-    borderWidth: 2,
+  chipText: { fontSize: 13, fontWeight: '600' },
+
+  descInput: {
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+    fontSize: 15, fontWeight: '500',
   },
 
-  categorySelector: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: THEME.radius.sm,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    backgroundColor: THEME.colors.surface,
+  budgetBar: {
+    marginTop: 14, borderRadius: 10, padding: 12, gap: 8,
   },
-  categorySelectorOpen: {
-    borderColor: THEME.colors.expense,
-    borderWidth: 2,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  categorySelectorText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: THEME.colors.textPrimary,
-  },
-  dropdownIcon: {
-    fontSize: 11,
-    color: THEME.colors.textTertiary,
-  },
-  categoryList: {
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: THEME.colors.expense,
-    borderBottomLeftRadius: THEME.radius.sm,
-    borderBottomRightRadius: THEME.radius.sm,
-    backgroundColor: THEME.colors.surface,
-    maxHeight: 280,
-    overflow: 'hidden',
-    marginBottom: 4,
-  },
-  categoryOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  categoryOptionBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.surfaceSecondary,
-  },
-  categoryOptionActive: {
-    backgroundColor: THEME.colors.expenseLight,
-  },
-  categoryOptionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: THEME.colors.textPrimary,
-  },
-  categoryOptionTextActive: {
-    color: THEME.colors.expense,
-  },
-  categoryCheckmark: {
-    fontSize: 14,
-    color: THEME.colors.expense,
-    fontWeight: '700',
-  },
+  budgetBarRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  budgetBarLabel: { fontSize: 12 },
+  budgetTrack: { height: 6, borderRadius: 3, flexDirection: 'row', overflow: 'hidden' },
+  budgetFill: { height: 6, borderRadius: 3 },
 
   addBtn: {
-    backgroundColor: THEME.colors.expense,
-    padding: 15,
-    borderRadius: THEME.radius.md,
-    alignItems: 'center',
-    marginTop: 16,
-    ...(Platform.OS !== 'web' ? {
-      shadowColor: THEME.colors.expense,
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.25,
-      shadowRadius: 8,
-      elevation: 4,
-    } : {}),
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, borderRadius: 16, paddingVertical: 16, marginTop: 18,
+    backgroundColor: '#EF4444',
+    ...(Platform.OS !== 'web' ? { shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 } : {}),
   },
-  addBtnText: {
-    color: THEME.colors.surface,
-    fontSize: 15,
-    fontWeight: '800',
-  },
+  addBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 
   errorBox: {
-    backgroundColor: THEME.colors.expenseLight,
-    padding: 12,
-    borderRadius: THEME.radius.sm,
-    borderLeftWidth: 3,
-    borderLeftColor: THEME.colors.expense,
-    marginBottom: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#FEF2F2', borderRadius: 10,
+    padding: 12, marginBottom: 14,
+    borderLeftWidth: 3, borderLeftColor: '#EF4444',
   },
-  errorText: {
-    color: THEME.colors.expense,
-    fontSize: 13,
-    fontWeight: '600',
-  },
+  errorText: { color: '#EF4444', fontSize: 13, fontWeight: '600' },
 
-  txItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  txItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.surfaceSecondary,
-  },
-  txLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  txIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: THEME.radius.pill,
-    backgroundColor: THEME.colors.expenseLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  txCategory: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: THEME.colors.textPrimary,
-  },
-  txDesc: {
-    fontSize: 12,
-    color: THEME.colors.textSecondary,
-    fontWeight: '500',
-    marginTop: 1,
-  },
-  txDate: {
-    fontSize: 12,
-    color: THEME.colors.textTertiary,
-    marginTop: 2,
-  },
-  txRight: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  expenseAmount: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: THEME.colors.expense,
-  },
-  deleteBtn: {
-    fontSize: 12,
-    color: THEME.colors.expense,
-    fontWeight: '600',
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: THEME.colors.textTertiary,
-    fontSize: 14,
-    paddingVertical: 20,
-  },
+  txCount: { fontSize: 12, fontWeight: '600' },
+  txItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  txIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  txCat: { fontSize: 14, fontWeight: '700' },
+  txDesc: { fontSize: 12, marginTop: 1 },
+  txDate: { fontSize: 11, marginTop: 2 },
+  txAmount: { fontSize: 16, fontWeight: '800', flexShrink: 0 },
+
+  emptyBox: { alignItems: 'center', paddingVertical: 32, gap: 8 },
+  emptyIcon: { fontSize: 40 },
+  emptyTitle: { fontSize: 16, fontWeight: '700' },
+  emptyDesc: { fontSize: 13 },
 });

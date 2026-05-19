@@ -1,5 +1,4 @@
 import { Transaction, FinancialProfile, FinancialGoal, AIAnalysis, Category } from '../../types';
-import { analyticsService } from './AnalyticsService';
 import { CATALOGO_CATEGORIAS } from '../../constants/catalogoCategorias';
 import {
   calcularMetricasFinancieras,

@@ -102,7 +102,7 @@ export function detectarTendencia(transactions: { amount: number; category: stri
     return {
       categoria: cat,
       promedio: calcularPromedioCategoria(transactions, cat, 3),
-      tendencia: diff > 0.1 ? 'sube' : diff < -0.1 ? 'baja' : 'estable',
+      tendencia: (diff > 0.1 ? 'sube' : diff < -0.1 ? 'baja' : 'estable') as 'sube' | 'baja' | 'estable',
     };
   }).filter(r => r.promedio > 0).sort((a, b) => b.promedio - a.promedio).slice(0, 5);
 }
