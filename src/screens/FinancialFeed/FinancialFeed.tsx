@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -223,6 +224,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   // Balance counter display
   const displayBalance = useRef(0);
   const balanceText    = useRef<any>(null);
+  const [webBalance, setWebBalance] = useState(0);
 
   // ── Mount effects ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -243,7 +245,9 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
 
     balanceAnim.addListener(({ value }) => {
       displayBalance.current = value;
-      if (balanceText.current) {
+      if (Platform.OS === 'web') {
+        setWebBalance(value);
+      } else if (balanceText.current) {
         balanceText.current.setNativeProps({ text: fmtCOP(value) });
       }
     });
@@ -501,7 +505,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
               <Animated.View style={[s.balanceCard, { backgroundColor: cardBg, borderColor: cardBorder, borderWidth: cardBorderW },
                 { opacity: heroAnim, transform: [{ scale: heroAnim.interpolate({ inputRange: [0,1], outputRange: [0.95,1] }) }] }]}>
                 <Text style={[s.balanceLabel, { color: sub, fontSize: fs(10) }]}>DISPONIBLE AHORA</Text>
-                <Text ref={balanceText} style={[s.balanceAmount, { color: textColor, fontSize: fs(36) }]}>{formatAmount(metricas.balanceDisponible)}</Text>
+                <Text ref={Platform.OS !== 'web' ? balanceText : undefined} style={[s.balanceAmount, { color: textColor, fontSize: fs(36) }]}>{Platform.OS === 'web' ? fmtCOP(webBalance) : formatAmount(metricas.balanceDisponible)}</Text>
                 <Text style={[s.balanceMonth, { color: sub, fontSize: fs(12) }]}>{capitalize(getNombreMes(mesActual))} {añoActual}</Text>
                 <View style={s.balanceSubCards}>
                   <View style={[s.balanceSubCard, { backgroundColor: subCardBg }]}>
@@ -541,7 +545,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
               <Animated.View style={[s.balanceCard, { backgroundColor: cardBg, borderColor: cardBorder, borderWidth: cardBorderW, paddingVertical: 18 },
                 { opacity: heroAnim, transform: [{ scale: heroAnim.interpolate({ inputRange: [0,1], outputRange: [0.95,1] }) }] }]}>
                 <Text style={[s.balanceLabel, { color: sub, fontSize: fs(10) }]}>DISPONIBLE AHORA</Text>
-                <Text ref={balanceText} style={[s.balanceAmount, { color: textColor, fontSize: fs(32), marginBottom: 4 }]}>{formatAmount(metricas.balanceDisponible)}</Text>
+                <Text ref={Platform.OS !== 'web' ? balanceText : undefined} style={[s.balanceAmount, { color: textColor, fontSize: fs(32), marginBottom: 4 }]}>{Platform.OS === 'web' ? fmtCOP(webBalance) : formatAmount(metricas.balanceDisponible)}</Text>
                 {/* Barra única de progreso */}
                 <View style={[s.segBarWrap, { marginBottom: 14 }]}>
                   <View style={[s.segSlice, { flex: pctGastado || 1, backgroundColor: pctGastado > 80 ? '#F87171' : '#4ADE80' }]} />
@@ -596,7 +600,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
                 <View style={{ flex: 1, gap: 8 }}>
                   <View>
                     <Text style={[s.balanceLabel, { color: sub, fontSize: fs(9) }]}>DISPONIBLE</Text>
-                    <Text ref={balanceText} style={[s.balanceAmount, { color: textColor, fontSize: fs(24), marginBottom: 0 }]}>{formatAmount(metricas.balanceDisponible)}</Text>
+                    <Text ref={Platform.OS !== 'web' ? balanceText : undefined} style={[s.balanceAmount, { color: textColor, fontSize: fs(24), marginBottom: 0 }]}>{Platform.OS === 'web' ? fmtCOP(webBalance) : formatAmount(metricas.balanceDisponible)}</Text>
                     <Text style={[s.balanceMonth, { color: sub, fontSize: fs(10), marginBottom: 0 }]}>{capitalize(getNombreMes(mesActual))}</Text>
                   </View>
                   <View style={{ gap: 4 }}>
@@ -622,7 +626,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
               {/* Lado izquierdo — balance principal */}
               <View style={{ flex: 1.1, padding: 18, justifyContent: 'center', borderRightWidth: 1, borderRightColor: 'rgba(255,255,255,0.15)' }}>
                 <Text style={[s.balanceLabel, { color: sub, fontSize: fs(9), marginBottom: 4 }]}>DISPONIBLE</Text>
-                <Text ref={balanceText} style={[s.balanceAmount, { color: textColor, fontSize: fs(26), marginBottom: 2 }]}>{formatAmount(metricas.balanceDisponible)}</Text>
+                <Text ref={Platform.OS !== 'web' ? balanceText : undefined} style={[s.balanceAmount, { color: textColor, fontSize: fs(26), marginBottom: 2 }]}>{Platform.OS === 'web' ? fmtCOP(webBalance) : formatAmount(metricas.balanceDisponible)}</Text>
                 <Text style={{ color: sub, fontSize: fs(10) }}>{capitalize(getNombreMes(mesActual))} {añoActual}</Text>
                 {/* Barra compacta */}
                 <View style={[s.segBarWrap, { marginTop: 12, marginBottom: 4 }]}>

@@ -169,10 +169,10 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
           <View style={styles.amountRow}>
             <Text style={[styles.currencySymbol, { color: accent }]}>$</Text>
             <TextInput
-              style={[styles.amountInput, { color: accent, borderBottomColor: amountFocused ? accent : colors.border }]}
+              style={[styles.amountInput, { color: accent, borderBottomColor: amountFocused ? accent : colors.border }, Platform.OS === 'web' && ({ outline: 'none' } as any)]}
               placeholder="0"
               placeholderTextColor={colors.border}
-              keyboardType="numeric"
+              keyboardType={Platform.OS === 'web' ? 'default' : 'numeric'}
               value={amount}
               onChangeText={(txt) => { const d = txt.replace(/\./g, '').replace(/[^0-9]/g, ''); const n = parseInt(d, 10); setAmount(isNaN(n) ? '' : n.toLocaleString('es-CO').replace(/,/g, '.')); }}
               onFocus={() => setAmountFocused(true)}
@@ -216,7 +216,7 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
               backgroundColor: colors.inputBg,
               borderColor:     colors.border,
               color:           colors.textPrimary,
-            }]}
+            }, Platform.OS === 'web' && ({ outline: 'none' } as any)]}
             placeholder="Descripción (opcional)"
             placeholderTextColor={colors.textTertiary ?? colors.border}
             value={description}

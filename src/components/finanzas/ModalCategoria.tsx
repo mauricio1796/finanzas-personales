@@ -74,11 +74,11 @@ export const ModalCategoria: React.FC<Props> = ({ visible, editing, existingCoun
           <ScrollView style={s.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             {error ? <Text style={s.error}>{error}</Text> : null}
             <Text style={s.fieldLabel}>Nombre del gasto</Text>
-            <TextInput style={s.input} placeholder="Ej: Gimnasio, Netflix..." placeholderTextColor={THEME.colors.textTertiary} value={nombre} onChangeText={t => { setNombre(t); setError(""); }} maxLength={30} />
+            <TextInput style={[s.input, Platform.OS === 'web' && ({ outline: 'none' } as any)]} placeholder="Ej: Gimnasio, Netflix..." placeholderTextColor={THEME.colors.textTertiary} value={nombre} onChangeText={t => { setNombre(t); setError(""); }} maxLength={30} />
             <Text style={s.fieldLabel}>Presupuesto mensual (COP)</Text>
             <View style={s.amountRow}>
               <Text style={s.currencySign}>$</Text>
-              <TextInput style={[s.input, s.amountInput]} keyboardType="numeric" placeholder="0" placeholderTextColor={THEME.colors.textTertiary} value={presupuesto} onChangeText={t => setPresupuesto(formatInput(t))} />
+              <TextInput style={[s.input, s.amountInput, Platform.OS === 'web' && ({ outline: 'none' } as any)]} keyboardType={Platform.OS === 'web' ? 'default' : 'numeric'} placeholder="0" placeholderTextColor={THEME.colors.textTertiary} value={presupuesto} onChangeText={t => setPresupuesto(formatInput(t))} />
             </View>
             <Text style={s.fieldLabel}>Tipo de gasto</Text>
             <View style={s.tipoRow}>
@@ -96,7 +96,7 @@ export const ModalCategoria: React.FC<Props> = ({ visible, editing, existingCoun
               {EMOJIS.map(e => (<TouchableOpacity key={e} style={[s.emojiBtn, emoji === e && s.emojiBtnActive]} onPress={() => setEmoji(e)} activeOpacity={0.7}><Text style={s.emojiChar}>{e}</Text></TouchableOpacity>))}
             </ScrollView>
             <Text style={s.fieldLabel}>Dia de pago (opcional, 1-28)</Text>
-            <TextInput style={s.input} keyboardType="numeric" placeholder="Sin fecha fija" placeholderTextColor={THEME.colors.textTertiary} value={diaPago} onChangeText={t => { const v = t.replace(/[^0-9]/g,""); setDiaPago(v.length > 2 ? v.slice(0,2) : v); }} maxLength={2} />
+            <TextInput style={[s.input, Platform.OS === 'web' && ({ outline: 'none' } as any)]} keyboardType={Platform.OS === 'web' ? 'default' : 'numeric'} placeholder="Sin fecha fija" placeholderTextColor={THEME.colors.textTertiary} value={diaPago} onChangeText={t => { const v = t.replace(/[^0-9]/g,""); setDiaPago(v.length > 2 ? v.slice(0,2) : v); }} maxLength={2} />
             <TouchableOpacity style={s.saveBtn} onPress={handleSave} activeOpacity={0.85}>
               <Text style={s.saveBtnText}>Guardar categoria</Text>
             </TouchableOpacity>

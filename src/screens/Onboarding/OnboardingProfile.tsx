@@ -113,6 +113,7 @@ export const OnboardingProfile: React.FC<Props> = ({ onNext, onBack }) => {
                 borderBottomColor: focused ? colors.primary : colors.border,
                 borderBottomWidth: focused ? 2 : 1,
               },
+              Platform.OS === 'web' && ({ outline: 'none' } as any),
             ]}
             placeholder="Tu nombre..."
             placeholderTextColor={colors.textTertiary}

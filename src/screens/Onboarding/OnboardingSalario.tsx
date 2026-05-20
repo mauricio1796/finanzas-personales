@@ -134,10 +134,10 @@ export const OnboardingSalario: React.FC<Props> = ({ onNext, onBack }) => {
           <View style={[s.salaryRow, { borderBottomColor: incFocus ? colors.primary : colors.border, borderBottomWidth: incFocus ? 2 : 1 }]}>
             <Text style={[s.currencySign, { color: colors.textTertiary }]}>$</Text>
             <TextInput
-              style={[s.salaryInput, { color: colors.textPrimary }]}
+              style={[s.salaryInput, { color: colors.textPrimary }, Platform.OS === 'web' && ({ outline: 'none' } as any)]}
               placeholder="0"
               placeholderTextColor={colors.textTertiary}
-              keyboardType="numeric"
+              keyboardType={Platform.OS === 'web' ? 'default' : 'numeric'}
               value={income}
               onChangeText={handleIncomeChange}
               onFocus={() => setIncFocus(true)}
@@ -204,10 +204,10 @@ export const OnboardingSalario: React.FC<Props> = ({ onNext, onBack }) => {
                 <View style={[s.debtInput, { borderColor: debtFocus ? colors.primary : colors.border }]}>
                   <Text style={[s.debtInputPrefix, { color: colors.textTertiary }]}>$</Text>
                   <TextInput
-                    style={[s.debtInputField, { color: colors.textPrimary }]}
+                    style={[s.debtInputField, { color: colors.textPrimary }, Platform.OS === 'web' && ({ outline: 'none' } as any)]}
                     placeholder="Monto total de deudas"
                     placeholderTextColor={colors.textTertiary}
-                    keyboardType="numeric"
+                    keyboardType={Platform.OS === 'web' ? 'default' : 'numeric'}
                     value={debtAmt}
                     onChangeText={t => { const d = t.replace(/\./g, '').replace(/[^0-9]/g, ''); setDebtAmt(fmtCOP(d)); }}
                     onFocus={() => setDebtFocus(true)}

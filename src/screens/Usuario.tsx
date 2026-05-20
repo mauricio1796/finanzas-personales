@@ -76,6 +76,11 @@ export function Usuario({ onReset, onStartTour, onNavigate }: UsuarioProps) {
   };
 
   const handleReset = () => {
+    if (Platform.OS === 'web') {
+      const ok = window.confirm('Se borrarán todas tus transacciones, perfil, progreso y configuración. ¿Estás seguro?');
+      if (ok) { resetAll().then(() => onReset?.()); }
+      return;
+    }
     Alert.alert(
       'Reiniciar App',
       'Se borrarán todas tus transacciones, perfil, progreso y configuración. ¿Estás seguro?',

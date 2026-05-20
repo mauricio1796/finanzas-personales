@@ -143,8 +143,8 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({ onParsed, size = 'norm
     clearAutoStop();
     if (stopWebRef.current) { stopWebRef.current(); stopWebRef.current = null; }
     const uri = await detenerGrabacion();
-    // Limpiar archivo temporal si quedó alguno
-    if (uri) {
+    // Limpiar archivo temporal si quedó alguno (solo nativo)
+    if (uri && Platform.OS !== 'web') {
       FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
     }
     setVoiceState('idle');

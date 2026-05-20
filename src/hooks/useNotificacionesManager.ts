@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, Platform } from 'react-native';
 import { useFinance } from '../state/FinanceContext';
 import {
   reprogramarTodasLasNotificaciones,
@@ -15,6 +15,7 @@ import { calcularRachaActual } from '../services/GamificacionService';
 
 export function useNotificacionesManager() {
   const { transactions, categories, profile, goal } = useFinance();
+  if (Platform.OS === 'web') return; // notificaciones push no disponibles en web
 
   const prevTxLen       = useRef(transactions.length);
   const prevCatSnapshot = useRef('');

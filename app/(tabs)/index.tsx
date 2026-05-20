@@ -8,12 +8,14 @@ import {
   Keyboard,
   ScrollView,
   BackHandler,
+  Platform,
 } from 'react-native';
 
 import { useFinance } from '../../src/state';
 import { User } from '../../src/types';
 import { useTheme } from '../../src/state/ThemeContext';
 import { MobileShell } from '../../src/components/layout/MobileShell';
+import { WebSidebar } from '../../src/components/layout/WebSidebar';
 import { BottomNavBar } from '../../src/components/layout/BottomNavBar';
 import { FinancialFeed } from '../../src/screens/FinancialFeed/FinancialFeed';
 import { SplashScreen } from '../../src/screens/SplashScreen';
@@ -120,10 +122,11 @@ export default function HomeScreen() {
     }
   }, [showSplash]);
 
-  // ==================== PERMISSIONS ====================
+  // ==================== PERMISSIONS (solo nativo) ====================
   const [showPermissions, setShowPermissions] = useState(false);
 
   useEffect(() => {
+    if (Platform.OS === 'web') return; // permisos no aplican en web
     storageService.getPermissionsShown().then(shown => {
       if (!shown) setShowPermissions(true);
     });
@@ -276,8 +279,9 @@ export default function HomeScreen() {
     return () => clearTimeout(t);
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Notification listeners — tap opens the target screen
+  // Notification listeners — tap opens the target screen (native only)
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     const SCREEN_MAP: Record<string, string> = {
       'dashboard':      'dashboard',
       'categorias':     'categorias',
@@ -643,11 +647,12 @@ export default function HomeScreen() {
     navegarA(section);
   };
 
-  // ── Android hardware back button ──────────────────────────────────────────
+  // ── Android hardware back button (native only) ────────────────────────────
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (quickAddMode !== null) { setQuickAddMode(null); return true; }
-      if (TAB_KEYS.includes(currentScreen)) return false; // let OS handle (exit app)
+      if (TAB_KEYS.includes(currentScreen)) return false;
       volver();
       return true;
     });
@@ -668,7 +673,7 @@ export default function HomeScreen() {
 
   // ==================== 1. PIN ENTRY (usuario que regresa — antes que todo) ====================
   // Si el usuario ya está en storage Y tiene PIN → pedirlo antes que nada
-  if (user && pinExists && !isUnlocked) {
+  if (user && pinExists && !isUnlocked && Platform.OS !== 'web') {
     return (
       <MobileShell>
         <PinEntryScreen
@@ -748,7 +753,7 @@ export default function HomeScreen() {
   }
 
   // ==================== 5. PIN SETUP (primera vez tras verificar OTP) ====================
-  if (showPinSetup) {
+  if (showPinSetup && Platform.OS !== 'web') {
     return (
       <MobileShell>
         <PinSetupScreen
@@ -767,6 +772,12 @@ export default function HomeScreen() {
   // ==================== 3. MAIN APP (CON DATOS DEL PERFIL CARGADOS) ====================
   return (
     <MobileShell>
+      <WebSidebar
+        currentScreen={currentScreen}
+        onNavigate={navegarATab}
+        onQuickAdd={() => setQuickAddMode('expense')}
+        userName={user?.name}
+      >
       <View style={styles.appContainer}>
         <Toast
           visible={toast.visible}
@@ -866,7 +877,7 @@ export default function HomeScreen() {
           {currentScreen === 'exportar' && (
             <ExportarReporteScreen onBack={volver} />
           )}
-          {currentScreen === 'widget' && (
+          {currentScreen === 'widget' && Platform.OS !== 'web' && (
             <WidgetConfigScreen onBack={volver} />
           )}
           {currentScreen === 'metas' && (
@@ -879,7 +890,7 @@ export default function HomeScreen() {
             <RecurrentesScreen onBack={volver} />
           )}
         </Animated.View>
-        {mostrarBottomNav(currentScreen) && (
+        {mostrarBottomNav(currentScreen) && Platform.OS !== 'web' && (
           <BottomNavBar
             currentScreen={getTabActivo(currentScreen)}
             onNavigate={navegarATab}
@@ -906,6 +917,7 @@ export default function HomeScreen() {
           setQuickAddMode(null);
         }}
       />
+      </WebSidebar>
     </MobileShell>
   );
 }

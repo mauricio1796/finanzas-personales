@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { useFinance } from '../state/FinanceContext';
 import { calcularWidgetData, actualizarWidget } from '../services/WidgetService';
 
@@ -9,6 +9,7 @@ import { calcularWidgetData, actualizarWidget } from '../services/WidgetService'
  */
 export function useWidgetSync() {
   const { transactions, categories, profile, userLevel, user } = useFinance();
+  if (Platform.OS === 'web') return; // widgets no disponibles en web
   const lastSyncRef = useRef<string>('');
 
   const sync = () => {

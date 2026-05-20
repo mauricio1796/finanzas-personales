@@ -437,7 +437,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={[st.root, { paddingTop: insets.top }]}
+      style={[st.root, { paddingTop: Platform.OS === 'web' ? 0 : insets.top }]}
     >
       {/* Decorative blobs */}
       <View style={st.blobTop} />
@@ -445,7 +445,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
 
       {/* ── Header ── */}
       <View style={st.header}>
-        {onBack && (
+        {onBack && Platform.OS !== 'web' && (
           <Pressable onPress={onBack} style={st.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Icon name="arrow-left" size={20} color="#111827" />
           </Pressable>
@@ -560,7 +560,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
         />
         <View style={[st.inputPill, inputFocused && st.inputPillFocused]}>
           <TextInput
-            style={st.input}
+            style={[st.input, Platform.OS === 'web' && ({ outline: 'none', resize: 'none' } as any)]}
             placeholder="Pregunta a Finn…"
             placeholderTextColor="#BBBBC8"
             value={inputText}

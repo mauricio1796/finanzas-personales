@@ -565,14 +565,29 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
   const renderForm = () => (
     <Modal
       visible={modalFormVisible}
-      animationType="slide"
+      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       presentationStyle="pageSheet"
+      transparent={Platform.OS === 'web'}
       onRequestClose={() => { setModalFormVisible(false); setModalEditar(null); }}
     >
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: colors.background }}
+        style={Platform.OS === 'web'
+          ? { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }
+          : { flex: 1, backgroundColor: colors.background }
+        }
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
+        {Platform.OS === 'web' && (
+          <TouchableOpacity
+            style={{ position: 'absolute', inset: 0 } as any}
+            activeOpacity={1}
+            onPress={() => { setModalFormVisible(false); setModalEditar(null); }}
+          />
+        )}
+        <View style={Platform.OS === 'web'
+          ? { width: '100%', maxWidth: 520, backgroundColor: colors.background, borderRadius: 20, overflow: 'hidden', maxHeight: '90vh' as any }
+          : { flex: 1 }
+        }>
         <ScrollView
           contentContainerStyle={[s.modalContent, { paddingBottom: 40 }]}
           keyboardShouldPersistTaps="handled"
@@ -600,7 +615,7 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
                 onChangeText={t => { setFormNombre(t); if (errores.nombre) setErrores(p => ({...p, nombre: ''})); }}
                 placeholder="ej. Alimentación"
                 placeholderTextColor={colors.textTertiary}
-                style={[s.input, { color: colors.textPrimary }]}
+                style={[s.input, { color: colors.textPrimary }, Platform.OS === 'web' && ({ outline: 'none' } as any)]}
                 maxLength={30}
                 autoFocus={!modalEditar}
               />
@@ -710,6 +725,7 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
             </Text>
           </TouchableOpacity>
         </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -749,7 +765,7 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
     <View style={[s.root, { backgroundColor: colors.background }]}>
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <View style={[s.header, { backgroundColor: colors.headerBg, paddingTop: insets.top + 12 }]}>
+      <View style={[s.header, { backgroundColor: colors.headerBg, paddingTop: Platform.OS === 'web' ? 12 : insets.top + 12 }]}>
         <View style={s.headerTop}>
           <Text style={s.headerTitle}>Categorías</Text>
           <View style={s.headerBtns}>
@@ -996,7 +1012,7 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
                 const estaActiva  = nombresActivos.has(item.nombre);
                 const estaElegida = seleccionNueva.has(item.nombre);
                 const paleta      = getPaletaItem(item.nombre, isDark);
-                const CARD_SIZE   = (Dimensions.get('window').width - 32 - 20) / 3;
+                const CARD_SIZE   = Platform.OS === 'web' ? 110 : (Dimensions.get('window').width - 32 - 20) / 3;
 
                 return (
                   <TouchableOpacity
