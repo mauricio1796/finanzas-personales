@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   completeButtonText: {
-    color: THEME.colors.surface,
+    color: '#fff',
     fontSize: 16,
     fontWeight: '700',
   },

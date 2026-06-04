@@ -80,7 +80,7 @@ const RecurrenteForm: React.FC<RecurrenteFormProps> = ({ visible, onClose, onSav
                 <TouchableOpacity key={f} onPress={() => setFrecuencia(f)}
                   style={[st.freqChip, { borderColor: colors.border, backgroundColor: colors.cardSecondary ?? colors.card },
                     frecuencia === f && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
-                  <Text style={[st.freqText, { color: frecuencia === f ? THEME.colors.surface : colors.textSecondary }]}>{FREQ_LABEL[f]}</Text>
+                  <Text style={[st.freqText, { color: frecuencia === f ? '#fff' : colors.textSecondary }]}>{FREQ_LABEL[f]}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -91,7 +91,7 @@ const RecurrenteForm: React.FC<RecurrenteFormProps> = ({ visible, onClose, onSav
                 <TouchableOpacity key={c} onPress={() => setCategoria(c)}
                   style={[st.freqChip, { borderColor: colors.border, backgroundColor: colors.cardSecondary ?? colors.card },
                     categoria === c && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
-                  <Text style={{ fontSize: 12, color: categoria === c ? THEME.colors.surface : colors.textSecondary, textTransform: 'capitalize' }}>{c}</Text>
+                  <Text style={{ fontSize: 12, color: categoria === c ? '#fff' : colors.textSecondary, textTransform: 'capitalize' }}>{c}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -257,5 +257,5 @@ const st = StyleSheet.create({
   freqText:      { fontSize: 13, fontWeight: '600' },
   input:         { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, marginBottom: 12 },
   saveBtn:       { paddingVertical: 15, borderRadius: 14, alignItems: 'center', marginTop: 4 },
-  saveBtnText:   { color: THEME.colors.surface, fontSize: 16, fontWeight: '800' },
+  saveBtnText:   { color: '#fff', fontSize: 16, fontWeight: '800' },
 });

@@ -6,10 +6,17 @@ import { CONFIG } from '../constants/config';
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface ParsedTransaction {
-  monto:       number;
-  categoria:   string;
-  descripcion: string;
-  tipo:        'income' | 'expense';
+  monto:        number;
+  categoria:    string;
+  subcategoria?: string;
+  descripcion:  string;
+  tipo:         'income' | 'expense';
+}
+
+export interface CategoriaVoz {
+  nombre: string;
+  esSub:  boolean;
+  padre?: string;
 }
 
 // ── Recording state ───────────────────────────────────────────────────────────
@@ -107,15 +114,21 @@ export async function transcribirAudio(uri: string): Promise<string> {
 
 // ── Parse via Worker ──────────────────────────────────────────────────────────
 
-export async function parsearTextoATransaccion(texto: string): Promise<ParsedTransaction> {
+export async function parsearTextoATransaccion(
+  texto:      string,
+  categorias?: CategoriaVoz[],
+): Promise<ParsedTransaction> {
   const controller = new AbortController();
   const timeoutId  = setTimeout(() => controller.abort(), 10_000);
 
   try {
+    const body: Record<string, unknown> = { transcript: texto };
+    if (categorias && categorias.length > 0) body.categorias = categorias;
+
     const response = await fetch(`${CONFIG.WORKER_URL}/voice`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ transcript: texto }),
+      body:    JSON.stringify(body),
       signal:  controller.signal,
     });
 
@@ -123,10 +136,11 @@ export async function parsearTextoATransaccion(texto: string): Promise<ParsedTra
     const data = await response.json() as any;
 
     return {
-      monto:       typeof data.monto      === 'number' ? Math.max(0, data.monto) : 0,
-      categoria:   typeof data.categoria  === 'string' ? data.categoria  : 'Otros',
-      descripcion: typeof data.descripcion === 'string' ? data.descripcion : texto,
-      tipo:        data.tipo === 'income' ? 'income' : 'expense',
+      monto:        typeof data.monto        === 'number' ? Math.max(0, data.monto) : 0,
+      categoria:    typeof data.categoria    === 'string' ? data.categoria    : 'Otros',
+      subcategoria: typeof data.subcategoria === 'string' ? data.subcategoria : undefined,
+      descripcion:  typeof data.descripcion  === 'string' ? data.descripcion  : texto,
+      tipo:         data.tipo === 'income' ? 'income' : 'expense',
     };
   } finally {
     clearTimeout(timeoutId);

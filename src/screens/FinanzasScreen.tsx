@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFinance } from '../state/FinanceContext';
+import { useTheme } from '../state/ThemeContext';
 import { SwipeableRow } from '../components/ui/SwipeableRow';
 import { Icon, getCategoryIcon } from '../components/ui/Icon';
 import { ResumenPresupuesto } from '../components/finanzas/ResumenPresupuesto';
@@ -12,6 +13,7 @@ import { CategoriaCard } from '../components/finanzas/CategoriaCard';
 import { ModalCategoria } from '../components/finanzas/ModalCategoria';
 import { ConfirmarPagoModal } from '../components/ui/ConfirmarPagoModal';
 import { THEME } from '../constants/theme';
+import { AppColors } from '../constants/colors';
 
 type SubTab = 'historial' | 'presupuesto';
 type PeriodoFilter = 'mes' | 'anterior' | '3m' | 'todo';
@@ -39,6 +41,8 @@ function filterByPeriod(txs: any[], periodo: PeriodoFilter) {
 // ─── Historial ───────────────────────────────────────────────────────────────
 function HistorialTab({ onDelete }: { onDelete: (id: string) => void }) {
   const { transactions } = useFinance();
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
   const [periodo, setPeriodo] = useState<PeriodoFilter>('mes');
   const [tipo, setTipo] = useState<TipoFilter>('todos');
   const [query, setQuery] = useState('');
@@ -73,17 +77,17 @@ function HistorialTab({ onDelete }: { onDelete: (id: string) => void }) {
     <ScrollView style={s.fill} contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       {/* Summary */}
       <View style={s.summaryRow}>
-        <View style={[s.summaryCard, { borderTopColor: THEME.colors.income }]}>
+        <View style={[s.summaryCard, { borderTopColor: colors.income }]}>
           <Text style={s.summaryLabel}>INGRESOS</Text>
-          <Text style={[s.summaryValue, { color: THEME.colors.income }]}>{fmtCOP(totalIngresos)}</Text>
+          <Text style={[s.summaryValue, { color: colors.income }]}>{fmtCOP(totalIngresos)}</Text>
         </View>
-        <View style={[s.summaryCard, { borderTopColor: THEME.colors.expense }]}>
+        <View style={[s.summaryCard, { borderTopColor: colors.expense }]}>
           <Text style={s.summaryLabel}>GASTOS</Text>
-          <Text style={[s.summaryValue, { color: THEME.colors.expense }]}>{fmtCOP(totalGastos)}</Text>
+          <Text style={[s.summaryValue, { color: colors.expense }]}>{fmtCOP(totalGastos)}</Text>
         </View>
-        <View style={[s.summaryCard, { borderTopColor: THEME.colors.primary }]}>
+        <View style={[s.summaryCard, { borderTopColor: colors.primary }]}>
           <Text style={s.summaryLabel}>BALANCE</Text>
-          <Text style={[s.summaryValue, { color: totalIngresos - totalGastos >= 0 ? THEME.colors.primary : THEME.colors.expense }]}>
+          <Text style={[s.summaryValue, { color: totalIngresos - totalGastos >= 0 ? colors.primary : colors.expense }]}>
             {fmtCOP(totalIngresos - totalGastos)}
           </Text>
         </View>
@@ -109,23 +113,23 @@ function HistorialTab({ onDelete }: { onDelete: (id: string) => void }) {
 
       {/* Search */}
       <View style={s.searchBox}>
-        <Icon name="search" size={15} color={THEME.colors.textTertiary} />
+        <Icon name="search" size={15} color={colors.textTertiary} />
         <TextInput
           style={s.searchInput}
           placeholder="Buscar por categoría o descripción..."
-          placeholderTextColor={THEME.colors.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           value={query}
           onChangeText={setQuery}
         />
         {query.length > 0 && (
-          <TouchableOpacity onPress={() => setQuery('')}><Icon name="x" size={14} color={THEME.colors.textTertiary} /></TouchableOpacity>
+          <TouchableOpacity onPress={() => setQuery('')}><Icon name="x" size={14} color={colors.textTertiary} /></TouchableOpacity>
         )}
       </View>
 
       {/* Transaction list */}
       {filtered.length === 0 ? (
         <View style={s.emptyBox}>
-          <Icon name="inbox" size={32} color={THEME.colors.border} />
+          <Icon name="inbox" size={32} color={colors.border} />
           <Text style={s.emptyText}>Sin transacciones</Text>
         </View>
       ) : (
@@ -135,15 +139,15 @@ function HistorialTab({ onDelete }: { onDelete: (id: string) => void }) {
             return (
               <SwipeableRow key={tx.id} onDelete={() => onDelete(tx.id)}>
                 <View style={[s.txRow, i < filtered.length - 1 && s.txRowBorder]}>
-                  <View style={[s.txIcon, { backgroundColor: isIncome ? THEME.colors.incomeLight : THEME.colors.expenseLight }]}>
-                    <Icon name={getCategoryIcon(tx.category)} size={16} color={isIncome ? THEME.colors.income : THEME.colors.expense} />
+                  <View style={[s.txIcon, { backgroundColor: isIncome ? colors.incomeLight : colors.expenseLight }]}>
+                    <Icon name={getCategoryIcon(tx.category)} size={16} color={isIncome ? colors.income : colors.expense} />
                   </View>
                   <View style={s.txInfo}>
                     <Text style={s.txCat}>{tx.category}</Text>
                     {tx.description ? <Text style={s.txDesc}>{tx.description}</Text> : null}
                     <Text style={s.txDate}>{fmtDate(tx.date)}</Text>
                   </View>
-                  <Text style={[s.txAmount, { color: isIncome ? THEME.colors.income : THEME.colors.expense }]}>
+                  <Text style={[s.txAmount, { color: isIncome ? colors.income : colors.expense }]}>
                     {isIncome ? '+' : '-'}{fmtCOP(tx.amount)}
                   </Text>
                 </View>
@@ -160,6 +164,8 @@ function HistorialTab({ onDelete }: { onDelete: (id: string) => void }) {
 
 function PresupuestoTab() {
   const { transactions, categories, profile, addCategory, updateCategory, deleteCategory, markCategoryPaid, unmarkCategoryPaid } = useFinance();
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
   const salary = (profile as any)?.monthlySalary ?? 0;
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCat, setEditingCat] = useState<any>(undefined);
@@ -180,7 +186,6 @@ function PresupuestoTab() {
     return map;
   }, [transactions, budgetCats]);
 
-  // Sort: alertas first, then pending, then paid
   const sorted = useMemo(() => {
     const today = new Date().getDate();
     return [...budgetCats].sort((a: any, b: any) => {
@@ -211,7 +216,7 @@ function PresupuestoTab() {
       {sorted.length === 0 ? (
         <View style={s.emptyBox}>
           <Text style={{ fontSize: 36, marginBottom: 8 }}>💰</Text>
-          <Text style={[s.emptyText, { fontWeight: "700", fontSize: 15, color: THEME.colors.textPrimary }]}>Aun no tienes categorias</Text>
+          <Text style={[s.emptyText, { fontWeight: "700", fontSize: 15, color: colors.textPrimary }]}>Aun no tienes categorias</Text>
           <Text style={[s.emptyText, { marginTop: 4 }]}>Agrega tus gastos fijos para ver tu presupuesto real</Text>
         </View>
       ) : (
@@ -253,6 +258,8 @@ interface FinanzasScreenProps { onBack?: () => void; }
 export const FinanzasScreen: React.FC<FinanzasScreenProps> = ({ onBack }) => {
   const insets = useSafeAreaInsets();
   const { deleteTransaction } = useFinance();
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
   const [subTab, setSubTab] = useState<SubTab>("historial");
   const handleDelete = (id: string) => {
     Alert.alert("Eliminar", "Deseas eliminar esta transaccion?", [
@@ -266,7 +273,7 @@ export const FinanzasScreen: React.FC<FinanzasScreenProps> = ({ onBack }) => {
         <View style={s.headerTopRow}>
           {onBack ? (
             <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
-              <Icon name="arrow-left" size={20} color={THEME.colors.textPrimary} />
+              <Icon name="arrow-left" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
           ) : <View style={{ width: 28 }} />}
           <Text style={s.headerTitle}>Finanzas</Text>
@@ -285,67 +292,67 @@ export const FinanzasScreen: React.FC<FinanzasScreenProps> = ({ onBack }) => {
   );
 };
 // --- Styles ---
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: THEME.colors.background },
+const makeStyles = (colors: AppColors) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background },
   fill: { flex: 1 },
   tabContent: { padding: 16, paddingBottom: 32, gap: 12 },
-  header: { backgroundColor: THEME.colors.surface, borderBottomWidth: 1, borderBottomColor: THEME.colors.border, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 0 },
+  header: { backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 0 },
   headerTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-  headerTitle: { fontSize: 22, fontWeight: "800", color: THEME.colors.textPrimary, flex: 1, textAlign: "center" },
+  headerTitle: { fontSize: 22, fontWeight: "800", color: colors.textPrimary, flex: 1, textAlign: "center" },
   subTabBar: { flexDirection: "row", gap: 4 },
   subTab: { flex: 1, paddingVertical: 10, alignItems: "center", borderBottomWidth: 3, borderBottomColor: "transparent" },
-  subTabActive: { borderBottomColor: THEME.colors.primary },
-  subTabText: { fontSize: 14, fontWeight: "600", color: THEME.colors.textTertiary },
-  subTabTextActive: { color: THEME.colors.primary },
-  card: { backgroundColor: THEME.colors.surface, borderRadius: THEME.radius.lg, borderWidth: 1, borderColor: THEME.colors.border, overflow: "hidden" },
-  cardTitle: { fontSize: 13, fontWeight: "700", color: THEME.colors.textPrimary, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
+  subTabActive: { borderBottomColor: colors.primary },
+  subTabText: { fontSize: 14, fontWeight: "600", color: colors.textTertiary },
+  subTabTextActive: { color: colors.primary },
+  card: { backgroundColor: colors.card, borderRadius: THEME.radius.lg, borderWidth: 1, borderColor: colors.border, overflow: "hidden" },
+  cardTitle: { fontSize: 13, fontWeight: "700", color: colors.textPrimary, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
   summaryRow: { flexDirection: "row", gap: 8 },
-  summaryCard: { flex: 1, backgroundColor: THEME.colors.surface, borderRadius: THEME.radius.md, borderWidth: 1, borderColor: THEME.colors.border, borderTopWidth: 3, padding: 12, alignItems: "center" },
-  summaryLabel: { fontSize: 10, fontWeight: "700", color: THEME.colors.textTertiary, letterSpacing: 0.8, marginBottom: 4 },
+  summaryCard: { flex: 1, backgroundColor: colors.card, borderRadius: THEME.radius.md, borderWidth: 1, borderColor: colors.border, borderTopWidth: 3, padding: 12, alignItems: "center" },
+  summaryLabel: { fontSize: 10, fontWeight: "700", color: colors.textTertiary, letterSpacing: 0.8, marginBottom: 4 },
   summaryValue: { fontSize: 13, fontWeight: "700" },
   pillsScroll: { flexGrow: 0 },
   pillsRow: { gap: 6, paddingVertical: 2 },
-  pill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: THEME.radius.lg, backgroundColor: THEME.colors.surfaceSecondary, borderWidth: 1, borderColor: THEME.colors.border },
-  pillActive: { backgroundColor: THEME.colors.primaryLight, borderColor: THEME.colors.primary },
-  pillText: { fontSize: 13, fontWeight: "600", color: THEME.colors.textSecondary },
-  pillTextActive: { color: THEME.colors.primary },
+  pill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: THEME.radius.lg, backgroundColor: colors.cardSecondary, borderWidth: 1, borderColor: colors.border },
+  pillActive: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+  pillText: { fontSize: 13, fontWeight: "600", color: colors.textSecondary },
+  pillTextActive: { color: colors.primary },
   tipoRow: { flexDirection: "row", gap: 6 },
-  tipoBtn: { flex: 1, paddingVertical: 8, borderRadius: THEME.radius.sm, backgroundColor: THEME.colors.surfaceSecondary, alignItems: "center" },
-  tipoBtnActive: { backgroundColor: THEME.colors.primary },
-  tipoBtnText: { fontSize: 13, fontWeight: "600", color: THEME.colors.textSecondary },
-  tipoBtnTextActive: { color: THEME.colors.surface },
-  searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: THEME.colors.surface, borderRadius: 10, borderWidth: 1, borderColor: THEME.colors.border, paddingHorizontal: 12, gap: 8, height: 42 },
-  searchInput: { flex: 1, fontSize: 14, color: THEME.colors.textPrimary },
+  tipoBtn: { flex: 1, paddingVertical: 8, borderRadius: THEME.radius.sm, backgroundColor: colors.cardSecondary, alignItems: "center" },
+  tipoBtnActive: { backgroundColor: colors.primary },
+  tipoBtnText: { fontSize: 13, fontWeight: "600", color: colors.textSecondary },
+  tipoBtnTextActive: { color: '#fff' },
+  searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: colors.card, borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, gap: 8, height: 42 },
+  searchInput: { flex: 1, fontSize: 14, color: colors.textPrimary },
   emptyBox: { alignItems: "center", paddingVertical: 40, gap: 8 },
-  emptyText: { fontSize: 14, color: THEME.colors.textTertiary },
+  emptyText: { fontSize: 14, color: colors.textTertiary },
   txRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, gap: 12 },
-  txRowBorder: { borderBottomWidth: 1, borderBottomColor: THEME.colors.surfaceSecondary },
+  txRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.cardSecondary },
   txIcon: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   txInfo: { flex: 1 },
-  txCat: { fontSize: 14, fontWeight: "600", color: THEME.colors.textPrimary },
-  txDesc: { fontSize: 12, color: THEME.colors.textTertiary, marginTop: 1 },
-  txDate: { fontSize: 11, color: THEME.colors.textTertiary, marginTop: 2 },
+  txCat: { fontSize: 14, fontWeight: "600", color: colors.textPrimary },
+  txDesc: { fontSize: 12, color: colors.textTertiary, marginTop: 1 },
+  txDate: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
   txAmount: { fontSize: 14, fontWeight: "700" },
-  sectionHeader: { fontSize: 11, fontWeight: "700", color: THEME.colors.textTertiary, letterSpacing: 1.2, marginTop: 4, marginLeft: 2 },
+  sectionHeader: { fontSize: 11, fontWeight: "700", color: colors.textTertiary, letterSpacing: 1.2, marginTop: 4, marginLeft: 2 },
   overviewRow: { flexDirection: "row", paddingHorizontal: 16, paddingBottom: 14 },
   overviewItem: { flex: 1, alignItems: "center" },
-  overviewDivider: { width: 1, backgroundColor: THEME.colors.surfaceSecondary, marginVertical: 4 },
-  overviewLabel: { fontSize: 11, color: THEME.colors.textTertiary, fontWeight: "600", marginBottom: 4 },
-  overviewValue: { fontSize: 15, fontWeight: "700", color: THEME.colors.textPrimary },
-  totalBarTrack: { height: 4, backgroundColor: THEME.colors.surfaceSecondary, borderRadius: 2, marginHorizontal: 16, marginBottom: 6 },
+  overviewDivider: { width: 1, backgroundColor: colors.cardSecondary, marginVertical: 4 },
+  overviewLabel: { fontSize: 11, color: colors.textTertiary, fontWeight: "600", marginBottom: 4 },
+  overviewValue: { fontSize: 15, fontWeight: "700", color: colors.textPrimary },
+  totalBarTrack: { height: 4, backgroundColor: colors.cardSecondary, borderRadius: 2, marginHorizontal: 16, marginBottom: 6 },
   totalBarFill: { height: 4, borderRadius: 2 },
-  totalBarLabel: { fontSize: 11, color: THEME.colors.textTertiary, textAlign: "center", paddingBottom: 14 },
+  totalBarLabel: { fontSize: 11, color: colors.textTertiary, textAlign: "center", paddingBottom: 14 },
   budgetRow: { paddingHorizontal: 16, paddingVertical: 12 },
-  budgetRowBorder: { borderBottomWidth: 1, borderBottomColor: THEME.colors.surfaceSecondary },
+  budgetRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.cardSecondary },
   budgetMeta: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
   budgetDot: { width: 10, height: 10, borderRadius: 5 },
-  budgetCatName: { fontSize: 14, fontWeight: "600", color: THEME.colors.textPrimary },
-  budgetCatSub: { fontSize: 11, color: THEME.colors.textTertiary, marginTop: 1 },
+  budgetCatName: { fontSize: 14, fontWeight: "600", color: colors.textPrimary },
+  budgetCatSub: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
   budgetBarWrap: { flexDirection: "row", alignItems: "center", gap: 10 },
-  budgetBarTrack: { flex: 1, height: 6, backgroundColor: THEME.colors.surfaceSecondary, borderRadius: 3 },
+  budgetBarTrack: { flex: 1, height: 6, backgroundColor: colors.cardSecondary, borderRadius: 3 },
   budgetBarFill: { height: 6, borderRadius: 3 },
-  budgetBarAmt: { fontSize: 12, fontWeight: "700", color: THEME.colors.textSecondary, minWidth: 70, textAlign: "right" },
-  addBtn: { borderWidth: 2, borderColor: THEME.colors.primary, borderStyle: "dashed", borderRadius: THEME.radius.lg, paddingVertical: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: THEME.colors.background },
-  addBtnIcon: { fontSize: 18, color: THEME.colors.primary, fontWeight: "700" },
-  addBtnText: { fontSize: 15, color: THEME.colors.primary, fontWeight: "600" },
+  budgetBarAmt: { fontSize: 12, fontWeight: "700", color: colors.textSecondary, minWidth: 70, textAlign: "right" },
+  addBtn: { borderWidth: 2, borderColor: colors.primary, borderStyle: "dashed", borderRadius: THEME.radius.lg, paddingVertical: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.background },
+  addBtnIcon: { fontSize: 18, color: colors.primary, fontWeight: "700" },
+  addBtnText: { fontSize: 15, color: colors.primary, fontWeight: "600" },
 });

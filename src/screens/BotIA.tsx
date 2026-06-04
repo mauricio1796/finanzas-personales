@@ -378,7 +378,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
               </View>
               <Text style={st.accionTime}>{timeStr}</Text>
             </View>
-            <Text style={[st.accionText, { color: item.accionFinn.exito ? PRIMARY : THEME.colors.expense }]}>
+            <Text style={[st.accionText, { color: item.accionFinn.exito ? PRIMARY : colors.expense }]}>
               {item.accionFinn.exito ? '✓ ' : '✗ '}{item.accionFinn.descripcion}
             </Text>
           </View>
@@ -551,10 +551,19 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
       <View style={[st.inputWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <VoiceButton
           size="small"
+          categorias={categories.map(c => ({
+            nombre: c.name,
+            esSub:  !!c.parentCategoryId,
+            padre:  c.parentCategoryId
+              ? categories.find(p => p.id === c.parentCategoryId)?.name
+              : undefined,
+          }))}
           onParsed={(tx) => {
+            const subLabel = tx.subcategoria ? ` > ${tx.subcategoria}` : '';
+            const catLabel = `${tx.categoria}${subLabel}`;
             const txt = tx.descripcion
-              ? `${tx.descripcion} — ${tx.tipo === 'expense' ? 'gasto' : 'ingreso'} de $${tx.monto.toLocaleString('es-CO').replace(/,/g, '.')} en ${tx.categoria}`
-              : `Registra un ${tx.tipo === 'expense' ? 'gasto' : 'ingreso'} de $${tx.monto.toLocaleString('es-CO').replace(/,/g, '.')} en ${tx.categoria}`;
+              ? `${tx.descripcion} — ${tx.tipo === 'expense' ? 'gasto' : 'ingreso'} de $${tx.monto.toLocaleString('es-CO').replace(/,/g, '.')} en ${catLabel}`
+              : `Registra un ${tx.tipo === 'expense' ? 'gasto' : 'ingreso'} de $${tx.monto.toLocaleString('es-CO').replace(/,/g, '.')} en ${catLabel}`;
             setInputText(txt);
           }}
         />
@@ -724,7 +733,7 @@ const st = StyleSheet.create({
   bubbleError: {
     backgroundColor: '#FFF5F5',
     borderWidth: 1,
-    borderColor: THEME.colors.expense,
+    borderColor: '#F55B5B',
   },
   bubbleAccent: {
     width: 3,
@@ -893,6 +902,6 @@ const st = StyleSheet.create({
   modalBtns:      { flexDirection: 'row', gap: 12, marginTop: 8, width: '100%' },
   modalBtnCancel: { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' },
   modalBtnCancelText: { fontSize: 15, fontWeight: '600', color: '#6B7280' },
-  modalBtnDelete: { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: 'center', backgroundColor: THEME.colors.expense },
+  modalBtnDelete: { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: 'center', backgroundColor: '#F55B5B' },
   modalBtnDeleteText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });

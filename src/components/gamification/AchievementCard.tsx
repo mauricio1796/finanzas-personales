@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Logro, RARITY_STYLE } from '../../services/GamificacionService';
+import { useTheme } from '../../state/ThemeContext';
 
 interface Props {
   logro:    Logro;
@@ -15,6 +16,7 @@ const RARITY_LABEL_ES: Record<string, string> = {
 };
 
 export const AchievementCard: React.FC<Props> = ({ logro, unlocked, isNew, onPress }) => {
+  const { colors } = useTheme();
   const r = RARITY_STYLE[logro.rarity];
 
   const glowAnim  = useRef(new Animated.Value(0)).current;
@@ -73,43 +75,48 @@ export const AchievementCard: React.FC<Props> = ({ logro, unlocked, isNew, onPre
     outputRange: [0, logro.rarity === 'legendary' ? 0.5 : logro.rarity === 'epic' ? 0.3 : 0.15],
   });
 
+  const lockedIconBg   = colors.cardSecondary;
+  const lockedIconColor = colors.border;
+  const dimTextColor   = colors.border;
+
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={onPress ? 0.75 : 1} style={styles.wrapper}>
-      <Animated.View style={[styles.card, !unlocked && styles.cardLocked, { transform: [{ scale: scaleAnim }] }]}>
+      <Animated.View style={[
+        styles.card,
+        { backgroundColor: colors.card, borderColor: colors.border },
+        !unlocked && { backgroundColor: colors.cardSecondary },
+        { transform: [{ scale: scaleAnim }] },
+      ]}>
 
-        {/* Glow halo */}
         {unlocked && (
           <Animated.View style={[styles.glow, { backgroundColor: r.glow, opacity: glowOpacity }]} pointerEvents="none" />
         )}
 
-        {/* Particles */}
         <View style={styles.particleLayer} pointerEvents="none">
           {particles.map((p, i) => (
             <Animated.View key={i} style={[styles.particle, { backgroundColor: r.glow, opacity: p.op, transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.s }] }]} />
           ))}
         </View>
 
-        {/* Icon */}
-        <View style={[styles.iconBox, { backgroundColor: unlocked ? r.bg : '#F3F4F6' }, unlocked && logro.rarity === 'legendary' && styles.legendaryBorder]}>
-          <Feather name={logro.icono as any} size={22} color={unlocked ? r.color : '#D1D5DB'} />
+        <View style={[styles.iconBox, { backgroundColor: unlocked ? r.bg : lockedIconBg }, unlocked && logro.rarity === 'legendary' && styles.legendaryBorder]}>
+          <Feather name={logro.icono as any} size={22} color={unlocked ? r.color : lockedIconColor} />
         </View>
 
-        {/* Rarity badge */}
-        <View style={[styles.rarityBadge, { backgroundColor: unlocked ? r.bg : '#F3F4F6' }]}>
-          <Text style={[styles.rarityText, { color: unlocked ? r.color : '#9CA3AF' }]}>
+        <View style={[styles.rarityBadge, { backgroundColor: unlocked ? r.bg : lockedIconBg }]}>
+          <Text style={[styles.rarityText, { color: unlocked ? r.color : colors.textTertiary }]}>
             {RARITY_LABEL_ES[logro.rarity]}
           </Text>
         </View>
 
-        <Text style={[styles.title, !unlocked && styles.textDim]} numberOfLines={1}>{logro.titulo}</Text>
-        <Text style={[styles.desc,  !unlocked && styles.textDim]} numberOfLines={2}>{logro.descripcion}</Text>
+        <Text style={[styles.title, { color: colors.textPrimary }, !unlocked && { color: dimTextColor }]} numberOfLines={1}>{logro.titulo}</Text>
+        <Text style={[styles.desc,  { color: colors.textSecondary }, !unlocked && { color: dimTextColor }]} numberOfLines={2}>{logro.descripcion}</Text>
 
         <View style={[styles.xpRow, { opacity: unlocked ? 1 : 0.4 }]}>
-          <Feather name="star" size={10} color={unlocked ? '#F59E0B' : '#9CA3AF'} />
-          <Text style={[styles.xpText, { color: unlocked ? '#F59E0B' : '#9CA3AF' }]}>+{logro.xp} XP</Text>
+          <Feather name="star" size={10} color={unlocked ? '#F59E0B' : colors.textTertiary} />
+          <Text style={[styles.xpText, { color: unlocked ? '#F59E0B' : colors.textTertiary }]}>+{logro.xp} XP</Text>
         </View>
 
-        {!unlocked && <View style={styles.lockOverlay} pointerEvents="none"><Feather name="lock" size={13} color="#C4C4C4" /></View>}
+        {!unlocked && <View style={styles.lockOverlay} pointerEvents="none"><Feather name="lock" size={13} color={colors.textTertiary} /></View>}
         {isNew && unlocked && <View style={styles.newBadge}><Text style={styles.newBadgeText}>¡NUEVO!</Text></View>}
       </Animated.View>
     </TouchableOpacity>
@@ -118,8 +125,7 @@ export const AchievementCard: React.FC<Props> = ({ logro, unlocked, isNew, onPre
 
 const styles = StyleSheet.create({
   wrapper:      { width: '47%', margin: '1.5%' },
-  card:         { borderRadius: 16, backgroundColor: '#FFF', padding: 14, alignItems: 'center', gap: 5, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2, overflow: 'hidden', position: 'relative', minHeight: 158 },
-  cardLocked:   { backgroundColor: '#FAFAFA', borderColor: '#EEEEEE' },
+  card:         { borderRadius: 16, padding: 14, alignItems: 'center', gap: 5, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 2, overflow: 'hidden', position: 'relative', minHeight: 158 },
   glow:         { position: 'absolute', top: -6, left: -6, right: -6, bottom: -6, borderRadius: 22, zIndex: 0 },
   particleLayer:{ position: 'absolute', top: '40%', left: '50%', width: 0, height: 0 },
   particle:     { position: 'absolute', width: 6, height: 6, borderRadius: 3 },
@@ -127,9 +133,8 @@ const styles = StyleSheet.create({
   legendaryBorder: { borderWidth: 2, borderColor: '#FCD34D' },
   rarityBadge:  { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 100, zIndex: 1 },
   rarityText:   { fontSize: 9, fontWeight: '700', letterSpacing: 0.4 },
-  title:        { fontSize: 12, fontWeight: '700', color: '#111827', textAlign: 'center', zIndex: 1 },
-  desc:         { fontSize: 10, color: '#6B7280', textAlign: 'center', lineHeight: 14, zIndex: 1 },
-  textDim:      { color: '#D1D5DB' },
+  title:        { fontSize: 12, fontWeight: '700', textAlign: 'center', zIndex: 1 },
+  desc:         { fontSize: 10, textAlign: 'center', lineHeight: 14, zIndex: 1 },
   xpRow:        { flexDirection: 'row', alignItems: 'center', gap: 3, zIndex: 1 },
   xpText:       { fontSize: 10, fontWeight: '700' },
   lockOverlay:  { position: 'absolute', top: 8, right: 8, zIndex: 2 },

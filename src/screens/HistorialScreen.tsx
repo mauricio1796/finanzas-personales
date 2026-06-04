@@ -95,7 +95,7 @@ const ev = StyleSheet.create({
   title:    { fontSize: 16, fontWeight: '500', textAlign: 'center' },
   sub:      { fontSize: 13, textAlign: 'center', lineHeight: 20 },
   btn:      { borderRadius: THEME.radius.md, paddingHorizontal: 20, paddingVertical: 10 },
-  btnText:  { fontSize: 13, fontWeight: '500', color: THEME.colors.surface },
+  btnText:  { fontSize: 13, fontWeight: '500', color: '#fff' },
 });
 
 // ── Filtros por defecto ───────────────────────────────────────────────────────
@@ -390,7 +390,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
             style={s.headerIconBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Icon name="arrow-left" size={16} color={THEME.colors.surface} />
+            <Icon name="arrow-left" size={16} color={'#fff'} />
           </TouchableOpacity>
 
           {/* Título o barra de búsqueda */}
@@ -430,7 +430,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
               style={[s.headerIconBtn, mostrarBusqueda && s.headerIconBtnActive]}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Icon name={mostrarBusqueda ? 'x' : 'search'} size={15} color={THEME.colors.surface} />
+              <Icon name={mostrarBusqueda ? 'x' : 'search'} size={15} color={'#fff'} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -438,7 +438,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
               style={[s.headerIconBtn, filtrosActivosCount > 0 && s.headerIconBtnActive]}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Icon name="sliders" size={15} color={THEME.colors.surface} />
+              <Icon name="sliders" size={15} color={'#fff'} />
               {filtrosActivosCount > 0 && (
                 <View
                   style={[
@@ -487,7 +487,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
                       },
                     ]}
                   >
-                    <Text style={[s.pillTxt, { color: activo ? THEME.colors.surface : colors.textSecondary }]}>
+                    <Text style={[s.pillTxt, { color: activo ? '#fff' : colors.textSecondary }]}>
                       {labels[i]}
                     </Text>
                   </TouchableOpacity>
@@ -528,7 +528,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
                       },
                     ]}
                   >
-                    <Text style={[s.pillSmTxt, { color: activo ? THEME.colors.surface : colors.textSecondary }]}>
+                    <Text style={[s.pillSmTxt, { color: activo ? '#fff' : colors.textSecondary }]}>
                       {f.label}
                     </Text>
                   </TouchableOpacity>
@@ -578,7 +578,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
                         },
                       ]}
                     >
-                      <Text style={[s.pillSmTxt, { color: activo ? THEME.colors.surface : colors.textSecondary }]}>
+                      <Text style={[s.pillSmTxt, { color: activo ? '#fff' : colors.textSecondary }]}>
                         {cat}
                       </Text>
                     </TouchableOpacity>
@@ -852,7 +852,7 @@ const s = StyleSheet.create({
     flex: 1,
     fontSize: 17,
     fontWeight: '500',
-    color: THEME.colors.surface,
+    color: '#fff',
     textAlign: 'center',
   },
   headerActions: {
@@ -892,7 +892,7 @@ const s = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: THEME.colors.surface,
+    color: '#fff',
     height: 38,
     padding: 0,
   },

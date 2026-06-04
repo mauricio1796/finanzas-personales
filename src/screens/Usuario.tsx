@@ -360,7 +360,7 @@ export function Usuario({ onReset, onStartTour, onNavigate }: UsuarioProps) {
           {isEditing && (
             <View style={styles.editButtons}>
               <Pressable style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSave}>
-                <Text style={[styles.saveBtnText, { color: THEME.colors.surface }]}>Guardar</Text>
+                <Text style={[styles.saveBtnText, { color: '#fff' }]}>Guardar</Text>
               </Pressable>
               <Pressable
                 style={[styles.cancelBtn, { backgroundColor: 'transparent', borderColor: colors.border }]}
@@ -506,17 +506,17 @@ const styles = StyleSheet.create({
   avatarWrap: {
     marginTop: 28,
     borderWidth: 3,
-    borderColor: THEME.colors.surface,
+    borderColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.2)',
     ...(Platform.OS !== 'web'
-      ? { shadowColor: THEME.colors.textPrimary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 6 }
+      ? { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 6 }
       : {}),
   },
-  avatarLetter: { color: THEME.colors.surface, fontWeight: '700' },
+  avatarLetter: { color: '#fff', fontWeight: '700' },
 
-  headerName: { color: THEME.colors.surface, fontWeight: '600', marginTop: 10 },
+  headerName: { color: '#fff', fontWeight: '600', marginTop: 10 },
   headerEmail: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 2 },
 
   headerDetails: { alignItems: 'center', width: '100%', paddingHorizontal: 32 },
@@ -528,14 +528,14 @@ const styles = StyleSheet.create({
     borderRadius: THEME.radius.pill,
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  levelPillText: { color: THEME.colors.surface, fontSize: 12, fontWeight: '500' },
+  levelPillText: { color: '#fff', fontSize: 12, fontWeight: '500' },
 
   xpSection: { width: '100%', marginTop: 14, gap: 6 },
   xpLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
   xpLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '500', letterSpacing: 0.8 },
-  xpValue: { color: THEME.colors.surface, fontSize: 11, fontWeight: '500' },
+  xpValue: { color: '#fff', fontSize: 11, fontWeight: '500' },
   xpTrack: { height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
-  xpFill: { height: '100%', borderRadius: 3, backgroundColor: THEME.colors.surface },
+  xpFill: { height: '100%', borderRadius: 3, backgroundColor: '#fff' },
 
   // Cards
   card: {

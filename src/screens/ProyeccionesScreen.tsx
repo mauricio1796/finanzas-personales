@@ -4,8 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Polyline, Circle } from 'react-native-svg';
 import { Icon } from '../components/ui/Icon';
 import { useFinance } from '../state/FinanceContext';
+import { useTheme } from '../state/ThemeContext';
 import { calcularMeta, calcularCredito, simularReduccion, proyectarMesProximo, detectarTendencia } from '../services/ProyeccionService';
 import { THEME } from '../constants/theme';
+import { AppColors } from '../constants/colors';
 
 type Escenario = 'proyeccion' | 'meta' | 'credito' | 'reduccion';
 const fmtCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
@@ -13,7 +15,7 @@ const fmtCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replac
 const CHART_W = 300;
 const CHART_H = 120;
 
-function MiniChart({ puntos, color = THEME.colors.primary }: { puntos: { mes: number; valor: number }[]; color?: string }) {
+function MiniChart({ puntos, color = '#6366F1' }: { puntos: { mes: number; valor: number }[]; color?: string }) {
   if (puntos.length < 2) return null;
   const maxVal = Math.max(...puntos.map(p => p.valor), 1);
   const maxMes = Math.max(...puntos.map(p => p.mes), 1);
@@ -41,25 +43,27 @@ interface StepRowProps {
 }
 
 function StepRow({ label, value, min, max, step, formato, onChange }: StepRowProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const display = formato === 'cop' ? fmtCOP(value) : formato === 'pct' ? value.toFixed(0) + '%' : value + ' meses';
   const dec = () => onChange(Math.max(min, value - step));
   const inc = () => onChange(Math.min(max, value + step));
   const pct = Math.round(((value - min) / (max - min)) * 100);
   return (
-    <View style={sl.container}>
-      <View style={sl.row}>
-        <Text style={sl.label}>{label}</Text>
-        <Text style={sl.valueText}>{display}</Text>
+    <View style={styles.container}>
+      <View style={styles.row}>
+        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.valueText}>{display}</Text>
       </View>
-      <View style={sl.controls}>
-        <TouchableOpacity onPress={dec} style={[sl.btn, value <= min && sl.btnDisabled]} activeOpacity={0.7}>
-          <Icon name="minus" size={14} color={value <= min ? THEME.colors.border : THEME.colors.primary} />
+      <View style={styles.controls}>
+        <TouchableOpacity onPress={dec} style={[styles.btn, value <= min && styles.btnDisabled]} activeOpacity={0.7}>
+          <Icon name="minus" size={14} color={value <= min ? colors.border : colors.primary} />
         </TouchableOpacity>
-        <View style={sl.track}>
-          <View style={[sl.fill, { width: pct + '%' as any }]} />
+        <View style={styles.track}>
+          <View style={[styles.fill, { width: pct + '%' as any }]} />
         </View>
-        <TouchableOpacity onPress={inc} style={[sl.btn, value >= max && sl.btnDisabled]} activeOpacity={0.7}>
-          <Icon name="plus" size={14} color={value >= max ? THEME.colors.border : THEME.colors.primary} />
+        <TouchableOpacity onPress={inc} style={[styles.btn, value >= max && styles.btnDisabled]} activeOpacity={0.7}>
+          <Icon name="plus" size={14} color={value >= max ? colors.border : colors.primary} />
         </TouchableOpacity>
       </View>
     </View>
@@ -68,6 +72,8 @@ function StepRow({ label, value, min, max, step, formato, onChange }: StepRowPro
 
 export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { profile, premium, transactions } = useFinance();
   const [escenario, setEscenario] = useState<Escenario>('proyeccion');
   const salario = profile?.monthlySalary ?? 2500000;
@@ -98,14 +104,14 @@ export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }
         <View style={styles.header}>
           {onBack ? (
             <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
-              <Icon name="arrow-left" size={20} color={THEME.colors.textPrimary} />
+              <Icon name="arrow-left" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
           ) : null}
           <Text style={[styles.headerTitle, onBack && { flex: 1, textAlign: 'center' }]}>Proyecciones</Text>
-          <Icon name="trending-up" size={20} color={THEME.colors.primary} />
+          <Icon name="trending-up" size={20} color={colors.primary} />
         </View>
         <View style={styles.lockContainer}>
-          <Icon name="lock" size={48} color={THEME.colors.border} />
+          <Icon name="lock" size={48} color={colors.border} />
           <Text style={styles.lockTitle}>Funcion Premium</Text>
           <Text style={styles.lockSub}>Simula escenarios financieros, calcula cuotas de credito y proyecta tu ahorro con CDTs colombianos.</Text>
         </View>
@@ -117,7 +123,7 @@ export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Proyecciones</Text>
-        <Icon name="trending-up" size={20} color={THEME.colors.primary} />
+        <Icon name="trending-up" size={20} color={colors.primary} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.escenarioRow}>
@@ -132,7 +138,7 @@ export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }
               style={[styles.escenarioTab, escenario === e && styles.escenarioTabActive]}
               onPress={() => setEscenario(e)}
             >
-              <Icon name={icon as any} size={14} color={escenario === e ? THEME.colors.primary : THEME.colors.textTertiary} />
+              <Icon name={icon as any} size={14} color={escenario === e ? colors.primary : colors.textTertiary} />
               <Text style={[styles.escenarioLabel, escenario === e && styles.escenarioLabelActive]}>{label}</Text>
             </TouchableOpacity>
           ))}
@@ -144,13 +150,13 @@ export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }
             {tendencias.map(t => (
               <View key={t.categoria} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: THEME.colors.textPrimary, textTransform: 'capitalize' }}>{t.categoria}</Text>
-                  <Text style={{ fontSize: 12, color: THEME.colors.textTertiary }}>{fmtCOP(t.promedio)}/mes promedio</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textPrimary, textTransform: 'capitalize' }}>{t.categoria}</Text>
+                  <Text style={{ fontSize: 12, color: colors.textTertiary }}>{fmtCOP(t.promedio)}/mes promedio</Text>
                 </View>
                 <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
-                  backgroundColor: t.tendencia === 'sube' ? THEME.colors.expenseLight : t.tendencia === 'baja' ? THEME.colors.incomeLight : THEME.colors.surfaceSecondary }}>
+                  backgroundColor: t.tendencia === 'sube' ? colors.expenseLight : t.tendencia === 'baja' ? colors.incomeLight : colors.cardSecondary }}>
                   <Text style={{ fontSize: 12, fontWeight: '700',
-                    color: t.tendencia === 'sube' ? THEME.colors.expense : t.tendencia === 'baja' ? THEME.colors.income : THEME.colors.textTertiary }}>
+                    color: t.tendencia === 'sube' ? colors.expense : t.tendencia === 'baja' ? colors.income : colors.textTertiary }}>
                     {t.tendencia === 'sube' ? '↑ sube' : t.tendencia === 'baja' ? '↓ baja' : '— estable'}
                   </Text>
                 </View>
@@ -161,8 +167,8 @@ export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }
 
         {escenario === 'proyeccion' && transactions.length === 0 && (
           <View style={[styles.slidersCard, { alignItems: 'center', paddingVertical: 24 }]}>
-            <Icon name="activity" size={32} color={THEME.colors.border} />
-            <Text style={{ fontSize: 14, color: THEME.colors.textTertiary, marginTop: 12, textAlign: 'center' }}>
+            <Icon name="activity" size={32} color={colors.border} />
+            <Text style={{ fontSize: 14, color: colors.textTertiary, marginTop: 12, textAlign: 'center' }}>
               Registra transacciones para ver proyecciones reales basadas en tus patrones de gasto.
             </Text>
           </View>
@@ -194,11 +200,11 @@ export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }
           <Text style={styles.resultTitulo}>{resultado.titulo}</Text>
           <Text style={styles.resultPrincipal}>{resultado.valorPrincipal}</Text>
           <View style={styles.chartContainer}>
-            <MiniChart puntos={resultado.lineasTiempo} color={THEME.colors.primary} />
+            <MiniChart puntos={resultado.lineasTiempo} color={colors.primary} />
           </View>
           {resultado.insights.map((ins, i) => (
             <View key={i} style={styles.insightRow}>
-              <Icon name="check-circle" size={14} color={THEME.colors.primary} />
+              <Icon name="check-circle" size={14} color={colors.primary} />
               <Text style={styles.insightText}>{ins}</Text>
             </View>
           ))}
@@ -208,36 +214,31 @@ export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: THEME.colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: THEME.colors.border, backgroundColor: THEME.colors.surface },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: THEME.colors.textPrimary },
+const makeStyles = (colors: AppColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.card },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
   scroll: { padding: 16, paddingBottom: 32, gap: 14 },
   lockContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
-  lockTitle: { fontSize: 20, fontWeight: '800', color: THEME.colors.textSecondary },
-  lockSub: { fontSize: 14, color: THEME.colors.textTertiary, textAlign: 'center', lineHeight: 22 },
+  lockTitle: { fontSize: 20, fontWeight: '800', color: colors.textSecondary },
+  lockSub: { fontSize: 14, color: colors.textTertiary, textAlign: 'center', lineHeight: 22 },
   escenarioRow: { flexDirection: 'row', gap: 8 },
-  escenarioTab: { flex: 1, flexDirection: 'column', alignItems: 'center', gap: 4, paddingVertical: 10, borderRadius: THEME.radius.md, backgroundColor: THEME.colors.surfaceSecondary, borderWidth: 1.5, borderColor: THEME.colors.border },
-  escenarioTabActive: { backgroundColor: THEME.colors.primaryLight, borderColor: THEME.colors.primary },
-  escenarioLabel: { fontSize: 11, fontWeight: '600', color: THEME.colors.textTertiary },
-  escenarioLabelActive: { color: THEME.colors.primary, fontWeight: '700' },
-  slidersCard: { backgroundColor: THEME.colors.surface, borderRadius: THEME.radius.lg, borderWidth: 1, borderColor: THEME.colors.border, padding: 16, gap: 16 },
-  resultCard: { backgroundColor: THEME.colors.surface, borderRadius: THEME.radius.lg, borderWidth: 1, borderColor: THEME.colors.border, padding: 16, gap: 10 },
-  resultTitulo: { fontSize: 12, fontWeight: '700', color: THEME.colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 },
-  resultPrincipal: { fontSize: 28, fontWeight: '800', color: THEME.colors.textPrimary },
+  escenarioTab: { flex: 1, flexDirection: 'column', alignItems: 'center', gap: 4, paddingVertical: 10, borderRadius: THEME.radius.md, backgroundColor: colors.cardSecondary, borderWidth: 1.5, borderColor: colors.border },
+  escenarioTabActive: { backgroundColor: colors.primaryLight, borderColor: colors.primary },
+  escenarioLabel: { fontSize: 11, fontWeight: '600', color: colors.textTertiary },
+  escenarioLabelActive: { color: colors.primary, fontWeight: '700' },
+  slidersCard: { backgroundColor: colors.card, borderRadius: THEME.radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16, gap: 16 },
+  resultCard: { backgroundColor: colors.card, borderRadius: THEME.radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16, gap: 10 },
+  resultTitulo: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 },
+  resultPrincipal: { fontSize: 28, fontWeight: '800', color: colors.textPrimary },
   chartContainer: { alignItems: 'center', paddingVertical: 8 },
   insightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  insightText: { fontSize: 13, color: THEME.colors.textSecondary, flex: 1, lineHeight: 20 },
-});
-
-const sl = StyleSheet.create({
-  container: { gap: 6 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  label: { fontSize: 13, fontWeight: '600', color: THEME.colors.textSecondary },
-  valueText: { fontSize: 14, fontWeight: '800', color: THEME.colors.primary },
+  insightText: { fontSize: 13, color: colors.textSecondary, flex: 1, lineHeight: 20 },
+  label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  valueText: { fontSize: 14, fontWeight: '800', color: colors.primary },
   controls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  btn: { width: 32, height: 32, borderRadius: THEME.radius.sm, backgroundColor: THEME.colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  btnDisabled: { backgroundColor: THEME.colors.surfaceSecondary },
-  track: { flex: 1, height: 4, borderRadius: 2, backgroundColor: THEME.colors.border, overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: THEME.colors.primary, borderRadius: 2 },
+  btn: { width: 32, height: 32, borderRadius: THEME.radius.sm, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  btnDisabled: { backgroundColor: colors.cardSecondary },
+  track: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.border, overflow: 'hidden' },
+  fill: { height: '100%', backgroundColor: colors.primary, borderRadius: 2 },
 });

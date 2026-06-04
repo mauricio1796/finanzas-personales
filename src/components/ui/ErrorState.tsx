@@ -73,7 +73,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
               paddingVertical: 10,
             }}
           >
-            <Text style={{ fontSize: 14, fontWeight: '500', color: THEME.colors.surface }}>Reintentar</Text>
+            <Text style={{ fontSize: 14, fontWeight: '500', color: '#fff' }}>Reintentar</Text>
           </TouchableOpacity>
         )}
       </View>

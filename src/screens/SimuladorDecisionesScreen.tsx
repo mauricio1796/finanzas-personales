@@ -161,7 +161,7 @@ export const SimuladorDecisionesScreen: React.FC<Props> = ({ onBack, onNavigate 
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             activeOpacity={0.7}
           >
-            <Icon name="arrow-left" size={16} color={THEME.colors.surface} />
+            <Icon name="arrow-left" size={16} color={'#fff'} />
           </TouchableOpacity>
           <Text style={s.headerTitle}>Simulador</Text>
           <View style={{ width: 34 }} />
@@ -257,7 +257,7 @@ export const SimuladorDecisionesScreen: React.FC<Props> = ({ onBack, onNavigate 
             ]}
             activeOpacity={0.85}
           >
-            <Icon name="zap" size={18} color={monto ? THEME.colors.surface : colors.textTertiary} />
+            <Icon name="zap" size={18} color={monto ? '#fff' : colors.textTertiary} />
             <Text style={[s.simularBtnText, { color: monto ? '#FFFFFF' : colors.textTertiary }]}>
               Analizar compra
             </Text>
@@ -509,11 +509,11 @@ const s = StyleSheet.create({
   header:          { paddingHorizontal: 20, paddingBottom: 20 },
   headerNav:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   backBtn:         { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  headerTitle:     { fontSize: 17, fontWeight: '500', color: THEME.colors.surface },
+  headerTitle:     { fontSize: 17, fontWeight: '500', color: '#fff' },
   headerSub:       { fontSize: 13, color: 'rgba(255,255,255,0.75)', textAlign: 'center', lineHeight: 18, marginBottom: 14 },
   statsRow:        { flexDirection: 'row', gap: 8 },
   statPill:        { flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12, padding: 10, alignItems: 'center' },
-  statPillValue:   { fontSize: 12, fontWeight: '500', color: THEME.colors.surface },
+  statPillValue:   { fontSize: 12, fontWeight: '500', color: '#fff' },
   statPillLabel:   { fontSize: 9, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
 
   // Input
@@ -585,7 +585,7 @@ const s = StyleSheet.create({
   // Finn
   finnCard:        { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 14, borderWidth: 0.5, padding: 14 }, // borderRadius 14 is intentionally between md(12) and lg(20)
   finnAvatar:      { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  finnLetter:      { fontSize: 11, fontWeight: '600', color: THEME.colors.surface },
+  finnLetter:      { fontSize: 11, fontWeight: '600', color: '#fff' },
   finnLabel:       { fontSize: 10, fontWeight: '600', letterSpacing: 0.4, marginBottom: 3 },
   finnText:        { fontSize: 13, lineHeight: 20 },
 
@@ -594,5 +594,5 @@ const s = StyleSheet.create({
   accionBtnOutline: { flex: 1, borderRadius: 14, borderWidth: 0.5, padding: 13, alignItems: 'center' }, // 14 is between md/lg
   accionBtnOutlineText: { fontSize: 13 },
   accionBtn:       { flex: 1, borderRadius: 14, padding: 13, alignItems: 'center' }, // 14 is between md/lg
-  accionBtnText:   { fontSize: 13, fontWeight: '500', color: THEME.colors.surface },
+  accionBtnText:   { fontSize: 13, fontWeight: '500', color: '#fff' },
 });

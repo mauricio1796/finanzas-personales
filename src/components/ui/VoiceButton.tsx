@@ -24,6 +24,7 @@ import {
   parsearTextoATransaccion,
   iniciarSpeechRecognitionWeb,
   type ParsedTransaction,
+  type CategoriaVoz,
 } from '../../services/VoiceService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -31,13 +32,14 @@ import {
 type VoiceState = 'idle' | 'recording' | 'processing' | 'confirming';
 
 export interface VoiceButtonProps {
-  onParsed: (tx: ParsedTransaction) => void;
-  size?:    'normal' | 'small';
+  onParsed:   (tx: ParsedTransaction) => void;
+  size?:      'normal' | 'small';
+  categorias?: CategoriaVoz[];
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export const VoiceButton: React.FC<VoiceButtonProps> = ({ onParsed, size = 'normal' }) => {
+export const VoiceButton: React.FC<VoiceButtonProps> = ({ onParsed, size = 'normal', categorias }) => {
   const { colors } = useTheme();
 
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
@@ -160,7 +162,7 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({ onParsed, size = 'norm
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
     try {
-      const tx = await parsearTextoATransaccion(txt);
+      const tx = await parsearTextoATransaccion(txt, categorias);
       setVoiceState('idle');
       setTranscript('');
       onParsed(tx);
@@ -169,11 +171,11 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({ onParsed, size = 'norm
       setErrorMsg('No pude procesar. Verifica tu conexión.');
       setVoiceState('confirming');
     }
-  }, [transcript, onParsed]);
+  }, [transcript, onParsed, categorias]);
 
   // ── Button appearance ────────────────────────────────────────────────────
   const isRecording = voiceState === 'recording';
-  const btnColor    = isRecording ? THEME.colors.expense : colors.primary;
+  const btnColor    = isRecording ? colors.expense : colors.primary;
   const btnBg       = isRecording ? '#FEE2E250' : colors.primaryLight;
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -189,11 +191,11 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({ onParsed, size = 'norm
           <>
             <Animated.View style={[
               StyleSheet.absoluteFill,
-              { borderRadius: dim / 2, backgroundColor: `${THEME.colors.expense}25`, transform: [{ scale: pulseOuter }] },
+              { borderRadius: dim / 2, backgroundColor: `${colors.expense}25`, transform: [{ scale: pulseOuter }] },
             ]} />
             <Animated.View style={[
               StyleSheet.absoluteFill,
-              { borderRadius: dim / 2, backgroundColor: `${THEME.colors.expense}38`, transform: [{ scale: pulseInner }] },
+              { borderRadius: dim / 2, backgroundColor: `${colors.expense}38`, transform: [{ scale: pulseInner }] },
             ]} />
           </>
         )}
@@ -268,8 +270,8 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({ onParsed, size = 'norm
                 disabled={!transcript.trim() || voiceState === 'processing'}
               >
                 {voiceState === 'processing'
-                  ? <ActivityIndicator size="small" color={THEME.colors.surface} />
-                  : <Text style={[st.btnTxt, { color: THEME.colors.surface }]}>Registrar →</Text>
+                  ? <ActivityIndicator size="small" color={'#fff'} />
+                  : <Text style={[st.btnTxt, { color: '#fff' }]}>Registrar →</Text>
                 }
               </TouchableOpacity>
             </View>

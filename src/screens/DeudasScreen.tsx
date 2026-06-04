@@ -149,7 +149,7 @@ export const DeudasScreen: React.FC<DeudasScreenProps> = ({ onBack }) => {
           <Icon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Gestor de Deudas</Text>
-        <TouchableOpacity onPress={() => setShowForm(true)} style={[st.addBtn, { backgroundColor: colors.expenseLight ?? THEME.colors.expenseLight }]}>
+        <TouchableOpacity onPress={() => setShowForm(true)} style={[st.addBtn, { backgroundColor: colors.expenseLight ?? colors.expenseLight }]}>
           <Icon name="plus" size={20} color={colors.expense} />
         </TouchableOpacity>
       </View>
@@ -170,7 +170,7 @@ export const DeudasScreen: React.FC<DeudasScreenProps> = ({ onBack }) => {
             {(['avalancha','bola_de_nieve'] as Estrategia[]).map(e => (
               <TouchableOpacity key={e} onPress={() => setEstrategia(e)}
                 style={[st.toggleBtn, estrategia === e && { backgroundColor: colors.expense }]}>
-                <Text style={[st.toggleText, { color: estrategia === e ? THEME.colors.surface : colors.textSecondary }]}>
+                <Text style={[st.toggleText, { color: estrategia === e ? '#fff' : colors.textSecondary }]}>
                   {e === 'avalancha' ? '⚡ Avalancha' : '❄️ Bola de nieve'}
                 </Text>
               </TouchableOpacity>
@@ -215,7 +215,7 @@ export const DeudasScreen: React.FC<DeudasScreenProps> = ({ onBack }) => {
               </View>
 
               <View style={[st.barBg, { backgroundColor: colors.border }]}>
-                <View style={[st.barFill, { width: `${Math.max(pct * 100, 2)}%` as any, backgroundColor: THEME.colors.income }]} />
+                <View style={[st.barFill, { width: `${Math.max(pct * 100, 2)}%` as any, backgroundColor: colors.income }]} />
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
                 <Text style={{ fontSize: 11, color: colors.textTertiary }}>{Math.round(pct * 100)}% pagado</Text>
@@ -236,7 +236,7 @@ export const DeudasScreen: React.FC<DeudasScreenProps> = ({ onBack }) => {
                     <View key={r.mes} style={[st.tableRow, { borderBottomColor: colors.border }]}>
                       <Text style={[st.tableCell, { color: colors.textSecondary }]}>{r.mes}</Text>
                       <Text style={[st.tableCell, { color: colors.textPrimary }]}>{fmt(r.cuota)}</Text>
-                      <Text style={[st.tableCell, { color: THEME.colors.income }]}>{fmt(r.capital)}</Text>
+                      <Text style={[st.tableCell, { color: colors.income }]}>{fmt(r.capital)}</Text>
                       <Text style={[st.tableCell, { color: colors.expense }]}>{fmt(r.interes)}</Text>
                       <Text style={[st.tableCell, { color: colors.textSecondary }]}>{fmt(r.saldo)}</Text>
                     </View>
@@ -253,10 +253,10 @@ export const DeudasScreen: React.FC<DeudasScreenProps> = ({ onBack }) => {
             {saldadas.map(d => (
               <View key={d.id} style={[st.card, { backgroundColor: colors.card, opacity: 0.6 }]}>
                 <View style={st.cardTop}>
-                  <Icon name="check-circle" size={20} color={THEME.colors.income} />
+                  <Icon name="check-circle" size={20} color={colors.income} />
                   <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={[st.cardNombre, { color: colors.textPrimary }]}>{d.nombre} ✓</Text>
-                    <Text style={[st.cardSub, { color: THEME.colors.income }]}>Pagado {fmt(d.montoOriginal)}</Text>
+                    <Text style={[st.cardSub, { color: colors.income }]}>Pagado {fmt(d.montoOriginal)}</Text>
                   </View>
                   <TouchableOpacity onPress={() => deleteDeuda(d.id)} style={st.iconBtn}>
                     <Icon name="trash-2" size={16} color={colors.textTertiary} />
@@ -300,7 +300,7 @@ const st = StyleSheet.create({
   barBg:          { height: 6, borderRadius: 3, overflow: 'hidden' },
   barFill:        { height: '100%', borderRadius: 3 },
   pagoBtn:        { paddingHorizontal: 16, paddingVertical: 7, borderRadius: THEME.radius.lg },
-  pagoBtnText:    { color: THEME.colors.surface, fontSize: 13, fontWeight: '700' },
+  pagoBtnText:    { color: '#fff', fontSize: 13, fontWeight: '700' },
   tableHeader:    { flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 4, borderRadius: THEME.radius.sm, marginBottom: 4 },
   tableRow:       { flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 4, borderBottomWidth: 1 },
   tableCell:      { flex: 1, fontSize: 11, textAlign: 'center' },
@@ -312,6 +312,6 @@ const st = StyleSheet.create({
   label:          { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 6 },
   input:          { borderWidth: 1, borderRadius: THEME.radius.md, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15 },
   saveBtn:        { paddingVertical: 15, borderRadius: THEME.radius.lg, alignItems: 'center', marginTop: 8 },
-  saveBtnText:    { color: THEME.colors.surface, fontSize: 16, fontWeight: '800' },
+  saveBtnText:    { color: '#fff', fontSize: 16, fontWeight: '800' },
   pagoCard:       { margin: 24, borderRadius: THEME.radius.lg, padding: 24 },
 });

@@ -1,10 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, FeatherName } from '../components/ui/Icon';
 import { useFinance } from '../state/FinanceContext';
+import { useTheme } from '../state/ThemeContext';
 import { LECCIONES, Leccion, calcularProgresoAcademia } from '../services/AcademiaService';
 import { THEME } from '../constants/theme';
+import { AppColors } from '../constants/colors';
 
 type TabNivel = 'todos' | 'basico' | 'intermedio' | 'avanzado';
 const NIVEL_COLORS = { basico: '#10B981', intermedio: '#F59E0B', avanzado: '#EF4444' };
@@ -14,6 +16,8 @@ interface AcademiaScreenProps { onPremiumPress?: () => void; onBack?: () => void
 
 export const AcademiaScreen: React.FC<AcademiaScreenProps> = ({ onPremiumPress, onBack }) => {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { leccionesCompletadas, premium } = useFinance();
   const [tabNivel, setTabNivel] = useState<TabNivel>('todos');
   const [leccionActiva, setLeccionActiva] = useState<Leccion | null>(null);
@@ -30,11 +34,11 @@ export const AcademiaScreen: React.FC<AcademiaScreenProps> = ({ onPremiumPress, 
       <View style={styles.header}>
         {onBack ? (
           <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
-            <Icon name="arrow-left" size={20} color="#111827" />
+            <Icon name="arrow-left" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
         ) : null}
         <Text style={[styles.headerTitle, onBack && { flex: 1, textAlign: 'center' }]}>Academia</Text>
-        <Icon name="book-open" size={20} color={THEME.colors.primary} />
+        <Icon name="book-open" size={20} color={colors.primary} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Progress */}
@@ -79,12 +83,12 @@ export const AcademiaScreen: React.FC<AcademiaScreenProps> = ({ onPremiumPress, 
               onPress={() => bloqueada ? onPremiumPress?.() : setLeccionActiva(leccion)}
               activeOpacity={0.8}
             >
-              <View style={[styles.leccionIcon, { backgroundColor: completada ? '#DCFCE7' : bloqueada ? THEME.colors.surfaceSecondary : THEME.colors.primaryLight }]}>
-                {completada ? <Icon name="check-circle" size={22} color={THEME.colors.income} /> : bloqueada ? <Icon name="lock" size={22} color={THEME.colors.textTertiary} /> : <Icon name="play-circle" size={22} color={THEME.colors.primary} />}
+              <View style={[styles.leccionIcon, { backgroundColor: completada ? '#DCFCE7' : bloqueada ? colors.cardSecondary : colors.primaryLight }]}>
+                {completada ? <Icon name="check-circle" size={22} color={colors.income} /> : bloqueada ? <Icon name="lock" size={22} color={colors.textTertiary} /> : <Icon name="play-circle" size={22} color={colors.primary} />}
               </View>
               <View style={{ flex: 1 }}>
                 <View style={styles.leccionTitleRow}>
-                  <Text style={[styles.leccionTitle, completada && { color: THEME.colors.textSecondary }]} numberOfLines={1}>{leccion.titulo}</Text>
+                  <Text style={[styles.leccionTitle, completada && { color: colors.textSecondary }]} numberOfLines={1}>{leccion.titulo}</Text>
                   {bloqueada && <View style={styles.premiumBadge}><Text style={styles.premiumBadgeText}>PREMIUM</Text></View>}
                 </View>
                 <Text style={styles.leccionDesc} numberOfLines={1}>{leccion.descripcion}</Text>
@@ -96,7 +100,7 @@ export const AcademiaScreen: React.FC<AcademiaScreenProps> = ({ onPremiumPress, 
                   <Text style={styles.xp}>+{leccion.xpRecompensa} XP</Text>
                 </View>
               </View>
-              {!bloqueada && <Icon name="chevron-right" size={16} color={THEME.colors.border} />}
+              {!bloqueada && <Icon name="chevron-right" size={16} color={colors.border} />}
             </TouchableOpacity>
           );
         })}
@@ -107,6 +111,8 @@ export const AcademiaScreen: React.FC<AcademiaScreenProps> = ({ onPremiumPress, 
 
 // ─── Leccion Player ───────────────────────────────────────────────────────────
 const LeccionPlayer: React.FC<{ leccion: Leccion; onBack: () => void }> = ({ leccion, onBack }) => {
+  const { colors } = useTheme();
+  const ps = useMemo(() => makePlayerStyles(colors), [colors]);
   const { completarLeccion, leccionesCompletadas, userLevel, setUserLevel } = useFinance();
   const [paso, setPaso] = useState(0);
   const [fase, setFase] = useState<'pasos' | 'quiz' | 'resultado'>('pasos');
@@ -193,7 +199,7 @@ const LeccionPlayer: React.FC<{ leccion: Leccion; onBack: () => void }> = ({ lec
           {q.opciones.map((op, i) => (
             <TouchableOpacity key={i} style={[ps.opcionBtn, opcionSel === i && ps.opcionBtnSel]} onPress={() => setOpcionSel(i)} activeOpacity={0.8}>
               <View style={[ps.opcionRadio, opcionSel === i && ps.opcionRadioSel]}>{opcionSel === i && <View style={ps.opcionRadioDot} />}</View>
-              <Text style={[ps.opcionText, opcionSel === i && { color: THEME.colors.primary, fontWeight: '700' }]}>{op}</Text>
+              <Text style={[ps.opcionText, opcionSel === i && { color: colors.primary, fontWeight: '700' }]}>{op}</Text>
             </TouchableOpacity>
           ))}
           <TouchableOpacity style={[ps.btnPrimary, opcionSel === null && { opacity: 0.4 }]} onPress={handleConfirmarQuiz} disabled={opcionSel === null}>
@@ -215,8 +221,8 @@ const LeccionPlayer: React.FC<{ leccion: Leccion; onBack: () => void }> = ({ lec
       <View style={ps.progressBar}><View style={[ps.progressFill, { width: (progresoPasos + '%') as any }]} /></View>
       <ScrollView contentContainerStyle={ps.scroll}>
         <Animated.View style={{ opacity: fadeAnim }}>
-          <View style={[ps.pasoCard, { backgroundColor: THEME.colors.primaryLight }]}>
-            <Icon name={(pasoActual.icon || 'book-open') as FeatherName} size={32} color={THEME.colors.primary} />
+          <View style={[ps.pasoCard, { backgroundColor: colors.primaryLight }]}>
+            <Icon name={(pasoActual.icon || 'book-open') as FeatherName} size={32} color={colors.primary} />
             <Text style={ps.pasoTipo}>{pasoActual.tipo.toUpperCase()}</Text>
             <Text style={ps.pasoTitulo}>{pasoActual.titulo}</Text>
             <Text style={ps.pasoContenido}>{pasoActual.contenido}</Text>
@@ -231,66 +237,66 @@ const LeccionPlayer: React.FC<{ leccion: Leccion; onBack: () => void }> = ({ lec
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: THEME.colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: THEME.colors.surfaceSecondary, backgroundColor: THEME.colors.surface },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: THEME.colors.textPrimary },
+const makeStyles = (colors: AppColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.cardSecondary, backgroundColor: colors.card },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
   scroll: { padding: 16, paddingBottom: 32, gap: 12 },
-  progressCard: { backgroundColor: THEME.colors.surface, borderRadius: THEME.radius.lg, borderWidth: 1, borderColor: THEME.colors.border, padding: 16, gap: 8 },
+  progressCard: { backgroundColor: colors.card, borderRadius: THEME.radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16, gap: 8 },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  progressLabel: { fontSize: 13, fontWeight: '700', color: THEME.colors.textSecondary },
-  progressPct: { fontSize: 20, fontWeight: '800', color: THEME.colors.primary },
-  progressTrack: { height: 8, backgroundColor: THEME.colors.surfaceSecondary, borderRadius: THEME.radius.sm / 2, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: THEME.colors.primary, borderRadius: THEME.radius.sm / 2 },
-  progressSub: { fontSize: 12, color: THEME.colors.textTertiary },
+  progressLabel: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
+  progressPct: { fontSize: 20, fontWeight: '800', color: colors.primary },
+  progressTrack: { height: 8, backgroundColor: colors.cardSecondary, borderRadius: THEME.radius.sm / 2, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: THEME.radius.sm / 2 },
+  progressSub: { fontSize: 12, color: colors.textTertiary },
   nivelStats: { flexDirection: 'row', gap: 12 },
-  nivelStat: { fontSize: 11, color: THEME.colors.textSecondary, fontWeight: '600' },
+  nivelStat: { fontSize: 11, color: colors.textSecondary, fontWeight: '600' },
   filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 2 },
-  filterTab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: THEME.radius.pill, backgroundColor: THEME.colors.surfaceSecondary, borderWidth: 1.5, borderColor: THEME.colors.border },
-  filterTabActive: { backgroundColor: THEME.colors.primary, borderColor: THEME.colors.primary },
-  filterTabText: { fontSize: 13, fontWeight: '600', color: THEME.colors.textSecondary },
-  filterTabTextActive: { color: THEME.colors.surface },
-  leccionCard: { backgroundColor: THEME.colors.surface, borderRadius: THEME.radius.lg, borderWidth: 1, borderColor: THEME.colors.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  filterTab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: THEME.radius.pill, backgroundColor: colors.cardSecondary, borderWidth: 1.5, borderColor: colors.border },
+  filterTabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterTabText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  filterTabTextActive: { color: '#fff' },
+  leccionCard: { backgroundColor: colors.card, borderRadius: THEME.radius.lg, borderWidth: 1, borderColor: colors.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
   leccionCardDone: { borderColor: '#DCFCE7', backgroundColor: '#F0FDF4' },
   leccionCardLocked: { opacity: 0.7 },
   leccionIcon: { width: 44, height: 44, borderRadius: THEME.radius.md, alignItems: 'center', justifyContent: 'center' },
   leccionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
-  leccionTitle: { fontSize: 14, fontWeight: '700', color: THEME.colors.textPrimary, flex: 1 },
-  leccionDesc: { fontSize: 12, color: THEME.colors.textTertiary, marginBottom: 6 },
+  leccionTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, flex: 1 },
+  leccionDesc: { fontSize: 12, color: colors.textTertiary, marginBottom: 6 },
   leccionMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   nivelBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: THEME.radius.pill },
   nivelBadgeText: { fontSize: 10, fontWeight: '700' },
-  duracion: { fontSize: 11, color: THEME.colors.textTertiary },
-  xp: { fontSize: 11, fontWeight: '700', color: THEME.colors.primary },
-  premiumBadge: { backgroundColor: THEME.colors.primary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: THEME.radius.sm / 2 },
-  premiumBadgeText: { fontSize: 9, fontWeight: '800', color: THEME.colors.surface, letterSpacing: 0.5 },
+  duracion: { fontSize: 11, color: colors.textTertiary },
+  xp: { fontSize: 11, fontWeight: '700', color: colors.primary },
+  premiumBadge: { backgroundColor: colors.primary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: THEME.radius.sm / 2 },
+  premiumBadgeText: { fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
 });
 
-const ps = StyleSheet.create({
-  container: { flex: 1, backgroundColor: THEME.colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: THEME.colors.surfaceSecondary, backgroundColor: THEME.colors.surface },
-  backBtn: { width: 36, height: 36, borderRadius: THEME.radius.sm, backgroundColor: THEME.colors.surfaceSecondary, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 15, fontWeight: '700', color: THEME.colors.textPrimary, flex: 1, textAlign: 'center' },
-  pasoIndicator: { fontSize: 13, fontWeight: '600', color: THEME.colors.textTertiary },
-  progressBar: { height: 4, backgroundColor: THEME.colors.surfaceSecondary },
-  progressFill: { height: 4, backgroundColor: THEME.colors.primary },
+const makePlayerStyles = (colors: AppColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.cardSecondary, backgroundColor: colors.card },
+  backBtn: { width: 36, height: 36, borderRadius: THEME.radius.sm, backgroundColor: colors.cardSecondary, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, flex: 1, textAlign: 'center' },
+  pasoIndicator: { fontSize: 13, fontWeight: '600', color: colors.textTertiary },
+  progressBar: { height: 4, backgroundColor: colors.cardSecondary },
+  progressFill: { height: 4, backgroundColor: colors.primary },
   scroll: { padding: 16, paddingBottom: 32, gap: 16 },
   pasoCard: { borderRadius: THEME.radius.lg, padding: 24, gap: 10, alignItems: 'center' },
-  pasoTipo: { fontSize: 10, fontWeight: '800', color: THEME.colors.primary, letterSpacing: 1 },
-  pasoTitulo: { fontSize: 20, fontWeight: '800', color: THEME.colors.textPrimary, textAlign: 'center' },
-  pasoContenido: { fontSize: 15, color: THEME.colors.textSecondary, lineHeight: 24, textAlign: 'center' },
-  btnPrimary: { backgroundColor: THEME.colors.primary, borderRadius: THEME.radius.md, paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
-  btnPrimaryText: { fontSize: 16, fontWeight: '800', color: THEME.colors.surface },
+  pasoTipo: { fontSize: 10, fontWeight: '800', color: colors.primary, letterSpacing: 1 },
+  pasoTitulo: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, textAlign: 'center' },
+  pasoContenido: { fontSize: 15, color: colors.textSecondary, lineHeight: 24, textAlign: 'center' },
+  btnPrimary: { backgroundColor: colors.primary, borderRadius: THEME.radius.md, paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  btnPrimaryText: { fontSize: 16, fontWeight: '800', color: '#fff' },
   quizContent: { flex: 1, padding: 16, gap: 12 },
-  quizPregunta: { fontSize: 18, fontWeight: '700', color: THEME.colors.textPrimary, lineHeight: 26, marginBottom: 8 },
-  opcionBtn: { backgroundColor: THEME.colors.surface, borderRadius: THEME.radius.md, borderWidth: 1.5, borderColor: THEME.colors.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  opcionBtnSel: { borderColor: THEME.colors.primary, backgroundColor: THEME.colors.primaryLight },
-  opcionRadio: { width: 20, height: 20, borderRadius: THEME.radius.pill, borderWidth: 2, borderColor: THEME.colors.border, alignItems: 'center', justifyContent: 'center' },
-  opcionRadioSel: { borderColor: THEME.colors.primary },
-  opcionRadioDot: { width: 10, height: 10, borderRadius: THEME.radius.pill, backgroundColor: THEME.colors.primary },
-  opcionText: { fontSize: 14, color: THEME.colors.textSecondary, flex: 1 },
+  quizPregunta: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, lineHeight: 26, marginBottom: 8 },
+  opcionBtn: { backgroundColor: colors.card, borderRadius: THEME.radius.md, borderWidth: 1.5, borderColor: colors.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  opcionBtnSel: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  opcionRadio: { width: 20, height: 20, borderRadius: THEME.radius.pill, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  opcionRadioSel: { borderColor: colors.primary },
+  opcionRadioDot: { width: 10, height: 10, borderRadius: THEME.radius.pill, backgroundColor: colors.primary },
+  opcionText: { fontSize: 14, color: colors.textSecondary, flex: 1 },
   resultadoContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
-  resultadoTitulo: { fontSize: 26, fontWeight: '800', color: THEME.colors.textPrimary },
-  resultadoXP: { fontSize: 20, fontWeight: '800', color: THEME.colors.primary },
-  resultadoSub: { fontSize: 14, color: THEME.colors.textTertiary },
+  resultadoTitulo: { fontSize: 26, fontWeight: '800', color: colors.textPrimary },
+  resultadoXP: { fontSize: 20, fontWeight: '800', color: colors.primary },
+  resultadoSub: { fontSize: 14, color: colors.textTertiary },
 });

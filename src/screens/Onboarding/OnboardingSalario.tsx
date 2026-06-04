@@ -237,7 +237,7 @@ const s = StyleSheet.create({
   inner:         { flex: 1, paddingTop: 8, paddingBottom: 24, gap: 12 },
   finnRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   finnAvatar:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
-  finnLetter:    { fontSize: 16, fontWeight: '600', color: THEME.colors.surface },
+  finnLetter:    { fontSize: 16, fontWeight: '600', color: '#fff' },
   bubble:        { flex: 1, borderRadius: 14, borderTopLeftRadius: 4, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
   bubbleText:    { fontSize: 15, lineHeight: 22 },
   salaryRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 8 },
@@ -257,5 +257,5 @@ const s = StyleSheet.create({
   debtInputPrefix:{ fontSize: 18, fontWeight: '500' },
   debtInputField: { flex: 1, fontSize: 18, fontWeight: '500' },
   btn:           { borderRadius: THEME.radius.lg, padding: 16, alignItems: 'center', marginTop: 8 },
-  btnText:       { fontSize: 16, fontWeight: '500', color: THEME.colors.surface },
+  btnText:       { fontSize: 16, fontWeight: '500', color: '#fff' },
 });

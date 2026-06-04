@@ -58,7 +58,7 @@ export const WidgetConfigScreen: React.FC<Props> = ({ onBack }) => {
   // ── Widget preview ───────────────────────────────────────────────────────
   const pct = Math.min(widgetData?.porcentajeGastado ?? 0, 100);
 
-  const barColor = pct >= 100 ? THEME.colors.expense : pct >= 80 ? '#F59E0B' : THEME.colors.income;
+  const barColor = pct >= 100 ? colors.expense : pct >= 80 ? '#F59E0B' : colors.income;
 
   const pasos = Platform.OS === 'android'
     ? [
@@ -94,7 +94,7 @@ export const WidgetConfigScreen: React.FC<Props> = ({ onBack }) => {
       >
         {/* Previsualización */}
         <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>PREVISUALIZACIÓN</Text>
-        <View style={s.widgetPreview}>
+        <View style={[s.widgetPreview, { backgroundColor: colors.primary }]}>
           {/* Header del widget */}
           <View style={s.wHeader}>
             <Text style={s.wBrand}>FinancyAI</Text>
@@ -197,8 +197,8 @@ export const WidgetConfigScreen: React.FC<Props> = ({ onBack }) => {
           disabled={sincronizando}
           activeOpacity={0.85}
         >
-          <Icon name={sincronizando ? 'loader' : 'refresh-cw'} size={18} color={sincronizando ? colors.textTertiary : THEME.colors.surface} />
-          <Text style={[s.syncBtnText, { color: sincronizando ? colors.textTertiary : THEME.colors.surface }]}>
+          <Icon name={sincronizando ? 'loader' : 'refresh-cw'} size={18} color={sincronizando ? colors.textTertiary : colors.card} />
+          <Text style={[s.syncBtnText, { color: sincronizando ? colors.textTertiary : colors.card }]}>
             {sincronizando ? 'Sincronizando…' : 'Sincronizar widget ahora'}
           </Text>
         </TouchableOpacity>
@@ -261,7 +261,7 @@ const s = StyleSheet.create({
 
   // Widget preview
   widgetPreview: {
-    backgroundColor: THEME.colors.primary,
+    backgroundColor: '#6156E8',
     borderRadius: THEME.radius.lg,
     padding: 16,
     marginBottom: 4,
@@ -273,7 +273,7 @@ const s = StyleSheet.create({
     fontSize: 9, fontWeight: '600', color: 'rgba(255,255,255,0.65)',
     letterSpacing: 0.5, marginBottom: 2,
   },
-  wBalance: { fontSize: 28, fontWeight: '800', color: THEME.colors.surface, marginBottom: 10 },
+  wBalance: { fontSize: 28, fontWeight: '800', color: '#fff', marginBottom: 10 },
   wBarTrack: {
     height: 5, backgroundColor: 'rgba(255,255,255,0.25)',
     borderRadius: 3, marginBottom: 4, overflow: 'hidden',
@@ -287,7 +287,7 @@ const s = StyleSheet.create({
     borderRadius: 9, padding: 7,
   },
   wPillLabel: { fontSize: 7, fontWeight: '600', color: 'rgba(255,255,255,0.65)', marginBottom: 2 },
-  wPillValue: { fontSize: 12, fontWeight: '700', color: THEME.colors.surface },
+  wPillValue: { fontSize: 12, fontWeight: '700', color: '#fff' },
 
   // Status
   statusCard: {

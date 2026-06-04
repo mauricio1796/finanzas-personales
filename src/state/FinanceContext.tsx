@@ -5,6 +5,7 @@ import type { ServerData } from '../services/supabase/SupabaseService';
 import { syncQueue, type SyncStatus } from '../services/SyncQueueService';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
 import { getIngresoEfectivoMes } from '../utils/ingresoUtils';
+import { inyectarSubcategoriasDefecto } from '../models/Category';
 import {
   User,
   Category,
@@ -217,7 +218,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           if (rest.tipo === 'variable' || rest.tipo === 'fijo') rest.tipo = 'gasto';
           return rest as Category;
         });
-        setCategoriesState(migrated);
+        // Inyectar subcategorías por defecto para categorías que no las tengan
+        setCategoriesState(inyectarSubcategoriasDefecto(migrated));
       }
       if (storedProfile) setProfileState(storedProfile);
       if (storedGoal) setGoalState(storedGoal);

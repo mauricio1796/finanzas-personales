@@ -47,7 +47,7 @@ export const TransactionDetailSheet: React.FC<Props> = ({ transaction, onClose }
   if (!transaction) return null;
 
   const isIncome  = transaction.type === 'income';
-  const accent    = isIncome ? THEME.colors.income : THEME.colors.expense;
+  const accent    = isIncome ? colors.income : colors.expense;
   const accentBg  = isIncome ? '#DCFCE7' : '#FEE2E2';
   const date      = new Date(transaction.date);
   const dia       = DIAS[date.getDay()];

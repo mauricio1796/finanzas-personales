@@ -1,100 +1,68 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SPACING } from '../../constants';
+import { SPACING } from '../../constants';
 import { THEME } from '../../constants/theme';
+import { useTheme } from '../../state/ThemeContext';
 
 interface UserLevelBadgeProps {
-  level: number;
-  experience: number;
+  level:         number;
+  experience:    number;
   maxExperience: number;
-  userName?: string;
+  userName?:     string;
 }
 
-const LEVEL_TITLES = [
-  'Novato',
-  'Aprendiz',
-  'Especialista',
-  'Maestro',
-  'Gurú Financiero',
-];
-
-const LEVEL_COLORS = [
-  '#8B5CF6',
-  '#3B82F6',
-  THEME.colors.income,
-  '#F59E0B',
-  THEME.colors.expense,
-];
+const LEVEL_TITLES = ['Novato', 'Aprendiz', 'Especialista', 'Maestro', 'Gurú Financiero'];
+const LEVEL_STATIC_COLORS = ['#8B5CF6', '#3B82F6', '#1D9E75', '#F59E0B', '#F55B5B'];
 
 export const UserLevelBadge: React.FC<UserLevelBadgeProps> = ({
-  level,
-  experience,
-  maxExperience,
-  userName = 'Usuario',
+  level, experience, maxExperience, userName = 'Usuario',
 }) => {
+  const { colors } = useTheme();
   const [progressPercent, setProgressPercent] = useState(0);
 
   useEffect(() => {
-    const progress = (experience / maxExperience) * 100;
-    setProgressPercent(Math.min(progress, 100));
+    setProgressPercent(Math.min((experience / maxExperience) * 100, 100));
   }, [experience, maxExperience]);
 
   const levelTitle = LEVEL_TITLES[Math.min(level - 1, 4)];
-  const levelColor = LEVEL_COLORS[Math.min(level - 1, 4)];
+  const levelColor = LEVEL_STATIC_COLORS[Math.min(level - 1, 4)];
   const experienceToNextLevel = maxExperience - experience;
 
   return (
-    <View style={styles.container}>
-      {/* Level Badge */}
+    <View style={[styles.container, { backgroundColor: colors.cardSecondary }]}>
       <View style={styles.badgeContainer}>
-        <View style={[styles.levelBadge, { backgroundColor: levelColor }]}>
-          <Text style={styles.levelNumber}>{level}</Text>
+        <View style={[styles.levelBadge, { backgroundColor: levelColor }, THEME.shadow.card as any]}>
+          <Text style={[styles.levelNumber, { color: '#fff' }]}>{level}</Text>
         </View>
         <View style={styles.info}>
-          <Text style={styles.userName}>{userName}</Text>
-          <Text style={styles.levelTitle}>{levelTitle}</Text>
+          <Text style={[styles.userName, { color: colors.textPrimary }]}>{userName}</Text>
+          <Text style={[styles.levelTitle, { color: colors.textSecondary }]}>{levelTitle}</Text>
         </View>
       </View>
 
-      {/* Experience Bar */}
       <View style={styles.experienceContainer}>
-        <View style={styles.experienceBar}>
-          <View
-            style={[
-              styles.experienceFill,
-              {
-                width: `${progressPercent}%`,
-                backgroundColor: levelColor,
-              },
-            ]}
-          />
+        <View style={[styles.experienceBar, { backgroundColor: colors.background }]}>
+          <View style={[styles.experienceFill, { width: `${progressPercent}%`, backgroundColor: levelColor }]} />
         </View>
         <View style={styles.experienceText}>
-          <Text style={styles.experienceLabel}>
-            {experience} / {maxExperience} XP
-          </Text>
-          <Text style={styles.experienceToNext}>
-            {experienceToNextLevel} XP para siguiente nivel
-          </Text>
+          <Text style={[styles.experienceLabel, { color: colors.textPrimary }]}>{experience} / {maxExperience} XP</Text>
+          <Text style={[styles.experienceToNext, { color: colors.textSecondary }]}>{experienceToNextLevel} XP para siguiente nivel</Text>
         </View>
       </View>
 
-      {/* Milestone Info */}
       <View style={styles.milestoneContainer}>
-        <View style={styles.milestoneItem}>
+        <View style={[styles.milestoneItem, { backgroundColor: colors.background }]}>
           <Text style={styles.milestoneIcon}>⭐</Text>
           <View>
-            <Text style={styles.milestoneLabel}>Nivel Actual</Text>
-            <Text style={styles.milestoneValue}>{level}</Text>
+            <Text style={[styles.milestoneLabel, { color: colors.textSecondary }]}>Nivel Actual</Text>
+            <Text style={[styles.milestoneValue, { color: colors.textPrimary }]}>{level}</Text>
           </View>
         </View>
-        <View style={styles.milestoneItem}>
+        <View style={[styles.milestoneItem, { backgroundColor: colors.background }]}>
           <Text style={styles.milestoneIcon}>🏆</Text>
           <View>
-            <Text style={styles.milestoneLabel}>Progreso</Text>
-            <Text style={styles.milestoneValue}>
-              {progressPercent.toFixed(0)}%
-            </Text>
+            <Text style={[styles.milestoneLabel, { color: colors.textSecondary }]}>Progreso</Text>
+            <Text style={[styles.milestoneValue, { color: colors.textPrimary }]}>{progressPercent.toFixed(0)}%</Text>
           </View>
         </View>
       </View>
@@ -103,94 +71,22 @@ export const UserLevelBadge: React.FC<UserLevelBadgeProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: COLORS.cardSecondary,
-    borderRadius: THEME.radius.md,
-    padding: SPACING.lg,
-    gap: SPACING.lg,
-  },
-  badgeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-  },
-  levelBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...THEME.shadow.card,
-  },
-  levelNumber: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: COLORS.background,
-  },
-  info: {
-    flex: 1,
-    gap: SPACING.xs,
-  },
-  userName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  levelTitle: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    fontWeight: '500',
-  },
-  experienceContainer: {
-    gap: SPACING.md,
-  },
-  experienceBar: {
-    height: 12,
-    backgroundColor: COLORS.background,
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  experienceFill: {
-    height: '100%',
-    borderRadius: 6,
-  },
-  experienceText: {
-    gap: SPACING.xs,
-  },
-  experienceLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  experienceToNext: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
-  },
-  milestoneContainer: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  milestoneItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    backgroundColor: COLORS.background,
-    borderRadius: THEME.radius.sm,
-    padding: SPACING.md,
-  },
-  milestoneIcon: {
-    fontSize: 20,
-  },
-  milestoneLabel: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
-    fontWeight: '500',
-  },
-  milestoneValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginTop: SPACING.xs,
-  },
+  container:         { borderRadius: THEME.radius.md, padding: SPACING.lg, gap: SPACING.lg },
+  badgeContainer:    { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+  levelBadge:        { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center' },
+  levelNumber:       { fontSize: 28, fontWeight: '700' },
+  info:              { flex: 1, gap: SPACING.xs },
+  userName:          { fontSize: 14, fontWeight: '700' },
+  levelTitle:        { fontSize: 12, fontWeight: '500' },
+  experienceContainer:{ gap: SPACING.md },
+  experienceBar:     { height: 12, borderRadius: 6, overflow: 'hidden' },
+  experienceFill:    { height: '100%', borderRadius: 6 },
+  experienceText:    { gap: SPACING.xs },
+  experienceLabel:   { fontSize: 12, fontWeight: '600' },
+  experienceToNext:  { fontSize: 11 },
+  milestoneContainer:{ flexDirection: 'row', gap: SPACING.md },
+  milestoneItem:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, borderRadius: THEME.radius.sm, padding: SPACING.md },
+  milestoneIcon:     { fontSize: 20 },
+  milestoneLabel:    { fontSize: 11, fontWeight: '500' },
+  milestoneValue:    { fontSize: 16, fontWeight: '700', marginTop: 2 },
 });

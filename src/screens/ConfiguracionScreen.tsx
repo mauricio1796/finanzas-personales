@@ -635,7 +635,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: THEME.colors.surface,
+    backgroundColor: '#fff',
   },
 
   // Preview card
@@ -746,7 +746,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: THEME.colors.surface,
+    backgroundColor: '#fff',
   },
   // IA section
   card: {
@@ -807,7 +807,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: THEME.colors.surface,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'absolute',

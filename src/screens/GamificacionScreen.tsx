@@ -15,6 +15,7 @@ import {
   XP_POR_ACCION, RARITY_STYLE,
 } from '../services/GamificacionService';
 import { THEME } from '../constants/theme';
+import { useTheme } from '../state/ThemeContext';
 
 const fmtK = (n: number) =>
   n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(Math.round(n));
@@ -35,6 +36,7 @@ interface Props {
 
 export function GamificacionScreen({ onNavigate, onBack }: Props) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const {
     transactions, categories, userLevel, leccionesCompletadas,
     retosCompletados, user, goal,
@@ -160,7 +162,7 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
   const xpNecesario = nivelSiguiente ? nivelSiguiente.xpRequired - nivelActual.xpRequired : 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#F8F7FF' }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <Animated.View style={[st.header, { paddingTop: insets.top + 8, backgroundColor: nivelActual.color, transform: [{ scale: headerScale }] }]}>
@@ -213,7 +215,7 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
       </Animated.View>
 
       {/* ── Tab bar ────────────────────────────────────────────────────── */}
-      <View style={st.tabBar}>
+      <View style={[st.tabBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         {([
           { key: 'progreso',     label: 'Progreso',    icon: 'activity'  },
           { key: 'logros',       label: 'Logros',      icon: 'award'     },
@@ -221,8 +223,8 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
           { key: 'ranking',      label: 'Ranking',     icon: 'users'     },
         ] as const).map(tab => (
           <TouchableOpacity key={tab.key} onPress={() => handleTabChange(tab.key as Tab)} style={[st.tabItem, activeTab === tab.key && { borderBottomColor: nivelActual.color }]} activeOpacity={0.8}>
-            <Feather name={tab.icon} size={14} color={activeTab === tab.key ? nivelActual.color : '#9CA3AF'} />
-            <Text style={[st.tabText, activeTab === tab.key && { color: nivelActual.color, fontWeight: '700' }]}>{tab.label}</Text>
+            <Feather name={tab.icon} size={14} color={activeTab === tab.key ? nivelActual.color : colors.textTertiary} />
+            <Text style={[st.tabText, { color: activeTab === tab.key ? nivelActual.color : colors.textTertiary }, activeTab === tab.key && { fontWeight: '700' }]}>{tab.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -235,15 +237,15 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
 
           {/* XP Breakdown */}
           {xpBreakdown.length > 0 && (
-            <View style={st.card}>
-              <Text style={st.cardTitle}>De dónde viene tu XP</Text>
+            <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[st.cardTitle, { color: colors.textPrimary }]}>De dónde viene tu XP</Text>
               {xpBreakdown.map((b, i) => (
                 <View key={b.label} style={[st.breakRow, i < xpBreakdown.length-1 && st.breakRowBorder]}>
                   <View style={[st.breakIcon, { backgroundColor: b.color + '20' }]}>
                     <Feather name={b.icon as any} size={14} color={b.color} />
                   </View>
-                  <Text style={st.breakLabel}>{b.label}</Text>
-                  <View style={[st.breakBar, { flex: 1, marginHorizontal: 10 }]}>
+                  <Text style={[st.breakLabel, { color: colors.textPrimary }]}>{b.label}</Text>
+                  <View style={[st.breakBar, { flex: 1, marginHorizontal: 10, backgroundColor: colors.cardSecondary }]}>
                     <View style={[st.breakBarFill, { backgroundColor: b.color, width: `${Math.min((b.xp / Math.max(xpActual, 1)) * 100, 100)}%` }]} />
                   </View>
                   <Text style={[st.breakXP, { color: b.color }]}>+{fmtK(b.xp)}</Text>
@@ -253,8 +255,8 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
           )}
 
           {/* Racha semanal */}
-          <View style={st.card}>
-            <Text style={st.cardTitle}>Racha semanal 🔥</Text>
+          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[st.cardTitle, { color: colors.textPrimary }]}>Racha semanal 🔥</Text>
             <View style={st.weekGrid}>
               {DAY_LABELS.map((lbl, i) => {
                 const isToday = i === todayIdx;
@@ -264,10 +266,10 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
                   <Animated.View key={i} style={[st.dayCol, { opacity: dayAnims[i], transform: [{ translateY: dayAnims[i].interpolate({ inputRange:[0,1], outputRange:[8,0] }) }] }]}>
                     <View style={[
                       st.dayCell,
+                      { backgroundColor: colors.cardSecondary },
                       isToday && hasTx  && { backgroundColor: nivelActual.color },
-                      isToday && !hasTx && { borderColor: nivelActual.color, borderWidth: 2, backgroundColor: '#fff' },
+                      isToday && !hasTx && { borderColor: nivelActual.color, borderWidth: 2, backgroundColor: colors.card },
                       isPast  && hasTx  && { backgroundColor: nivelActual.color + '33' },
-                      !hasTx && !isToday && { backgroundColor: '#F3F4F6' },
                     ]}>
                       {hasTx && <Feather name="check" size={13} color={isToday ? '#fff' : nivelActual.color} />}
                     </View>
@@ -284,16 +286,16 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
               ].map((s, i) => (
                 <View key={i} style={st.weekStat}>
                   <Text style={[st.weekStatVal, { color: nivelActual.color }]}>{s.val}</Text>
-                  <Text style={st.weekStatLabel}>{s.label}</Text>
-                  {s.unit ? <Text style={st.weekStatUnit}>{s.unit}</Text> : null}
+                  <Text style={[st.weekStatLabel, { color: colors.textSecondary }]}>{s.label}</Text>
+                  {s.unit ? <Text style={[st.weekStatUnit, { color: colors.textTertiary }]}>{s.unit}</Text> : null}
                 </View>
               ))}
             </View>
           </View>
 
           {/* Hábitos */}
-          <Text style={st.sectionLabel}>Hábitos — XP acumulado</Text>
-          <View style={st.card}>
+          <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Hábitos — XP acumulado</Text>
+          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {habitos.map((h, i) => (
               <View key={h.id} style={[st.habitRow, i < habitos.length-1 && st.habitBorder]}>
                 <View style={[st.habitIcon, { backgroundColor: h.iconBg }]}>
@@ -301,11 +303,11 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
                 </View>
                 <View style={{ flex: 1, gap: 4 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={st.habitName}>{h.nombre}</Text>
+                    <Text style={[st.habitName, { color: colors.textPrimary }]}>{h.nombre}</Text>
                     <Text style={[st.habitXPEarned, { color: h.color }]}>+{fmtK(h.xpGanado)} / {fmtK(h.xpMax)} XP</Text>
                   </View>
-                  <Text style={st.habitDesc}>{h.descripcion}</Text>
-                  <View style={st.habitTrack}>
+                  <Text style={[st.habitDesc, { color: colors.textTertiary }]}>{h.descripcion}</Text>
+                  <View style={[st.habitTrack, { backgroundColor: colors.cardSecondary }]}>
                     <Animated.View style={[st.habitFill, { backgroundColor: h.color, width: habitAnims[i].interpolate({ inputRange:[0,1], outputRange:['0%','100%'] }) as any }]} />
                   </View>
                   <Text style={st.habitProgress}>{h.progresoLabel}</Text>
@@ -315,16 +317,16 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
           </View>
 
           {/* Stats */}
-          <Text style={st.sectionLabel}>Tu historial</Text>
+          <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Tu historial</Text>
           <View style={st.statsRow}>
             {[
               { val: transactions.length, label: 'Transacciones' },
               { val: unlockedIds.size,    label: 'Logros' },
               { val: nivelActual.level,   label: 'Nivel actual' },
             ].map((s, i) => (
-              <View key={i} style={[st.statCard, { borderColor: nivelActual.color + '30' }]}>
+              <View key={i} style={[st.statCard, { backgroundColor: colors.card, borderColor: nivelActual.color + '30' }]}>
                 <Text style={[st.statVal, { color: nivelActual.color }]}>{s.val}</Text>
-                <Text style={st.statLabel}>{s.label}</Text>
+                <Text style={[st.statLabel, { color: colors.textSecondary }]}>{s.label}</Text>
               </View>
             ))}
           </View>
@@ -333,7 +335,7 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
         {/* ════════════ LOGROS ════════════ */}
         {activeTab === 'logros' && (<>
           <View style={st.logroHeader}>
-            <Text style={st.logroHeaderTitle}>
+            <Text style={[st.logroHeaderTitle, { color: colors.textPrimary }]}>
               {unlockedIds.size} / {LOGROS.length} logros desbloqueados
             </Text>
             <View style={[st.logroXPTotal, { backgroundColor: nivelActual.color + '15' }]}>
@@ -350,7 +352,7 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
             const catLabels: Record<string, string> = { habitos:'🔥 Hábitos', ahorro:'💰 Ahorro', retos:'⚡ Retos', educacion:'📚 Educación', social:'🌟 Nivel' };
             return (
               <View key={cat}>
-                <Text style={st.sectionLabel}>{catLabels[cat]}</Text>
+                <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>{catLabels[cat]}</Text>
                 <View style={st.achGrid}>
                   {[...catLogros.filter(l => unlockedIds.has(l.id)), ...catLogros.filter(l => !unlockedIds.has(l.id))].map(logro => (
                     <AchievementCard
@@ -369,10 +371,10 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
 
         {/* ════════════ DESBLOQUEOS ════════════ */}
         {activeTab === 'desbloqueos' && (<>
-          <View style={st.card}>
-            <Text style={st.cardTitle}>Tu XP actual</Text>
+          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[st.cardTitle, { color: colors.textPrimary }]}>Tu XP actual</Text>
             <Text style={[st.bigXP, { color: nivelActual.color }]}>{Math.round(xpActual).toLocaleString('es-CO')} XP</Text>
-            <Text style={st.bigXPSub}>Nivel {nivelActual.level} · {nivelActual.title}</Text>
+            <Text style={[st.bigXPSub, { color: colors.textSecondary }]}>Nivel {nivelActual.level} · {nivelActual.title}</Text>
             {nivelSiguiente && (
               <TouchableOpacity style={[st.earnBtn, { backgroundColor: nivelActual.color }]} onPress={() => onNavigate?.('retos')} activeOpacity={0.85}>
                 <Feather name="zap" size={14} color="#fff" />
@@ -381,7 +383,7 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
             )}
           </View>
 
-          <Text style={st.sectionLabel}>Ruta de desbloqueos</Text>
+          <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>Ruta de desbloqueos</Text>
           {NIVELES.map((n, i) => {
             const desbloqueado = xpActual >= n.xpRequired;
             const esActual     = n.level === nivelActual.level;
@@ -390,15 +392,15 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
             const tcolor       = TIPO_COLORS[n.unlock.tipo];
 
             return (
-              <View key={n.level} style={[st.unlockCard, desbloqueado ? { borderColor: n.color + '50', backgroundColor: '#fff' } : { borderColor: '#EEEEEE', backgroundColor: '#FAFAFA' }]}>
+              <View key={n.level} style={[st.unlockCard, desbloqueado ? { borderColor: n.color + '50', backgroundColor: colors.card } : { borderColor: colors.border, backgroundColor: colors.cardSecondary }]}>
                 {/* Level indicator line */}
-                {i < NIVELES.length - 1 && <View style={[st.unlockLine, { backgroundColor: desbloqueado ? n.color : '#E5E7EB' }]} />}
+                {i < NIVELES.length - 1 && <View style={[st.unlockLine, { backgroundColor: desbloqueado ? n.color : colors.border }]} />}
 
                 <View style={st.unlockLeft}>
-                  <View style={[st.unlockLevelCircle, { backgroundColor: desbloqueado ? n.color : '#E5E7EB' }]}>
+                  <View style={[st.unlockLevelCircle, { backgroundColor: desbloqueado ? n.color : colors.border }]}>
                     {desbloqueado
                       ? <Feather name="check" size={14} color="#fff" />
-                      : <Text style={[st.unlockLevelNum, { color: '#9CA3AF' }]}>{n.level}</Text>
+                      : <Text style={[st.unlockLevelNum, { color: colors.textTertiary }]}>{n.level}</Text>
                     }
                   </View>
                 </View>
@@ -411,12 +413,12 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
                     </View>
                   </View>
                   <View style={st.unlockRow}>
-                    <View style={[st.unlockIconBox, { backgroundColor: desbloqueado ? n.color + '20' : '#F3F4F6' }]}>
+                    <View style={[st.unlockIconBox, { backgroundColor: desbloqueado ? n.color + '20' : colors.cardSecondary }]}>
                       <Feather name={n.unlock.icono as any} size={16} color={desbloqueado ? n.color : '#D1D5DB'} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[st.unlockName, !desbloqueado && { color: '#D1D5DB' }]}>{n.unlock.nombre}</Text>
-                      <Text style={[st.unlockDesc, !desbloqueado && { color: '#E5E7EB' }]}>{n.unlock.descripcion}</Text>
+                      <Text style={[st.unlockName, { color: desbloqueado ? colors.textPrimary : colors.border }]}>{n.unlock.nombre}</Text>
+                      <Text style={[st.unlockDesc, { color: desbloqueado ? colors.textSecondary : colors.border }]}>{n.unlock.descripcion}</Text>
                     </View>
                   </View>
                   {desbloqueado
@@ -424,9 +426,9 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
                         <Feather name="unlock" size={11} color={n.color} />
                         <Text style={[st.unlockStatusText, { color: n.color }]}>Desbloqueado{esActual ? ' · Nivel actual' : ''}</Text>
                       </View>
-                    : <View style={st.unlockStatusPill}>
-                        <Feather name="lock" size={11} color="#9CA3AF" />
-                        <Text style={st.unlockStatusText}>
+                    : <View style={[st.unlockStatusPill, { backgroundColor: colors.cardSecondary }]}>
+                        <Feather name="lock" size={11} color={colors.textTertiary} />
+                        <Text style={[st.unlockStatusText, { color: colors.textTertiary }]}>
                           {esSiguiente
                             ? `Faltan ${Math.round(faltanXP).toLocaleString('es-CO')} XP`
                             : `Requiere ${Math.round(n.xpRequired).toLocaleString('es-CO')} XP`}
@@ -441,7 +443,7 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
 
         {/* ════════════ RANKING ════════════ */}
         {activeTab === 'ranking' && (<>
-          <View style={st.card}>
+          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {leaderboard.map((j, i) => (
               <View key={j.id} style={[st.rankRow, j.esUsuario && { backgroundColor: nivelActual.color + '12', borderRadius: 10, paddingHorizontal: 8, marginHorizontal: -4 }, i < leaderboard.length-1 && st.rankBorder]}>
                 <Text style={[st.rankNum, i < 3 && { color: ['#EAB308','#94A3B8','#B45309'][i] }]}>{i+1}</Text>
@@ -450,10 +452,10 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={st.rankName}>{j.nombre}</Text>
+                    <Text style={[st.rankName, { color: colors.textPrimary }]}>{j.nombre}</Text>
                     {j.esUsuario && <View style={[st.youBadge, { backgroundColor: nivelActual.color }]}><Text style={st.youBadgeText}>Tú</Text></View>}
                   </View>
-                  <Text style={st.rankSub}>Nv.{j.nivel} · {j.titulo}</Text>
+                  <Text style={[st.rankSub, { color: colors.textTertiary }]}>Nv.{j.nivel} · {j.titulo}</Text>
                 </View>
                 <Text style={[st.rankXP, { color: nivelActual.color }]}>{Math.round(j.xp).toLocaleString('es-CO')}</Text>
               </View>
@@ -463,7 +465,7 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
           {userPos > 0 && xpToNext > 0 && (
             <View style={[st.rankPill, { backgroundColor: nivelActual.color + '15', borderColor: nivelActual.color + '30' }]}>
               <Feather name="trending-up" size={14} color={nivelActual.color} />
-              <Text style={st.rankPillText}>
+              <Text style={[st.rankPillText, { color: colors.textSecondary }]}>
                 Gana <Text style={{ fontWeight: '700', color: nivelActual.color }}>{Math.round(xpToNext).toLocaleString('es-CO')} XP</Text> para subir al puesto {userPos}
               </Text>
             </View>
@@ -480,15 +482,15 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
             const r  = RARITY_STYLE[selectedLogro.rarity];
             const ul = unlockedIds.has(selectedLogro.id);
             return (
-              <Pressable style={st.modalCard} onPress={() => {}}>
-                <View style={[st.modalIconBox, { backgroundColor: ul ? r.bg : '#F3F4F6' }]}>
-                  <Feather name={selectedLogro.icono as any} size={36} color={ul ? r.color : '#D1D5DB'} />
+              <Pressable style={[st.modalCard, { backgroundColor: colors.card }]} onPress={() => {}}>
+                <View style={[st.modalIconBox, { backgroundColor: ul ? r.bg : colors.cardSecondary }]}>
+                  <Feather name={selectedLogro.icono as any} size={36} color={ul ? r.color : colors.border} />
                 </View>
-                <Text style={[st.modalTitle, { color: ul ? r.color : '#9CA3AF' }]}>{selectedLogro.titulo}</Text>
+                <Text style={[st.modalTitle, { color: ul ? r.color : colors.textTertiary }]}>{selectedLogro.titulo}</Text>
                 <View style={[st.rarityPill, { backgroundColor: r.bg }]}>
                   <Text style={[st.rarityPillText, { color: r.color }]}>{selectedLogro.rarity.charAt(0).toUpperCase() + selectedLogro.rarity.slice(1)}</Text>
                 </View>
-                <Text style={st.modalDesc}>{selectedLogro.descripcion}</Text>
+                <Text style={[st.modalDesc, { color: colors.textSecondary }]}>{selectedLogro.descripcion}</Text>
                 <View style={[st.modalXPRow, { backgroundColor: '#FEF3C7' }]}>
                   <Feather name="star" size={14} color="#F59E0B" />
                   <Text style={st.modalXPText}>+{selectedLogro.xp} XP al desbloquear</Text>
@@ -496,8 +498,8 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
                 <Text style={[st.modalStatus, { color: ul ? '#10B981' : '#9CA3AF' }]}>
                   {ul ? '✓ Logro desbloqueado' : '🔒 Pendiente de desbloquear'}
                 </Text>
-                <TouchableOpacity onPress={() => setSelectedLogro(null)} style={[st.modalClose, { backgroundColor: ul ? r.color : '#E5E7EB' }]}>
-                  <Text style={[st.modalCloseText, { color: ul ? '#fff' : '#6B7280' }]}>Cerrar</Text>
+                <TouchableOpacity onPress={() => setSelectedLogro(null)} style={[st.modalClose, { backgroundColor: ul ? r.color : colors.border }]}>
+                  <Text style={[st.modalCloseText, { color: ul ? '#fff' : colors.textSecondary }]}>Cerrar</Text>
                 </TouchableOpacity>
               </Pressable>
             );
@@ -533,22 +535,22 @@ const st = StyleSheet.create({
   levelDotText: { fontSize: 10, fontWeight: '700' },
 
   // Tabs
-  tabBar:      { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  tabBar:      { flexDirection: 'row', borderBottomWidth: 1 },
   tabItem:     { flex: 1, alignItems: 'center', paddingVertical: 10, gap: 2, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabText:     { fontSize: 10, color: '#9CA3AF', fontWeight: '500' },
+  tabText:     { fontSize: 10, fontWeight: '500' },
 
   // Layout
   scroll:      { padding: 16, gap: 12 },
-  card:        { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width:0, height:2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  cardTitle:   { fontSize: 13, fontWeight: '700', color: '#111827', marginBottom: 12 },
-  sectionLabel:{ fontSize: 10, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1, textTransform: 'uppercase', marginTop: 4, marginBottom: 4 },
+  card:        { borderRadius: 16, padding: 16, borderWidth: 1, shadowColor: '#000', shadowOffset: { width:0, height:2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  cardTitle:   { fontSize: 13, fontWeight: '700', marginBottom: 12 },
+  sectionLabel:{ fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 4, marginBottom: 4 },
 
   // XP Breakdown
   breakRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9 },
   breakRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F9FAFB' },
   breakIcon:   { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  breakLabel:  { fontSize: 12, color: '#374151', fontWeight: '500', width: 110 },
-  breakBar:    { height: 4, backgroundColor: '#F3F4F6', borderRadius: 2, overflow: 'hidden' },
+  breakLabel:  { fontSize: 12, fontWeight: '500', width: 110 },
+  breakBar:    { height: 4, borderRadius: 2, overflow: 'hidden' },
   breakBarFill:{ height: '100%', borderRadius: 2 },
   breakXP:     { fontSize: 11, fontWeight: '700', width: 36, textAlign: 'right' },
 
@@ -557,39 +559,39 @@ const st = StyleSheet.create({
   dayCol:      { alignItems: 'center', gap: 4 },
   dayCell:     { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
   dayLabel:    { fontSize: 9, color: '#9CA3AF', fontWeight: '500' },
-  weekStats:   { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#F9FAFB', paddingTop: 12, justifyContent: 'space-around' },
+  weekStats:   { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 12, justifyContent: 'space-around' },
   weekStat:    { alignItems: 'center', gap: 2 },
   weekStatVal: { fontSize: 22, fontWeight: '800' },
-  weekStatLabel: { fontSize: 10, color: '#6B7280', fontWeight: '500' },
-  weekStatUnit:  { fontSize: 9, color: '#9CA3AF' },
+  weekStatLabel: { fontSize: 10, fontWeight: '500' },
+  weekStatUnit:  { fontSize: 9 },
 
   // Habits
   habitRow:    { flexDirection: 'row', gap: 10, paddingVertical: 12, alignItems: 'flex-start' },
   habitBorder: { borderBottomWidth: 1, borderBottomColor: '#F9FAFB' },
   habitIcon:   { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  habitName:   { fontSize: 13, fontWeight: '600', color: '#111827' },
+  habitName:   { fontSize: 13, fontWeight: '600' },
   habitXPEarned: { fontSize: 11, fontWeight: '700' },
-  habitDesc:   { fontSize: 11, color: '#9CA3AF' },
-  habitTrack:  { height: 5, backgroundColor: '#F3F4F6', borderRadius: 3, overflow: 'hidden' },
+  habitDesc:   { fontSize: 11 },
+  habitTrack:  { height: 5, borderRadius: 3, overflow: 'hidden' },
   habitFill:   { height: '100%', borderRadius: 3 },
   habitProgress: { fontSize: 10, color: '#9CA3AF' },
 
   // Stats
   statsRow:    { flexDirection: 'row', gap: 10 },
-  statCard:    { flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 14, alignItems: 'center', gap: 4, borderWidth: 1.5 },
+  statCard:    { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center', gap: 4, borderWidth: 1.5 },
   statVal:     { fontSize: 26, fontWeight: '800' },
-  statLabel:   { fontSize: 10, color: '#6B7280', textAlign: 'center', fontWeight: '500' },
+  statLabel:   { fontSize: 10, textAlign: 'center', fontWeight: '500' },
 
   // Logros
   logroHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  logroHeaderTitle: { fontSize: 13, fontWeight: '700', color: '#111827' },
+  logroHeaderTitle: { fontSize: 13, fontWeight: '700' },
   logroXPTotal: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4 },
   logroXPTotalText: { fontSize: 11, fontWeight: '700' },
   achGrid:     { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 },
 
   // Desbloqueos
   bigXP:       { fontSize: 40, fontWeight: '800', letterSpacing: -1, textAlign: 'center', marginBottom: 2 },
-  bigXPSub:    { fontSize: 13, color: '#6B7280', textAlign: 'center', marginBottom: 14 },
+  bigXPSub:    { fontSize: 13, textAlign: 'center', marginBottom: 14 },
   earnBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20 },
   earnBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   unlockCard:  { backgroundColor: '#fff', borderRadius: 16, borderWidth: 1.5, padding: 14, marginBottom: 10, flexDirection: 'row', gap: 12, position: 'relative', overflow: 'hidden' },
@@ -603,10 +605,10 @@ const st = StyleSheet.create({
   tipoText:    { fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
   unlockRow:   { flexDirection: 'row', gap: 10, marginBottom: 8 },
   unlockIconBox: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  unlockName:  { fontSize: 13, fontWeight: '700', color: '#111827', marginBottom: 2 },
-  unlockDesc:  { fontSize: 11, color: '#6B7280', lineHeight: 16 },
-  unlockStatusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#F9FAFB', borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
-  unlockStatusText: { fontSize: 11, fontWeight: '600', color: '#9CA3AF' },
+  unlockName:  { fontSize: 13, fontWeight: '700', marginBottom: 2 },
+  unlockDesc:  { fontSize: 11, lineHeight: 16 },
+  unlockStatusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
+  unlockStatusText: { fontSize: 11, fontWeight: '600' },
 
   // Ranking
   rankRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
@@ -614,22 +616,22 @@ const st = StyleSheet.create({
   rankNum:     { fontSize: 14, fontWeight: '700', color: '#9CA3AF', width: 22, textAlign: 'center' },
   rankAvatar:  { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   rankInitials:{ fontSize: 12, fontWeight: '700' },
-  rankName:    { fontSize: 13, fontWeight: '600', color: '#111827' },
-  rankSub:     { fontSize: 11, color: '#9CA3AF' },
+  rankName:    { fontSize: 13, fontWeight: '600' },
+  rankSub:     { fontSize: 11 },
   rankXP:      { fontSize: 13, fontWeight: '700' },
   youBadge:    { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
   youBadgeText:{ fontSize: 9, fontWeight: '800', color: '#fff' },
   rankPill:    { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, borderWidth: 1, padding: 12 },
-  rankPillText:{ fontSize: 13, color: '#6B7280', flex: 1 },
+  rankPillText:{ fontSize: 13, flex: 1 },
 
   // Modal
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  modalCard:   { backgroundColor: '#fff', borderRadius: 24, padding: 24, alignItems: 'center', width: '100%', gap: 10 },
+  modalCard:   { borderRadius: 24, padding: 24, alignItems: 'center', width: '100%', gap: 10 },
   modalIconBox:{ width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   modalTitle:  { fontSize: 22, fontWeight: '800', textAlign: 'center' },
   rarityPill:  { borderRadius: 100, paddingHorizontal: 12, paddingVertical: 4 },
   rarityPillText: { fontSize: 12, fontWeight: '700' },
-  modalDesc:   { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 20 },
+  modalDesc:   { fontSize: 14, textAlign: 'center', lineHeight: 20 },
   modalXPRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 100, paddingHorizontal: 14, paddingVertical: 6 },
   modalXPText: { fontSize: 13, fontWeight: '700', color: '#B45309' },
   modalStatus: { fontSize: 13, fontWeight: '600' },

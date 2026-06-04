@@ -10,6 +10,7 @@ import { Icon, FeatherName } from '../../components/ui/Icon';
 import { OnboardingShell } from '../../components/onboarding/OnboardingShell';
 import { CATALOGO_CATEGORIAS } from '../../constants/catalogoCategorias';
 import { THEME } from '../../constants/theme';
+import { inyectarSubcategoriasDefecto } from '../../models/Category';
 
 interface Props { onNext: () => void; onBack: () => void; }
 
@@ -96,7 +97,7 @@ const CatCard: React.FC<CardProps> = ({ cat, isSelected, onPress, delay, cardSiz
         </Text>
         {isSelected && (
           <View style={[s.checkDot, { backgroundColor: colors.primary }]}>
-            <Icon name="check" size={9} color={THEME.colors.surface} />
+            <Icon name="check" size={9} color={'#fff'} />
           </View>
         )}
       </TouchableOpacity>
@@ -165,7 +166,8 @@ export const OnboardingCategories: React.FC<Props> = ({ onNext, onBack }) => {
       });
 
     const existingIds = new Set(newCats.map(c => c.id));
-    setCategories([...categories.filter(c => !existingIds.has(c.id)), ...newCats]);
+    const merged = [...categories.filter(c => !existingIds.has(c.id)), ...newCats];
+    setCategories(inyectarSubcategoriasDefecto(merged));
     onNext();
   };
 
@@ -235,7 +237,7 @@ const s = StyleSheet.create({
   topArea:      { paddingTop: 8, gap: 10, marginBottom: 8 },
   finnRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   finnAvatar:   { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
-  finnLetter:   { fontSize: 16, fontWeight: '600', color: THEME.colors.surface },
+  finnLetter:   { fontSize: 16, fontWeight: '600', color: '#fff' },
   bubble:       { flex: 1, borderRadius: 14, borderTopLeftRadius: 4, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
   bubbleText:   { fontSize: 15, lineHeight: 22 },
   bubbleSub:    { fontSize: 12, marginTop: 2 },
@@ -247,5 +249,5 @@ const s = StyleSheet.create({
   checkDot:     { position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   footer:       { paddingTop: 8 },
   btn:          { borderRadius: THEME.radius.lg, padding: 16, alignItems: 'center' },
-  btnText:      { fontSize: 16, fontWeight: '500', color: THEME.colors.surface },
+  btnText:      { fontSize: 16, fontWeight: '500', color: '#fff' },
 });

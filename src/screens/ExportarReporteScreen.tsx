@@ -267,7 +267,7 @@ export const ExportarReporteScreen: React.FC<Props> = ({ onBack, mesInicial }) =
                 ]}
                 onPress={() => setMesSelec(m)}
               >
-                <Text style={[s.monthPillText, { color: active ? THEME.colors.surface : colors.textSecondary }]}>
+                <Text style={[s.monthPillText, { color: active ? '#fff' : colors.textSecondary }]}>
                   {mesLabel(m.mes, m.año)}
                 </Text>
               </TouchableOpacity>
@@ -342,7 +342,7 @@ export const ExportarReporteScreen: React.FC<Props> = ({ onBack, mesInicial }) =
               ]}
               onPress={() => setFiltroTipo(f)}
             >
-              <Text style={[s.filterPillText, { color: filtroTipo === f ? THEME.colors.surface : colors.textSecondary }]}>
+              <Text style={[s.filterPillText, { color: filtroTipo === f ? '#fff' : colors.textSecondary }]}>
                 {f.charAt(0).toUpperCase() + f.slice(1)}
               </Text>
             </TouchableOpacity>
@@ -357,8 +357,8 @@ export const ExportarReporteScreen: React.FC<Props> = ({ onBack, mesInicial }) =
           disabled={isLoading}
           activeOpacity={0.8}
         >
-          <Icon name="share-2" size={18} color={isLoading ? colors.textTertiary : THEME.colors.surface} />
-          <Text style={[s.actionBtnText, { color: isLoading ? colors.textTertiary : THEME.colors.surface }]}>
+          <Icon name="share-2" size={18} color={isLoading ? colors.textTertiary : '#fff'} />
+          <Text style={[s.actionBtnText, { color: isLoading ? colors.textTertiary : '#fff' }]}>
             Generar y compartir
           </Text>
         </TouchableOpacity>

@@ -264,12 +264,22 @@ function buildSystemPromptAgente(
     const fecha = new Date(t.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
     const tipo  = t.type === 'income' ? 'INGRESO' : 'GASTO';
     const monto = '$' + Math.round(t.amount).toLocaleString('es-CO').replace(/,/g, '.');
-    return `[ID:${t.id}] ${tipo} ${monto} en ${t.category} (${fecha})`;
+    const sub   = t.subcategory ? categories.find(c => c.id === t.subcategory) : null;
+    const subLabel = sub ? ` > ${sub.name}` : '';
+    return `[ID:${t.id}] ${tipo} ${monto} en ${t.category}${subLabel} (${fecha})`;
   }).join('\n') || 'Sin transacciones';
 
-  const catsList = categories.map(c =>
-    `[ID:${c.id}] ${c.name} presupuesto:$${c.budget ?? 0}`,
-  ).join('\n') || 'Sin categorías';
+  // Construir árbol categoría → subcategorías
+  const topCats = categories.filter(c => !c.parentCategoryId);
+  const catsList = topCats.map(c => {
+    const subs = categories.filter(s => s.parentCategoryId === c.id);
+    const presupuesto = `presupuesto:$${c.budget ?? 0}`;
+    if (subs.length > 0) {
+      const subsStr = subs.map(s => `    - [SUBCAT:${s.id}] ${s.name}`).join('\n');
+      return `[ID:${c.id}] ${c.name} ${presupuesto}\n${subsStr}`;
+    }
+    return `[ID:${c.id}] ${c.name} ${presupuesto}`;
+  }).join('\n') || 'Sin categorías';
 
   return `${buildSystemPrompt(contexto, nombreUsuario)}
 
@@ -282,10 +292,17 @@ Puedes ejecutar acciones directas usando las herramientas disponibles. Úsalas s
 - Crear categoría nueva → crear_categoria
 - Actualizar meta financiera → actualizar_meta
 
+REGLAS DE SUBCATEGORÍAS — MUY IMPORTANTE:
+- Las categorías con entradas "- [SUBCAT:...]" tienen subcategorías configuradas por el usuario.
+- Cuando el usuario mencione algo que corresponda a una subcategoría (ej: "recibo del agua", "luz", "internet", "netflix"), SIEMPRE incluye el campo "subcategoria" con el nombre exacto de la subcategoría.
+- Usa el nombre de la subcategoría tal como aparece en la lista (ej: si existe "Agua" y el usuario dice "recibo del agua" → subcategoria="Agua").
+- Si no existe una subcategoría que encaje, omite el campo subcategoria.
+- El gasto se registra en la categoría PRINCIPAL (ej: "Servicios") pero con la subcategoría indicada.
+
 TRANSACCIONES RECIENTES:
 ${recientes}
 
-CATEGORÍAS:
+CATEGORÍAS (con subcategorías indentadas):
 ${catsList}
 
 Para preguntas o análisis, responde con texto normal. Solo usa herramientas cuando la intención del usuario sea claramente ejecutar una acción.

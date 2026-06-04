@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   StyleSheet, TextInput, Pressable, View, Text,
-  ScrollView, Platform,
+  ScrollView, Platform, Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -55,10 +55,11 @@ export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack
   const [description, setDescription] = useState('');
   const [selCatId,    setSelCatId]    = useState<string | null>(topCats[0]?.id ?? null);
   const [selSubId,    setSelSubId]    = useState<string | null>(null);
-  const [error,       setError]       = useState('');
-  const [amtFocused,  setAmtFocused]  = useState(false);
-  const [descFocused, setDescFocused] = useState(false);
-  const [tipIdx]                      = useState(() => Math.floor(Math.random() * TIPS.length));
+  const [error,         setError]         = useState('');
+  const [amtFocused,    setAmtFocused]    = useState(false);
+  const [descFocused,   setDescFocused]   = useState(false);
+  const [tipIdx]                          = useState(() => Math.floor(Math.random() * TIPS.length));
+  const [subModalOpen, setSubModalOpen]   = useState(false);
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const expList = useMemo(
@@ -86,6 +87,7 @@ export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack
     const n = parseCOP(amount);
     if (isNaN(n) || n <= 0) { setError('Ingresa un monto válido'); return; }
     if (!selCat) { setError('Selecciona una categoría'); return; }
+    if (subcats.length > 0 && !selSubId) { setError('Selecciona una subcategoría'); return; }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     const addFn = onAddExpense as any;
     addFn(n, selCat.name, new Date(), description || undefined, selSubId ?? undefined);
@@ -203,6 +205,8 @@ export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack
                     setSelCatId(c.id);
                     setSelSubId(null);
                     Haptics.selectionAsync().catch(() => {});
+                    const hasSubs = categories.some(cat => cat.parentCategoryId === c.id);
+                    if (hasSubs) setTimeout(() => setSubModalOpen(true), 150);
                   }}
                 >
                   <Icon name={iconName as any} size={18} color={active ? '#fff' : color} />
@@ -213,31 +217,71 @@ export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack
             })}
           </View>
 
-          {/* Subcategory chips */}
+          {/* Subcategory selector */}
           {subcats.length > 0 && (
             <>
-              <Text style={[s.fieldLabel, { color: colors.textTertiary, marginTop: 18 }]}>ETIQUETA (opcional)</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsContent}>
-                {subcats.map(sub => {
-                  const active = selSubId === sub.id;
-                  return (
-                    <Pressable
-                      key={sub.id}
-                      style={[s.chip, {
-                        backgroundColor: active ? '#EF4444' : (isDark ? colors.cardSecondary : '#FEE2E2'),
-                        borderColor: active ? '#EF4444' : '#FCA5A5',
-                      }]}
-                      onPress={() => setSelSubId(active ? null : sub.id)}
-                    >
-                      <Text style={[s.chipText, { color: active ? '#fff' : '#EF4444' }]}>
-                        {sub.icon ? `${sub.icon} ` : ''}{sub.name}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
+              <Text style={[s.fieldLabel, { color: colors.textTertiary, marginTop: 18 }]}>SUBCATEGORÍA</Text>
+              <Pressable
+                style={[s.subPicker, {
+                  borderColor: selSub ? '#EF4444' : colors.border,
+                  borderWidth: selSub ? 2 : 1,
+                  backgroundColor: isDark ? colors.cardSecondary : '#FFF5F5',
+                }]}
+                onPress={() => { setSubModalOpen(true); Haptics.selectionAsync().catch(() => {}); }}
+              >
+                {selSub ? (
+                  <Text style={[s.subPickerVal, { color: colors.textPrimary }]}>
+                    {selSub.icon ? `${selSub.icon}  ` : ''}{selSub.name}
+                  </Text>
+                ) : (
+                  <Text style={[s.subPickerPlaceholder, { color: colors.textTertiary }]}>Seleccionar subcategoría…</Text>
+                )}
+                <Icon name="chevron-down" size={16} color={selSub ? '#EF4444' : colors.textTertiary} />
+              </Pressable>
             </>
           )}
+
+          {/* Subcategory modal */}
+          <Modal
+            visible={subModalOpen}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setSubModalOpen(false)}
+          >
+            <Pressable style={s.modalOverlay} onPress={() => setSubModalOpen(false)}>
+              <Pressable style={[s.modalSheet, { backgroundColor: colors.card }]} onPress={e => e.stopPropagation()}>
+                <View style={s.modalHandle} />
+                <Text style={[s.modalTitle, { color: colors.textPrimary }]}>
+                  Subcategoría de {selCat?.name}
+                </Text>
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  {subcats.map(sub => {
+                    const active = selSubId === sub.id;
+                    return (
+                      <Pressable
+                        key={sub.id}
+                        style={[s.modalItem, {
+                          backgroundColor: active ? '#FEE2E2' : 'transparent',
+                          borderColor: active ? '#EF4444' : colors.border,
+                        }]}
+                        onPress={() => {
+                          setSelSubId(sub.id);
+                          setSubModalOpen(false);
+                          Haptics.selectionAsync().catch(() => {});
+                        }}
+                      >
+                        <View style={[s.modalItemIconPlaceholder, { backgroundColor: active ? '#FEE2E2' : (isDark ? colors.cardSecondary : '#F9FAFB') }]}>
+                          <Icon name={(sub.icon as any) || 'tag'} size={15} color={active ? '#EF4444' : colors.textSecondary} />
+                        </View>
+                        <Text style={[s.modalItemLabel, { color: active ? '#EF4444' : colors.textPrimary }]}>{sub.name}</Text>
+                        {active && <Icon name="check" size={16} color="#EF4444" />}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </Pressable>
+            </Pressable>
+          </Modal>
 
           {/* Description */}
           <Text style={[s.fieldLabel, { color: colors.textTertiary, marginTop: 18 }]}>NOTA (opcional)</Text>
@@ -400,12 +444,35 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  chipsContent: { gap: 8, paddingVertical: 4 },
-  chip: {
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: 20, borderWidth: 1,
+  subPicker: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
   },
-  chipText: { fontSize: 13, fontWeight: '600' },
+  subPickerVal: { fontSize: 15, fontWeight: '600', flex: 1 },
+  subPickerPlaceholder: { fontSize: 15, flex: 1 },
+
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, maxHeight: '70%',
+  },
+  modalHandle: {
+    width: 40, height: 4, borderRadius: 2, backgroundColor: '#D1D5DB',
+    alignSelf: 'center', marginBottom: 16,
+  },
+  modalTitle: { fontSize: 17, fontWeight: '800', marginBottom: 16 },
+  modalItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 14, paddingHorizontal: 12,
+    borderRadius: 14, borderWidth: 1, marginBottom: 8,
+  },
+  modalItemIconPlaceholder: {
+    width: 32, height: 32, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  modalItemLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
 
   descInput: {
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,

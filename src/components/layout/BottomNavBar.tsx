@@ -166,7 +166,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
 
   return (
     <View style={{
-      backgroundColor: isDark ? colors.card : '#FFFFFF',
+      backgroundColor: colors.card,
       borderTopWidth: 0.5,
       borderTopColor: colors.border,
       flexDirection: 'row',
