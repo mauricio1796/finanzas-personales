@@ -38,6 +38,7 @@ export function Navigation({ currentScreen, onScreenChange, userName }: Navigati
           {navItems.map(item => (
             <Pressable
               key={item.id}
+              testID={`nav-${item.id}`}
               style={[
                 styles.mobileNavItem,
                 currentScreen === item.id && styles.mobileNavItemActive,
@@ -75,6 +76,7 @@ export function Navigation({ currentScreen, onScreenChange, userName }: Navigati
         {navItems.slice(0, 3).map(item => (
           <Pressable
             key={item.id}
+            testID={`nav-${item.id}`}
             style={[
               styles.navItem,
               currentScreen === item.id && styles.navItemActive,
@@ -101,6 +103,7 @@ export function Navigation({ currentScreen, onScreenChange, userName }: Navigati
         {navItems.slice(3, 6).map(item => (
           <Pressable
             key={item.id}
+            testID={`nav-${item.id}`}
             style={[
               styles.navItem,
               currentScreen === item.id && styles.navItemActive,
@@ -127,6 +130,7 @@ export function Navigation({ currentScreen, onScreenChange, userName }: Navigati
         {navItems.slice(6).map(item => (
           <Pressable
             key={item.id}
+            testID={`nav-${item.id}`}
             style={[
               styles.navItem,
               currentScreen === item.id && styles.navItemActive,

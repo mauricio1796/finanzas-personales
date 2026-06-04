@@ -93,7 +93,7 @@ export const OnboardingProfile: React.FC<Props> = ({ onNext, onBack }) => {
   return (
     <OnboardingShell step={1} totalSteps={5} onBack={onBack}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={[s.inner, { paddingHorizontal: 24 }]}>
+        <View style={[s.inner, { paddingHorizontal: 24 }]} testID="onboarding-profile-screen">
           <View style={s.finnRow}>
             <View style={[s.finnAvatar, { backgroundColor: colors.primary }]}>
               <Text style={s.finnLetter}>F</Text>
@@ -106,6 +106,7 @@ export const OnboardingProfile: React.FC<Props> = ({ onNext, onBack }) => {
           </View>
 
           <TextInput
+            testID="onboarding-name-input"
             style={[
               s.nameInput,
               {
@@ -153,6 +154,7 @@ export const OnboardingProfile: React.FC<Props> = ({ onNext, onBack }) => {
                       }}
                     >
                       <TouchableOpacity
+                        testID={`employment-type-${opt.key}`}
                         style={[
                           s.empCard,
                           {
@@ -178,6 +180,7 @@ export const OnboardingProfile: React.FC<Props> = ({ onNext, onBack }) => {
 
           <View style={{ flex: 1 }} />
           <TouchableOpacity
+            testID="onboarding-next-btn"
             style={[s.btn, { backgroundColor: colors.primary, opacity: canContinue ? 1 : 0.4 }]}
             onPress={handleNext}
             disabled={!canContinue}

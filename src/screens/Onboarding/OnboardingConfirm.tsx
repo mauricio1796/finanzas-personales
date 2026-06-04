@@ -96,7 +96,7 @@ export const OnboardingConfirm: React.FC<Props> = ({ onDone }) => {
   };
 
   return (
-    <View style={[s.root, { backgroundColor: colors.background, paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}>
+    <View testID="onboarding-confirm-screen" style={[s.root, { backgroundColor: colors.background, paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 }]}>
       {/* Confetti */}
       <View style={s.confettiLayer} pointerEvents="none">
         {confettiAnims.map((a, i) => (
@@ -177,6 +177,7 @@ export const OnboardingConfirm: React.FC<Props> = ({ onDone }) => {
         {/* CTA */}
         <Animated.View style={slideUp(btnAnim)}>
           <TouchableOpacity
+            testID="onboarding-finish-btn"
             style={[s.btn, { backgroundColor: colors.primary }]}
             onPress={() => {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

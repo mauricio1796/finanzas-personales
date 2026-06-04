@@ -109,6 +109,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({
         </TouchableOpacity>
 
         <TextInput
+          testID={`budget-input-${cat.id}`}
           style={cc.input}
           keyboardType="numeric"
           value={rawInput}
@@ -328,7 +329,7 @@ export const OnboardingMontos: React.FC<Props> = ({ onNext, onBack }) => {
 
   return (
     <OnboardingShell step={4} totalSteps={5} onBack={onBack} keyboardAvoiding={false}>
-      <ScrollView
+      <ScrollView testID="onboarding-montos-screen"
         style={{ flex: 1 }}
         contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -383,7 +384,7 @@ export const OnboardingMontos: React.FC<Props> = ({ onNext, onBack }) => {
           </View>
         </View>
 
-        <TouchableOpacity style={s.btn} onPress={handleNext} activeOpacity={0.85}>
+        <TouchableOpacity testID="onboarding-next-btn" style={s.btn} onPress={handleNext} activeOpacity={0.85}>
           <Text style={s.btnText}>Confirmar presupuestos</Text>
         </TouchableOpacity>
       </View>

@@ -266,7 +266,7 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
+      <ScrollView testID="configuracion-screen" contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
 
         {/* ── Sección tema ── */}
         <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>TEMA DE LA APP</Text>

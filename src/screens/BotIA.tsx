@@ -436,6 +436,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
   // ── JSX ──────────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
+      testID="finn-chat-screen"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={[st.root, { paddingTop: Platform.OS === 'web' ? 0 : insets.top }]}
     >
@@ -569,6 +570,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
         />
         <View style={[st.inputPill, inputFocused && st.inputPillFocused]}>
           <TextInput
+            testID="finn-message-input"
             style={[st.input, Platform.OS === 'web' && ({ outline: 'none', resize: 'none' } as any)]}
             placeholder="Pregunta a Finn…"
             placeholderTextColor="#BBBBC8"
@@ -581,6 +583,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
             editable={!isTyping}
           />
           <Pressable
+            testID="finn-send-btn"
             style={[st.sendBtn, (isTyping || !inputText.trim()) && st.sendBtnDisabled]}
             onPress={() => handleSend()}
             disabled={isTyping || !inputText.trim()}

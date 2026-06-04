@@ -117,7 +117,7 @@ export const OnboardingSalario: React.FC<Props> = ({ onNext, onBack }) => {
   return (
     <OnboardingShell step={2} totalSteps={5} onBack={onBack}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={[s.inner, { paddingHorizontal: 24 }]}>
+        <View style={[s.inner, { paddingHorizontal: 24 }]} testID="onboarding-salary-screen">
           {/* Finn bubble */}
           <View style={s.finnRow}>
             <View style={[s.finnAvatar, { backgroundColor: colors.primary }]}>
@@ -134,6 +134,7 @@ export const OnboardingSalario: React.FC<Props> = ({ onNext, onBack }) => {
           <View style={[s.salaryRow, { borderBottomColor: incFocus ? colors.primary : colors.border, borderBottomWidth: incFocus ? 2 : 1 }]}>
             <Text style={[s.currencySign, { color: colors.textTertiary }]}>$</Text>
             <TextInput
+              testID="salary-input"
               style={[s.salaryInput, { color: colors.textPrimary }, Platform.OS === 'web' && ({ outline: 'none' } as any)]}
               placeholder="0"
               placeholderTextColor={colors.textTertiary}
@@ -179,6 +180,7 @@ export const OnboardingSalario: React.FC<Props> = ({ onNext, onBack }) => {
 
               <View style={s.debtRow}>
                 <TouchableOpacity
+                  testID="debt-yes-btn"
                   style={[s.debtBtn, { backgroundColor: hasDebt === true ? colors.expenseLight : colors.card, borderColor: hasDebt === true ? colors.expense : colors.border, borderWidth: hasDebt === true ? 1.5 : 0.5 }]}
                   onPress={() => handleSelectDebt(true)}
                   activeOpacity={0.8}
@@ -189,6 +191,7 @@ export const OnboardingSalario: React.FC<Props> = ({ onNext, onBack }) => {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
+                  testID="debt-no-btn"
                   style={[s.debtBtn, { backgroundColor: hasDebt === false ? colors.incomeLight : colors.card, borderColor: hasDebt === false ? colors.income : colors.border, borderWidth: hasDebt === false ? 1.5 : 0.5 }]}
                   onPress={() => handleSelectDebt(false)}
                   activeOpacity={0.8}
@@ -220,6 +223,7 @@ export const OnboardingSalario: React.FC<Props> = ({ onNext, onBack }) => {
 
           <View style={{ flex: 1 }} />
           <TouchableOpacity
+            testID="onboarding-next-btn"
             style={[s.btn, { backgroundColor: colors.primary, opacity: canContinue ? 1 : 0.4 }]}
             onPress={handleNext}
             disabled={!canContinue}

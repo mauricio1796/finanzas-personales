@@ -1,0 +1,30 @@
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Maestro E2E — FinancyAI
+# Docs: https://maestro.mobile.dev
+#
+# Cómo ejecutar:
+#   1. Instalar: curl -Ls "https://get.maestro.mobile.dev" | bash
+#   2. Levantar emulador Android o simulador iOS
+#   3. Iniciar app: cd finanzas-personales && npx expo start
+#   4. Ejecutar todos los flujos: maestro test .maestro/flows/
+#   5. Ejecutar uno solo:         maestro test .maestro/flows/01_auth.yaml
+#   6. Ver reporte visual:        maestro studio
+#
+# Orden de ejecución recomendado:
+#   01_auth.yaml          → Registro con email nuevo + verificación OTP
+#   02_onboarding.yaml    → Flujo completo de onboarding (6 pasos)
+#   03_dashboard.yaml     → Dashboard, agregar ingreso y gasto
+#   04_categorias.yaml    → Crear y editar categoría
+#   05_metas.yaml         → Crear meta financiera
+#   06_finn_ai.yaml       → Chatear con Finn IA
+#   07_gamificacion.yaml  → Ver logros y nivel
+#   08_configuracion.yaml → Cambiar perfil y cerrar sesión
+# ══════════════════════════════════════════════════════════════════════════════
+
+appId: com.financyai.app    # Ajustar al bundle ID real del app.json
+---
+env:
+  TEST_EMAIL: "e2e.test@financyai-audit.com"
+  TEST_NAME: "Usuario E2E"
+  TEST_SALARY: "3500000"

@@ -1,0 +1,116 @@
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FLUJO 03 — Dashboard: agregar ingreso, agregar gasto, ver resumen
+# ══════════════════════════════════════════════════════════════════════════════
+appId: com.financyai.app
+name: "03 — Dashboard y Transacciones"
+tags:
+  - dashboard
+  - transactions
+  - smoke
+
+---
+
+# ── Verificar Dashboard cargado ───────────────────────────────────────────────
+- assertVisible:
+    id: "dashboard-screen"
+    timeout: 8000
+
+# Verificar saldo visible
+- assertVisible:
+    id: "dashboard-balance"
+
+# ── Agregar un INGRESO ────────────────────────────────────────────────────────
+- tapOn:
+    id: "fab-add-transaction"
+
+- assertVisible:
+    id: "transaction-modal"
+    timeout: 3000
+
+# Seleccionar tipo INGRESO
+- tapOn:
+    id: "tx-type-income"
+
+- tapOn:
+    id: "tx-amount-input"
+- clearText
+- inputText: "3500000"
+- hideKeyboard
+
+# Seleccionar categoría
+- tapOn:
+    id: "tx-category-selector"
+- tapOn:
+    text: "Salario"
+
+- tapOn:
+    id: "tx-description-input"
+- inputText: "Salario del mes"
+- hideKeyboard
+
+- tapOn:
+    id: "tx-save-btn"
+
+# Verificar que el ingreso aparece en el historial
+- assertVisible:
+    text: "3.500.000"
+    timeout: 4000
+
+- takeScreenshot: "03a_ingreso_agregado"
+
+# ── Agregar un GASTO ─────────────────────────────────────────────────────────
+- tapOn:
+    id: "fab-add-transaction"
+
+- tapOn:
+    id: "tx-type-expense"
+
+- tapOn:
+    id: "tx-amount-input"
+- clearText
+- inputText: "85000"
+- hideKeyboard
+
+- tapOn:
+    id: "tx-category-selector"
+- tapOn:
+    text: "Alimentación"
+
+- tapOn:
+    id: "tx-description-input"
+- inputText: "Mercado semana"
+- hideKeyboard
+
+- tapOn:
+    id: "tx-save-btn"
+
+- assertVisible:
+    text: "85.000"
+    timeout: 4000
+
+- takeScreenshot: "03b_gasto_agregado"
+
+# ── Verificar balance actualizado (ingreso - gasto = 3.415.000) ───────────────
+- assertVisible:
+    id: "dashboard-balance"
+
+# ── Navegar al Historial ──────────────────────────────────────────────────────
+- tapOn:
+    id: "nav-historial"
+
+- assertVisible:
+    id: "historial-screen"
+    timeout: 3000
+
+- assertVisible:
+    text: "Salario del mes"
+
+- assertVisible:
+    text: "Mercado semana"
+
+- takeScreenshot: "03c_historial"
+
+# ── Volver al Dashboard ───────────────────────────────────────────────────────
+- tapOn:
+    id: "nav-dashboard"

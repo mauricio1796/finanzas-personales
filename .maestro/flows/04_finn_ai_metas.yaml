@@ -1,0 +1,95 @@
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FLUJO 04 — Finn IA y Metas Financieras
+# Cubre: abrir chat Finn, enviar mensaje, crear meta financiera
+# ══════════════════════════════════════════════════════════════════════════════
+appId: com.financyai.app
+name: "04 — Finn IA y Metas"
+tags:
+  - finn
+  - goals
+
+---
+
+# ── Abrir Finn IA ─────────────────────────────────────────────────────────────
+- tapOn:
+    id: "nav-finn"
+
+- assertVisible:
+    id: "finn-chat-screen"
+    timeout: 5000
+
+- assertVisible:
+    id: "finn-message-input"
+
+# ── Enviar un mensaje ─────────────────────────────────────────────────────────
+- tapOn:
+    id: "finn-message-input"
+- inputText: "¿Cómo van mis finanzas este mes?"
+- hideKeyboard
+
+- tapOn:
+    id: "finn-send-btn"
+
+# Esperar respuesta del AI (puede tardar hasta 10s)
+- assertVisible:
+    id: "finn-response-bubble"
+    timeout: 12000
+
+- takeScreenshot: "04a_finn_respuesta"
+
+# ── Navegar a Metas ───────────────────────────────────────────────────────────
+- tapOn:
+    id: "nav-metas"
+
+- assertVisible:
+    id: "metas-screen"
+    timeout: 3000
+
+# ── Crear una meta financiera ─────────────────────────────────────────────────
+- tapOn:
+    id: "metas-add-btn"
+
+- assertVisible:
+    id: "meta-form-modal"
+    timeout: 3000
+
+# Título de la meta
+- tapOn:
+    id: "meta-title-input"
+- inputText: "Viaje a la playa"
+- hideKeyboard
+
+# Tipo de meta
+- tapOn:
+    id: "meta-type-savings"
+
+# Monto objetivo
+- tapOn:
+    id: "meta-target-input"
+- clearText
+- inputText: "2000000"
+- hideKeyboard
+
+# Prioridad
+- tapOn:
+    id: "meta-priority-high"
+
+# Fecha límite
+- tapOn:
+    id: "meta-deadline-input"
+- inputText: "2026-12-31"
+- hideKeyboard
+
+- tapOn:
+    id: "meta-save-btn"
+
+# Verificar que la meta aparece
+- assertVisible:
+    text: "Viaje a la playa"
+    timeout: 4000
+
+- assertVisible:
+    text: "2.000.000"
+
+- takeScreenshot: "04b_meta_creada"

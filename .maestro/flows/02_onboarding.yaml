@@ -1,0 +1,115 @@
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FLUJO 02 — Onboarding completo (6 pasos)
+# Cubre: Welcome → Perfil → Salario → Categorías → Montos → Confirmación
+# ══════════════════════════════════════════════════════════════════════════════
+appId: com.financyai.app
+name: "02 — Onboarding completo"
+tags:
+  - onboarding
+  - smoke
+
+---
+
+# ── Paso 1: Bienvenida ────────────────────────────────────────────────────────
+- assertVisible:
+    id: "onboarding-welcome"
+    timeout: 5000
+
+- tapOn:
+    id: "onboarding-next-btn"
+
+# ── Paso 2: Perfil financiero ─────────────────────────────────────────────────
+- assertVisible:
+    id: "onboarding-profile-screen"
+    timeout: 3000
+
+# Seleccionar tipo de empleo
+- tapOn:
+    id: "employment-type-employed"
+
+# Seleccionar tipo de ingreso
+- tapOn:
+    id: "income-type-fixed"
+
+# Seleccionar preocupación financiera principal
+- tapOn:
+    id: "concern-savings"
+
+- tapOn:
+    id: "onboarding-next-btn"
+
+# ── Paso 3: Salario ───────────────────────────────────────────────────────────
+- assertVisible:
+    id: "onboarding-salary-screen"
+    timeout: 3000
+
+- tapOn:
+    id: "salary-input"
+- clearText
+- inputText: ${TEST_SALARY}
+- hideKeyboard
+
+- tapOn:
+    id: "onboarding-next-btn"
+
+# ── Paso 4: Selección de categorías ──────────────────────────────────────────
+- assertVisible:
+    id: "onboarding-categories-screen"
+    timeout: 3000
+
+# Seleccionar al menos 3 categorías predefinidas
+- tapOn:
+    id: "category-item-arriendo"
+- tapOn:
+    id: "category-item-alimentacion"
+- tapOn:
+    id: "category-item-transporte"
+- tapOn:
+    id: "category-item-salud"
+
+- tapOn:
+    id: "onboarding-next-btn"
+
+# ── Paso 5: Asignar montos ────────────────────────────────────────────────────
+- assertVisible:
+    id: "onboarding-montos-screen"
+    timeout: 3000
+
+# Verificar que las categorías seleccionadas aparecen con inputs de presupuesto
+- assertVisible:
+    id: "budget-input-arriendo"
+
+- tapOn:
+    id: "budget-input-arriendo"
+- clearText
+- inputText: "900000"
+- hideKeyboard
+
+- tapOn:
+    id: "budget-input-alimentacion"
+- clearText
+- inputText: "500000"
+- hideKeyboard
+
+- tapOn:
+    id: "onboarding-next-btn"
+
+# ── Paso 6: Confirmación ──────────────────────────────────────────────────────
+- assertVisible:
+    id: "onboarding-confirm-screen"
+    timeout: 3000
+
+# Verificar resumen visible
+- assertVisible:
+    text: "3.500.000"
+
+- tapOn:
+    id: "onboarding-finish-btn"
+
+# ── Verificar llegada al Dashboard ────────────────────────────────────────────
+- assertVisible:
+    id: "dashboard-screen"
+    timeout: 8000
+
+- takeScreenshot: "02_onboarding_complete"

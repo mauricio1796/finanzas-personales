@@ -121,6 +121,7 @@ function Field({
       <Text style={st.fieldIcon}>{icon}</Text>
       <TextInput
         ref={inputRef as any}
+        testID={keyboardType === 'email-address' ? 'auth-email-input' : secureTextEntry ? 'auth-password-input' : 'auth-otp-input'}
         style={[
           st.fieldInput,
           { color: textPrimary },
@@ -162,7 +163,7 @@ function CTAButton({ label, onPress, loading, disabled, primary, primaryDark }: 
   };
   return (
     <Animated.View style={{ transform: [{ scale }], marginTop: 16 }}>
-      <Pressable onPress={press} disabled={disabled || loading} style={{ opacity: disabled ? 0.45 : 1 }}>
+      <Pressable onPress={press} disabled={disabled || loading} style={{ opacity: disabled ? 0.45 : 1 }} testID="auth-submit-btn">
         <LinearGradient
           colors={[primary, primaryDark]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}

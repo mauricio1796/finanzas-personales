@@ -1,0 +1,55 @@
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FLUJO 01 — Registro y Login con OTP
+# Cubre: pantalla de bienvenida, ingreso de email, flujo OTP
+# ══════════════════════════════════════════════════════════════════════════════
+appId: com.financyai.app
+name: "01 — Registro y Login con OTP"
+tags:
+  - auth
+  - smoke
+
+---
+
+# ── Precondición: app en estado inicial ───────────────────────────────────────
+- launchApp:
+    clearState: true
+
+# ── Verificar pantalla de Auth ────────────────────────────────────────────────
+- assertVisible: "FinancyAI"
+- assertVisible: "Continuar con email"
+
+# ── Ingresar email ────────────────────────────────────────────────────────────
+- tapOn:
+    id: "auth-email-input"
+- clearText
+- inputText: ${TEST_EMAIL}
+- hideKeyboard
+
+- tapOn:
+    id: "auth-submit-btn"
+
+# ── Verificar transición a pantalla OTP ──────────────────────────────────────
+- assertVisible:
+    text: "Revisa tu email"
+    timeout: 5000
+
+# ── Simular ingreso de OTP (en testing, Supabase puede configurarse sin OTP) ─
+# En desarrollo con Supabase local, el OTP es "000000" por defecto
+- tapOn:
+    id: "auth-otp-input"
+- inputText: "000000"
+
+- tapOn:
+    id: "auth-verify-btn"
+
+# ── Verificar que entra a la app (onboarding o dashboard) ────────────────────
+- assertVisible:
+    anyOf:
+      - text: "Bienvenido"
+      - text: "¡Hola"
+      - id: "onboarding-welcome"
+      - id: "dashboard-screen"
+    timeout: 8000
+
+- takeScreenshot: "01_auth_success"

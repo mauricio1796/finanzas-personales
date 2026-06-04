@@ -79,6 +79,7 @@ const CatCard: React.FC<CardProps> = ({ cat, isSelected, onPress, delay, cardSiz
   return (
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }, { scale: scaleAnim }], width: cardSize, aspectRatio: 1 }}>
       <TouchableOpacity
+        testID={`category-item-${cat.id}`}
         style={[
           s.card,
           {
@@ -180,7 +181,7 @@ export const OnboardingCategories: React.FC<Props> = ({ onNext, onBack }) => {
   return (
     <OnboardingShell step={3} totalSteps={5} onBack={onBack} keyboardAvoiding={false}>
       {/* Finn bubble + counter badge */}
-      <View style={[s.topArea, { paddingHorizontal: 16 }]}>
+      <View style={[s.topArea, { paddingHorizontal: 16 }]} testID="onboarding-categories-screen">
         <View style={s.finnRow}>
           <View style={[s.finnAvatar, { backgroundColor: colors.primary }]}>
             <Text style={s.finnLetter}>F</Text>
@@ -219,6 +220,7 @@ export const OnboardingCategories: React.FC<Props> = ({ onNext, onBack }) => {
       {/* Footer */}
       <View style={[s.footer, { paddingHorizontal: 16, paddingBottom: 16 }]}>
         <TouchableOpacity
+          testID="onboarding-next-btn"
           style={[s.btn, { backgroundColor: colors.primary, opacity: canContinue ? 1 : 0.4 }]}
           onPress={handleNext}
           disabled={!canContinue}

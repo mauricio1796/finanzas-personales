@@ -132,7 +132,7 @@ export function OnboardingWelcome({ onNext }: { onNext: () => void }) {
   const current = SCENES[sceneIdx] ?? SCENES[SCENES.length - 1];
 
   return (
-    <View style={s.root}>
+    <View style={s.root} testID="onboarding-welcome">
       {/* Decoración de fondo */}
       <View style={s.bgCircle1} />
       <View style={s.bgCircle2} />

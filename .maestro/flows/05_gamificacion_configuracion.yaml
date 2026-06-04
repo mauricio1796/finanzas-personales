@@ -1,0 +1,86 @@
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FLUJO 05 — Gamificación, Estadísticas y Configuración
+# Cubre: ver nivel XP, logros, estadísticas mensuales, cerrar sesión
+# ══════════════════════════════════════════════════════════════════════════════
+appId: com.financyai.app
+name: "05 — Gamificación, Estadísticas y Configuración"
+tags:
+  - gamification
+  - stats
+  - settings
+
+---
+
+# ── Gamificación ──────────────────────────────────────────────────────────────
+- tapOn:
+    id: "nav-gamificacion"
+
+- assertVisible:
+    id: "gamificacion-screen"
+    timeout: 5000
+
+# Verificar nivel y XP visibles
+- assertVisible:
+    id: "nivel-badge"
+
+- assertVisible:
+    id: "xp-bar"
+
+# Ver logros
+- tapOn:
+    id: "ver-logros-btn"
+
+- assertVisible:
+    id: "logros-list"
+    timeout: 3000
+
+- takeScreenshot: "05a_gamificacion"
+
+- tapOn:
+    id: "back-btn"
+
+# ── Estadísticas ──────────────────────────────────────────────────────────────
+- tapOn:
+    id: "nav-estadisticas"
+
+- assertVisible:
+    id: "estadisticas-screen"
+    timeout: 5000
+
+# Verificar gráficas visibles
+- assertVisible:
+    id: "chart-gastos-vs-ingresos"
+
+- takeScreenshot: "05b_estadisticas"
+
+# ── Configuración y Cierre de Sesión ─────────────────────────────────────────
+- tapOn:
+    id: "nav-configuracion"
+
+- assertVisible:
+    id: "configuracion-screen"
+    timeout: 3000
+
+# Verificar nombre del usuario visible
+- assertVisible:
+    id: "perfil-nombre"
+
+# Verificar sección premium visible
+- assertVisible:
+    id: "premium-section"
+
+# Cerrar sesión
+- tapOn:
+    id: "cerrar-sesion-btn"
+
+# Confirmar en el dialogo
+- tapOn:
+    text: "Cerrar sesión"
+
+# Verificar que vuelve a la pantalla de Auth
+- assertVisible:
+    text: "Continuar con email"
+    timeout: 5000
+
+- takeScreenshot: "05c_logout_exitoso"

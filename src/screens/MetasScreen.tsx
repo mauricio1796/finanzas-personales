@@ -41,7 +41,7 @@ const MetaForm: React.FC<MetaFormProps> = ({ visible, onClose, onSave }) => {
   };
 
   return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
+    <Modal testID="meta-form-modal" transparent animationType="slide" visible={visible} onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <Pressable style={st.overlay} onPress={onClose}>
           <Pressable style={[st.sheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + 24 }]} onPress={() => {}}>
@@ -66,20 +66,20 @@ const MetaForm: React.FC<MetaFormProps> = ({ visible, onClose, onSave }) => {
               ))}
             </ScrollView>
 
-            <TextInput style={[st.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+            <TextInput testID="meta-title-input" style={[st.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
               placeholder="Nombre de la meta" placeholderTextColor={colors.textTertiary}
               value={nombre} onChangeText={setNombre} />
 
-            <TextInput style={[st.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+            <TextInput testID="meta-target-input" style={[st.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
               placeholder="Monto objetivo (COP)" placeholderTextColor={colors.textTertiary}
               keyboardType="numeric" value={objetivo}
               onChangeText={t => { const d = t.replace(/\./g,'').replace(/\D/g,''); const n = parseInt(d,10); setObjetivo(isNaN(n)?'':n.toLocaleString('es-CO').replace(/,/g,'.')); }} />
 
-            <TextInput style={[st.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
+            <TextInput testID="meta-deadline-input" style={[st.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary }]}
               placeholder="Fecha límite (AAAA-MM-DD, opcional)" placeholderTextColor={colors.textTertiary}
               value={fecha} onChangeText={setFecha} />
 
-            <TouchableOpacity style={[st.saveBtn, { backgroundColor: color }]} onPress={handleSave}>
+            <TouchableOpacity testID="meta-save-btn" style={[st.saveBtn, { backgroundColor: color }]} onPress={handleSave}>
               <Text style={st.saveBtnText}>Crear Meta</Text>
             </TouchableOpacity>
           </Pressable>
@@ -155,14 +155,14 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack }) => {
   const completadas = metas.filter(m => m.completada);
 
   return (
-    <View style={[st.screen, { backgroundColor: colors.background }]}>
+    <View testID="metas-screen" style={[st.screen, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[st.header, { borderBottomColor: colors.border, paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={onBack} style={st.backBtn}>
           <Icon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Mis Metas</Text>
-        <TouchableOpacity onPress={() => setShowForm(true)} style={[st.addBtn, { backgroundColor: colors.primaryLight }]}>
+        <TouchableOpacity testID="metas-add-btn" onPress={() => setShowForm(true)} style={[st.addBtn, { backgroundColor: colors.primaryLight }]}>
           <Icon name="plus" size={20} color={colors.primary} />
         </TouchableOpacity>
       </View>

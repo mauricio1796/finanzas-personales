@@ -85,7 +85,7 @@ export function Dashboard({ transactions, monthlySalary, onNavigateToSection }: 
   }, [transactions]);
 
   const StatCard = ({ label, value, color, subtext }: { label: string; value: string; color: string; subtext?: string }) => (
-    <ThemedView style={[styles.statCard, { borderLeftColor: color, borderLeftWidth: 3, backgroundColor: '#23272f' }]}> 
+    <ThemedView testID={label === 'Saldo' ? 'dashboard-balance' : undefined} style={[styles.statCard, { borderLeftColor: color, borderLeftWidth: 3, backgroundColor: '#23272f' }]}> 
       <ThemedText style={styles.statLabel}>{label}</ThemedText>
       <ThemedText style={[styles.statValue, { color }]}>{value}</ThemedText>
       {subtext && <ThemedText style={styles.statSubtext}>{subtext}</ThemedText>}
@@ -144,6 +144,7 @@ export function Dashboard({ transactions, monthlySalary, onNavigateToSection }: 
 
   return (
     <FlatList
+      testID="dashboard-screen"
       data={selectedCategories}
       keyExtractor={item => item.id}
       contentContainerStyle={[styles.container, { paddingHorizontal: isSmallScreen ? 16 : 24, backgroundColor: '#181a20' }]}
