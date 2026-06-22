@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NativeModules, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { type Transaction, type Category } from '../types';
 import { calcularMetricasFinancieras } from '../utils/ingresoUtils';
 import { calcularRachaActual } from '../services/GamificacionService';
+import { updateWidgetNative } from '../../modules/widget-bridge';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -84,17 +85,12 @@ export async function actualizarWidget(data: WidgetData): Promise<void> {
   try {
     const json = JSON.stringify(data);
 
-    // Siempre guardar en AsyncStorage como fallback legible
+    // Guardar en AsyncStorage como fallback legible en desarrollo
     await AsyncStorage.setItem(WIDGET_KEY, json);
 
-    // Llamar al módulo nativo si está disponible (post-prebuild)
-    const mod = NativeModules.WidgetModule;
-    if (mod?.updateWidget) {
-      if (Platform.OS === 'android') {
-        await mod.updateWidget(json);
-      } else if (Platform.OS === 'ios') {
-        await mod.updateWidget(json);
-      }
+    // Escribir al App Group compartido y recargar el timeline de WidgetKit (iOS)
+    if (Platform.OS === 'ios') {
+      await updateWidgetNative(json);
     }
   } catch (e) {
     // Falla silenciosamente — nunca crashear la app

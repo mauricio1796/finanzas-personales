@@ -13,7 +13,9 @@
       "bundleIdentifier": "com.financyai.finanzaspersonales",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "FinancyAI usa el micrófono para que puedas registrar gastos e ingresos con tu voz.",
-        "NSCameraUsageDescription": "FinancyAI puede usar la cámara para escanear recibos.",
+        "NSCameraUsageDescription": "FinancyAI usa la cámara para escanear recibos y registrar gastos automáticamente.",
+        "NSPhotoLibraryUsageDescription": "FinancyAI accede a tu galería para que puedas escanear fotos de recibos y facturas.",
+        "NSPhotoLibraryAddOnlyUsageDescription": "FinancyAI puede guardar fotos de recibos en tu galería.",
         "NSUserNotificationsUsageDescription": "FinancyAI te enviará recordatorios de pagos, alertas de presupuesto y resúmenes financieros."
       },
       "entitlements": {
@@ -31,7 +33,10 @@
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.USE_EXACT_ALARM",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -49,6 +54,7 @@
     },
     "plugins": [
       "expo-router",
+      "@bacons/apple-targets",
       [
         "expo-splash-screen",
         {
@@ -74,6 +80,13 @@
         "expo-av",
         {
           "microphonePermission": "FinancyAI usa el micrófono para que puedas registrar gastos e ingresos con tu voz."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FinancyAI accede a tu galería para que puedas escanear fotos de recibos y facturas.",
+          "cameraPermission": "FinancyAI usa la cámara para escanear recibos y registrar gastos automáticamente."
         }
       ]
     ],

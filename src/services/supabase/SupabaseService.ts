@@ -1,5 +1,5 @@
 import { supabase, isSupabaseReady } from '../../lib/supabase';
-import type { Transaction, Category, FinancialProfile, FinancialGoal, UserLevel } from '../../types';
+import type { Transaction, Category, FinancialProfile, FinancialGoal, UserLevel, Meta, Deuda, GastoRecurrente } from '../../types';
 import type { PremiumState, RetoActivo } from '../../state/FinanceContext';
 
 // ─── Tipos públicos ───────────────────────────────────────────────────────────
@@ -17,6 +17,9 @@ export interface ServerData {
   paidTxIds: string[];
   name: string;
   monthlySalary: number;
+  metas: Meta[];
+  deudas: Deuda[];
+  recurrentes: GastoRecurrente[];
 }
 
 export interface TransactionPage {
@@ -130,7 +133,7 @@ function rowToUserLevel(r: Record<string, any>, userId: string): UserLevel {
     level: r.level as number,
     experience: r.experience as number,
     title: r.title as UserLevel['title'],
-    createdAt: r.updated_at as string,
+    createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
 }
@@ -183,7 +186,7 @@ class SupabaseService {
 
     let query = db
       .from('transactions')
-      .select('id, amount, category, date, type, description, updated_at')
+      .select('id, amount, category, date, type, description, subcategory, updated_at')
       .eq('user_id', userId)
       .is('deleted_at', null)   // excluye soft-deleted
       .order('date', { ascending: false })
@@ -212,7 +215,7 @@ class SupabaseService {
     if (!db) return null;
     const { data, error } = await db
       .from('transactions')
-      .select('id, amount, category, date, type, description')
+      .select('id, amount, category, date, type, description, subcategory')
       .eq('user_id', userId)
       .is('deleted_at', null)
       .order('date', { ascending: false });
@@ -478,6 +481,157 @@ class SupabaseService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // METAS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async getMetas(userId: string): Promise<Meta[] | null> {
+    const db = this.db;
+    if (!db) return null;
+    const { data, error } = await db
+      .from('metas')
+      .select('*')
+      .eq('user_id', userId)
+      .order('creada_en', { ascending: false });
+    if (error || !data) return null;
+    return (data as any[]).map(r => ({
+      id: r.id,
+      nombre: r.nombre,
+      montoObjetivo: r.monto_objetivo,
+      montoActual: r.monto_actual,
+      emoji: r.emoji,
+      color: r.color,
+      fechaLimite: r.fecha_limite ?? undefined,
+      completada: r.completada,
+      creadaEn: r.creada_en,
+    } as Meta));
+  }
+
+  async upsertMeta(userId: string, meta: Meta): Promise<void> {
+    const db = this.db;
+    if (!db) return;
+    await db.from('metas').upsert({
+      id: meta.id,
+      user_id: userId,
+      nombre: meta.nombre.substring(0, 200),
+      monto_objetivo: meta.montoObjetivo,
+      monto_actual: meta.montoActual,
+      emoji: meta.emoji,
+      color: meta.color,
+      fecha_limite: meta.fechaLimite ?? null,
+      completada: meta.completada,
+      creada_en: meta.creadaEn,
+    });
+  }
+
+  async deleteMeta(id: string, userId: string): Promise<void> {
+    const db = this.db;
+    if (!db) return;
+    await db.from('metas').delete().eq('id', id).eq('user_id', userId);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DEUDAS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async getDeudas(userId: string): Promise<Deuda[] | null> {
+    const db = this.db;
+    if (!db) return null;
+    const { data, error } = await db
+      .from('deudas')
+      .select('*')
+      .eq('user_id', userId)
+      .order('creada_en', { ascending: false });
+    if (error || !data) return null;
+    return (data as any[]).map(r => ({
+      id: r.id,
+      nombre: r.nombre,
+      montoOriginal: r.monto_original,
+      saldo: r.saldo,
+      tasaMensual: r.tasa_mensual,
+      cuotaMensual: r.cuota_mensual,
+      diaPago: r.dia_pago ?? undefined,
+      pagos: r.pagos ?? [],
+      creadaEn: r.creada_en,
+      saldada: r.saldada,
+    } as Deuda));
+  }
+
+  async upsertDeuda(userId: string, deuda: Deuda): Promise<void> {
+    const db = this.db;
+    if (!db) return;
+    await db.from('deudas').upsert({
+      id: deuda.id,
+      user_id: userId,
+      nombre: deuda.nombre.substring(0, 200),
+      monto_original: deuda.montoOriginal,
+      saldo: deuda.saldo,
+      tasa_mensual: deuda.tasaMensual,
+      cuota_mensual: deuda.cuotaMensual,
+      dia_pago: deuda.diaPago ?? null,
+      pagos: deuda.pagos,
+      saldada: deuda.saldada,
+      creada_en: deuda.creadaEn,
+    });
+  }
+
+  async deleteDeuda(id: string, userId: string): Promise<void> {
+    const db = this.db;
+    if (!db) return;
+    await db.from('deudas').delete().eq('id', id).eq('user_id', userId);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GASTOS RECURRENTES
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async getRecurrentes(userId: string): Promise<GastoRecurrente[] | null> {
+    const db = this.db;
+    if (!db) return null;
+    const { data, error } = await db
+      .from('gastos_recurrentes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('creado_en', { ascending: false });
+    if (error || !data) return null;
+    return (data as any[]).map(r => ({
+      id: r.id,
+      nombre: r.nombre,
+      monto: r.monto,
+      categoria: r.categoria,
+      frecuencia: r.frecuencia,
+      diaPago: r.dia_pago ?? undefined,
+      activo: r.activo,
+      proximoPago: r.proximo_pago ?? undefined,
+      descripcion: r.descripcion ?? undefined,
+      creadoEn: r.creado_en,
+    } as GastoRecurrente));
+  }
+
+  async upsertRecurrente(userId: string, r: GastoRecurrente): Promise<void> {
+    const db = this.db;
+    if (!db) return;
+    await db.from('gastos_recurrentes').upsert({
+      id: r.id,
+      user_id: userId,
+      nombre: r.nombre.substring(0, 200),
+      monto: r.monto,
+      categoria: r.categoria.substring(0, 100),
+      frecuencia: r.frecuencia,
+      dia_pago: r.diaPago ?? null,
+      activo: r.activo,
+      proximo_pago: r.proximoPago ?? null,
+      descripcion: r.descripcion?.substring(0, 500) ?? null,
+      creado_en: r.creadoEn,
+    });
+  }
+
+  async deleteRecurrente(id: string, userId: string): Promise<void> {
+    const db = this.db;
+    if (!db) return;
+    await db.from('gastos_recurrentes').delete().eq('id', id).eq('user_id', userId);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // FINN MEMORY
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -509,13 +663,16 @@ class SupabaseService {
   async pullFromServer(userId: string): Promise<ServerData | null> {
     if (!this.db) return null;
     try {
-      const [transactions, categories, profile, goal, userLevel, userData] = await Promise.all([
+      const [transactions, categories, profile, goal, userLevel, userData, metas, deudas, recurrentes] = await Promise.all([
         this.getAllTransactions(userId),
         this.getCategories(userId),
         this.getFinancialProfile(userId),
         this.getGoal(userId),
         this.getUserLevel(userId),
         this.getUserData(userId),
+        this.getMetas(userId),
+        this.getDeudas(userId),
+        this.getRecurrentes(userId),
       ]);
 
       if (!transactions && !categories && !profile && !userData) return null;
@@ -534,6 +691,9 @@ class SupabaseService {
         paidTxIds: userData?.paidTxIds ?? [],
         name: userData?.name ?? '',
         monthlySalary: userData?.monthlySalary ?? 0,
+        metas: metas ?? [],
+        deudas: deudas ?? [],
+        recurrentes: recurrentes ?? [],
       };
     } catch (e) {
       console.warn('[SupabaseService] pullFromServer error:', e);
@@ -554,6 +714,9 @@ class SupabaseService {
     isOnboarded: boolean;
     name: string;
     monthlySalary: number;
+    metas?: Meta[];
+    deudas?: Deuda[];
+    recurrentes?: GastoRecurrente[];
   }): Promise<void> {
     if (!this.db) return;
     try {
@@ -572,6 +735,9 @@ class SupabaseService {
           retoActivo: data.retoActivo,
           premium: data.premium,
         }),
+        ...(data.metas ?? []).map(m => this.upsertMeta(userId, m)),
+        ...(data.deudas ?? []).map(d => this.upsertDeuda(userId, d)),
+        ...(data.recurrentes ?? []).map(r => this.upsertRecurrente(userId, r)),
       ]);
     } catch (e) {
       console.warn('[SupabaseService] pushAllToServer error:', e);
@@ -591,6 +757,9 @@ class SupabaseService {
         db.from('financial_goals').delete().eq('user_id', userId),
         db.from('user_levels').delete().eq('user_id', userId),
         db.from('finn_memory').delete().eq('user_id', userId),
+        db.from('metas').delete().eq('user_id', userId),
+        db.from('deudas').delete().eq('user_id', userId),
+        db.from('gastos_recurrentes').delete().eq('user_id', userId),
         db.from('profiles').update({
           monthly_salary: 0,
           is_onboarded: false,

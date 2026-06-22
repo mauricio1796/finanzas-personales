@@ -52,7 +52,7 @@ export function Usuario({ onReset, onStartTour, onNavigate }: UsuarioProps) {
   const xpCurrent = userLevel?.experience ?? 0;
   const xpNext = level * 1000;
 
-  const unlockedCount = achievements.filter(a => a.unclocked).length;
+  const unlockedCount = achievements.filter(a => a.unlocked).length;
 
   // Monthly transactions
   const now = new Date();

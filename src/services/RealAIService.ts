@@ -8,6 +8,7 @@ import {
 import { procesarMensajeUsuario } from './ai/AIService';
 import { finnMemoryService } from './FinnMemoryService';
 import { CONFIG } from '../constants/config';
+import type { SharedSpaceSummary } from '../features/shared-finances/types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -30,12 +31,24 @@ export interface ContextoPersonalizado {
   recurrentes?: GastoRecurrente[];
   userLevel?: UserLevel | null;
   userId?: string;
+  /** When true, Finn gives shorter, conversational responses optimised for TTS */
+  vozMode?: boolean;
+  /** Contexto del espacio compartido — solo datos del espacio, NUNCA finanzas personales del otro miembro */
+  espacioCompartido?: SharedSpaceSummary | null;
 }
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
-function buildSystemPrompt(contexto: string, nombreUsuario: string): string {
-  return `Eres Finn, el asistente financiero personal de ${nombreUsuario} en la app FinancyAI.
+function buildSystemPrompt(contexto: string, nombreUsuario: string, vozMode = false): string {
+  const vozInstructions = vozMode ? `
+MODO VOZ ACTIVO:
+- El usuario te está hablando por voz — responde EXACTAMENTE como si hablaras.
+- Respuestas MUY cortas: máximo 2 oraciones. Nunca más de 40 palabras.
+- PROHIBIDO: viñetas, listas, asteriscos, markdown, emojis, símbolos especiales.
+- Usa lenguaje oral natural: "Claro," "Mira," "Pues," "Oye," etc.
+- Pronuncia números de forma hablada: "un millón doscientos" no "$1.200.000".
+` : '';
+  return `Eres Finn, el asistente financiero personal de ${nombreUsuario} en la app FinancyAI.${vozInstructions}
 
 PERSONALIDAD:
 - Eres amigable, directo y empático
@@ -117,7 +130,29 @@ async function buildContextoEnriquecido(
     },
   );
 
-  return { contexto, metricas };
+  // Contexto del espacio compartido — se añade al final, separado del contexto personal
+  let contextoFinal = contexto;
+  if (extra.espacioCompartido) {
+    const ec = extra.espacioCompartido;
+    const deudaTxt = ec.deudaNeta
+      ? `${ec.deudaNeta.deudorNombre} le debe $${Math.round(ec.deudaNeta.monto).toLocaleString('es-CO')} a ${ec.deudaNeta.acreedorNombre}`
+      : 'Están a mano, sin deudas pendientes';
+    const catTxt = ec.gastosPorCategoria
+      .sort((a, b) => b.monto - a.monto)
+      .slice(0, 3)
+      .map(c => `${c.categoria}: $${Math.round(c.monto).toLocaleString('es-CO')}`)
+      .join(', ');
+    contextoFinal += `
+
+ESPACIO COMPARTIDO — "${ec.spaceName}":
+- Miembros: ${ec.members.map(m => m.displayName).join(' y ')}
+- Gasto total del espacio este mes: $${Math.round(ec.totalGastosMes).toLocaleString('es-CO')}
+- Principales categorías compartidas: ${catTxt || 'Sin gastos aún'}
+- Balance: ${deudaTxt}
+IMPORTANTE: Solo usa datos del espacio compartido para responder preguntas sobre el espacio. No reveles ni compares las finanzas personales de ningún miembro.`;
+  }
+
+  return { contexto: contextoFinal, metricas };
 }
 
 // ── Llamada al Worker ─────────────────────────────────────────────────────────
@@ -136,6 +171,7 @@ async function llamarWorker(
       headers: {
         'Content-Type':  'application/json',
         'X-App-Version': CONFIG.APP_VERSION,
+        'X-App-Token':   CONFIG.WORKER_TOKEN,
       },
       body: JSON.stringify({ system, messages: mensajes, max_tokens: maxTokens }),
       signal: controller.signal,
@@ -163,6 +199,8 @@ const FINANCE_KEYWORDS = [
   'financy','cuánto','cuanto','registra','borra','elimina','agrega','crea','actualiza',
   'disponible','mes','semana','diario','reporte','estadística','estadistica','compra',
   'factura','arriendo','servicios','alimentaci','transporte','entreteni','ropa','salud',
+  // Finanzas compartidas
+  'compartido','espacio','pareja','debe','debo','mitad','dividir','división','roomie',
 ];
 
 const OFFTOPIC_PATTERNS = [
@@ -171,7 +209,7 @@ const OFFTOPIC_PATTERNS = [
   /política|politica|presidente|gobierno|elección/i,
   /película|pelicula|serie|netflix|spotify|música|musica/i,
   /chiste|cuento|historia|poema|canción/i,
-  /amor|novio|novia|relaci[oó]n personal|cita|pareja/i,
+  /amor|novio|novia|relaci[oó]n personal|cita/i,
   /clima|tiempo.*hoy|temperatura/i,
   /traducir|translate|translate/i,
   /programar|código|codigo|javascript|python(?! finanz)/i,
@@ -205,13 +243,14 @@ export async function enviarMensajeAFinn(
   if (esOffTopic(mensajeUsuario)) return RESPUESTA_OFFTOPIC;
   try {
     const { contexto } = await buildContextoEnriquecido(transactions, categories, profile, extra);
-    const system   = buildSystemPrompt(contexto, profile?.name ?? 'Usuario');
+    const system   = buildSystemPrompt(contexto, profile?.name ?? 'Usuario', extra.vozMode);
+    const maxTokens = extra.vozMode ? 150 : CONFIG.MAX_TOKENS_RESPUESTA;
     const mensajes: MensajeChat[] = [
       ...historial.slice(-(CONFIG.MAX_HISTORIAL_MENSAJES - 1)),
       { role: 'user', content: mensajeUsuario },
     ];
 
-    const texto = await llamarWorker(mensajes, system, CONFIG.MAX_TOKENS_RESPUESTA);
+    const texto = await llamarWorker(mensajes, system, maxTokens);
 
     // Actualizar patrones en background (sin bloquear la respuesta)
     if (extra.userId) {

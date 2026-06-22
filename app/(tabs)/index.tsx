@@ -34,12 +34,14 @@ import { WidgetConfigScreen } from '../../src/screens/WidgetConfigScreen';
 import { deberiasMostrarResumen } from '../../src/utils/resumenMensualUtils';
 import { GamificacionScreen } from '../../src/screens/GamificacionScreen';
 import { ConfiguracionScreen } from '../../src/screens/ConfiguracionScreen';
-import { PersonalizacionScreen } from '../../src/screens/PersonalizacionScreen';
+import { PersonalizacionScreen }        from '../../src/screens/PersonalizacionScreen';
+import { AlertasPreferencesScreen }     from '../../src/features/proactive-alerts/AlertasPreferencesScreen';
 import { ResumenSemanalCard } from '../../src/components/finanzas/ResumenSemanalCard';
 import { type NotifData } from '../../src/services/NotificacionesService';
 import { useNotificacionesManager } from '../../src/hooks/useNotificacionesManager';
 import { useWidgetSync } from '../../src/hooks/useWidgetSync';
 import * as Notifications from 'expo-notifications';
+import * as Linking from 'expo-linking';
 
 import { AuthScreen } from '../../src/screens/AuthScreen';
 
@@ -73,6 +75,8 @@ import { PermissionsScreen } from '../../src/screens/PermissionsScreen';
 import { PinSetupScreen }   from '../../src/screens/PinSetupScreen';
 import { PinEntryScreen }   from '../../src/screens/PinEntryScreen';
 import { savePin, hasPin, verifyPin, clearPin } from '../../src/services/PinService';
+import { SharedFinancesEntryScreen } from '../../src/features/shared-finances/screens/SharedFinancesEntryScreen';
+import { ReceiptScanScreen } from '../../src/features/receipt-scan/screens/ReceiptScanScreen';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -96,12 +100,30 @@ export default function HomeScreen() {
     addTransaction: ctxAddTransaction, deleteTransaction: ctxDeleteTransaction,
     addCategory,
     isLoading, importServerData, saldoDisponible, resetAll,
+    syncFailureMessage, clearSyncFailure,
   } = useFinance();
   useTheme(); // keep context subscription
 
   // ==================== NOTIFICATIONS ====================
   useNotificacionesManager();
   useWidgetSync();
+
+  // ==================== DEEP LINK (widget tap) ====================
+  // Maneja finanzaspersonales://agregar-gasto cuando el usuario toca el widget
+  useEffect(() => {
+    const handleUrl = ({ url }: { url: string }) => {
+      if (url.includes('agregar-gasto')) {
+        setQuickAddMode('expense');
+      }
+    };
+    // URL que abrió la app desde estado cerrado
+    Linking.getInitialURL().then(url => {
+      if (url && url.includes('agregar-gasto')) setQuickAddMode('expense');
+    });
+    // URL mientras la app está en background
+    const sub = Linking.addEventListener('url', handleUrl);
+    return () => sub.remove();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ==================== SPLASH ====================
   const [showSplash, setShowSplash] = useState(true);
@@ -165,6 +187,14 @@ export default function HomeScreen() {
   const [botInitialMessage, setBotInitialMessage] = useState<string | undefined>(undefined);
   const [resumenMensualMes, setResumenMensualMes] = useState<{ mes: number; año: number } | undefined>(undefined);
   const { toast, mostrar: mostrarToast, ocultar: ocultarToast } = useToast();
+
+  // Mostrar Toast cuando SyncQueue descarta una operación definitivamente
+  useEffect(() => {
+    if (syncFailureMessage) {
+      mostrarToast(syncFailureMessage, 'error');
+      clearSyncFailure();
+    }
+  }, [syncFailureMessage, mostrarToast, clearSyncFailure]);
 
   // ==================== NAVIGATION STACK ====================
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -852,6 +882,9 @@ export default function HomeScreen() {
           {currentScreen === 'personalizacion' && (
             <PersonalizacionScreen onBack={volver} />
           )}
+          {currentScreen === 'alertas-preferencias' && (
+            <AlertasPreferencesScreen onBack={volver} />
+          )}
           {currentScreen === 'retos' && (
             <RetosScreen onBack={volver} />
           )}
@@ -888,6 +921,15 @@ export default function HomeScreen() {
           )}
           {currentScreen === 'recurrentes' && (
             <RecurrentesScreen onBack={volver} />
+          )}
+          {currentScreen === 'compartido' && (
+            <SharedFinancesEntryScreen onVolver={volver} />
+          )}
+          {currentScreen === 'escanear' && (
+            <ReceiptScanScreen
+              onGastoRegistrado={() => navegarA('gastos')}
+              onCancelar={volver}
+            />
           )}
         </Animated.View>
         {mostrarBottomNav(currentScreen) && Platform.OS !== 'web' && (

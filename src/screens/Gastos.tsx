@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import {
   StyleSheet, TextInput, Pressable, View, Text,
-  ScrollView, Platform, Modal,
+  ScrollView, Platform, Modal, TouchableOpacity,
 } from 'react-native';
+import { ReceiptScanScreen } from '@/src/features/receipt-scan/screens/ReceiptScanScreen';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Transaction } from '@/src/core/financeEngine';
@@ -59,7 +60,8 @@ export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack
   const [amtFocused,    setAmtFocused]    = useState(false);
   const [descFocused,   setDescFocused]   = useState(false);
   const [tipIdx]                          = useState(() => Math.floor(Math.random() * TIPS.length));
-  const [subModalOpen, setSubModalOpen]   = useState(false);
+  const [subModalOpen,  setSubModalOpen]  = useState(false);
+  const [scanModalOpen, setScanModalOpen] = useState(false);
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const expList = useMemo(
@@ -317,12 +319,30 @@ export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack
             </View>
           )}
 
+          {/* Escanear recibo */}
+          <TouchableOpacity
+            style={[s.scanBtn, { borderColor: '#EF4444', backgroundColor: isDark ? '#2D0808' : '#FFF5F5' }]}
+            onPress={() => setScanModalOpen(true)}
+            activeOpacity={0.8}
+          >
+            <Icon name="camera" size={18} color="#EF4444" />
+            <Text style={[s.scanBtnText, { color: '#EF4444' }]}>Escanear recibo con IA</Text>
+          </TouchableOpacity>
+
           {/* CTA */}
           <Pressable style={s.addBtn} onPress={handleAdd}>
             <Icon name="arrow-down-circle" size={20} color="#fff" />
             <Text style={s.addBtnText}>Registrar gasto</Text>
           </Pressable>
         </View>
+
+        {/* Modal: escaneo de recibo */}
+        <Modal visible={scanModalOpen} animationType="slide" presentationStyle="pageSheet">
+          <ReceiptScanScreen
+            onGastoRegistrado={() => setScanModalOpen(false)}
+            onCancelar={() => setScanModalOpen(false)}
+          />
+        </Modal>
 
         {/* ── History ─────────────────────────────────────────────────── */}
         <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -487,9 +507,16 @@ const s = StyleSheet.create({
   budgetTrack: { height: 6, borderRadius: 3, flexDirection: 'row', overflow: 'hidden' },
   budgetFill: { height: 6, borderRadius: 3 },
 
+  scanBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, borderRadius: 16, paddingVertical: 13, marginTop: 14,
+    borderWidth: 1.5,
+  },
+  scanBtnText: { fontSize: 15, fontWeight: '700' },
+
   addBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, borderRadius: 16, paddingVertical: 16, marginTop: 18,
+    gap: 8, borderRadius: 16, paddingVertical: 16, marginTop: 10,
     backgroundColor: '#EF4444',
     ...(Platform.OS !== 'web' ? { shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 } : {}),
   },

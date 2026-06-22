@@ -4,6 +4,8 @@ import { storageService } from './storage/StorageService';
 
 export type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline';
 
+export type SyncFailureListener = (descripcion: string) => void;
+
 export interface SyncOperation {
   id: string;
   fn: () => Promise<void>;
@@ -23,6 +25,7 @@ class SyncQueueService {
   private isProcessing = false;
   private status: SyncStatus = 'idle';
   private listeners: SyncStatusListener[] = [];
+  private failureListeners: SyncFailureListener[] = [];
   private retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   // ─── API pública ───────────────────────────────────────────────────────────
@@ -42,9 +45,16 @@ class SyncQueueService {
 
   onStatusChange(listener: SyncStatusListener): () => void {
     this.listeners.push(listener);
-    // Retorna función de cleanup
     return () => {
       this.listeners = this.listeners.filter(l => l !== listener);
+    };
+  }
+
+  // Registra un listener para cuando una operación se descarta definitivamente
+  onSyncFailure(listener: SyncFailureListener): () => void {
+    this.failureListeners.push(listener);
+    return () => {
+      this.failureListeners = this.failureListeners.filter(l => l !== listener);
     };
   }
 
@@ -96,8 +106,9 @@ class SyncQueueService {
       }
 
       if (op.intentos >= op.maxIntentos) {
-        // Agotó reintentos: descartar y continuar con la siguiente
+        // Agotó reintentos: descartar y notificar al usuario
         console.warn(`[SyncQueue] Operación descartada (${op.intentos} intentos): ${op.descripcion}`, e?.message);
+        this.failureListeners.forEach(l => l(op.descripcion));
         this.queue.shift();
         this.setStatus(this.queue.length > 0 ? 'syncing' : 'error', this.queue.length);
         // Continuar con la siguiente operación

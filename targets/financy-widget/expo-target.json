@@ -1,0 +1,11 @@
+{
+  "type": "widget",
+  "name": "FinancyWidget",
+  "deploymentTarget": "16.0",
+  "entitlements": {
+    "com.apple.security.application-groups": [
+      "group.com.financyai.finanzaspersonales"
+    ]
+  },
+  "frameworks": ["WidgetKit", "SwiftUI"]
+}

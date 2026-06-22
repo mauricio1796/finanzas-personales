@@ -321,6 +321,25 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
               </View>
               <Icon name="chevron-right" size={16} color={colors.textTertiary} />
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.personalizacionBtn, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 10 }]}
+              onPress={() => onNavigate('alertas-preferencias')}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.personalizacionIcon, { backgroundColor: colors.primaryLight }]}>
+                <Icon name="bell" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.personalizacionTitle, { color: colors.textPrimary }]}>
+                  Alertas de Finn
+                </Text>
+                <Text style={[styles.personalizacionSub, { color: colors.textTertiary }]}>
+                  Controla qué alertas recibes y con qué frecuencia
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
           </>
         )}
 

@@ -154,7 +154,7 @@ export interface Achievement {
   description: string;
   icon: string;
   unlockedAt?: string;
-  unclocked: boolean;
+  unlocked: boolean;
 }
 
 // Nivel del Usuario

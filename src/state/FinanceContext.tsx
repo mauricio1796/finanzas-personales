@@ -79,6 +79,8 @@ interface FinanceContextType {
   // Estado de sincronización visible al usuario
   syncStatus: SyncStatus;
   syncPendingCount: number;
+  syncFailureMessage: string | null;
+  clearSyncFailure: () => void;
 
   // Phase 3 methods
   completarLeccion: (leccionId: string, xp: number) => void;
@@ -169,6 +171,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Sync status
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [syncPendingCount, setSyncPendingCount] = useState(0);
+  const [syncFailureMessage, setSyncFailureMessage] = useState<string | null>(null);
 
   // ─── Hydration (AsyncStorage → estado local) ──────────────────────────────
   const hydrate = useCallback(async () => {
@@ -252,6 +255,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return unsub;
   }, []);
 
+  // Notificar al usuario cuando una operación de sync falla definitivamente
+  useEffect(() => {
+    const unsub = syncQueue.onSyncFailure((descripcion) => {
+      setSyncFailureMessage(`No se pudo guardar "${descripcion}". Verifica tu conexión.`);
+    });
+    return unsub;
+  }, []);
+
   // ─── Auto-persist (AsyncStorage) ──────────────────────────────────────────
   // Nota: el sync a Supabase se hace en cada método de acción (fire-and-forget),
   // NO en estos effects, para evitar syncs completos en cada cambio.
@@ -288,6 +299,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (data.premium !== undefined) setPremiumState(data.premium);
     if (data.isOnboarded !== undefined) setIsOnboardedState(data.isOnboarded);
     if (data.paidTxIds !== undefined) await storageService.savePaidTxIds(data.paidTxIds);
+    if (data.metas !== undefined) setMetas(data.metas);
+    if (data.deudas !== undefined) setDeudas(data.deudas);
+    if (data.recurrentes !== undefined) setRecurrentes(data.recurrentes);
   };
 
   // ─── Core methods ─────────────────────────────────────────────────────────
@@ -580,41 +594,83 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // ─── Metas ────────────────────────────────────────────────────────────────
-  const addMeta = (meta: Meta) => setMetas(prev => [meta, ...prev]);
+  const addMeta = (meta: Meta) => {
+    setMetas(prev => [meta, ...prev]);
+    if (user) syncQueue.enqueue('agregar meta', () => supabaseService.upsertMeta(user.id, meta));
+  };
   const updateMeta = (id: string, update: Partial<Meta>) =>
-    setMetas(prev => prev.map(m => m.id === id ? { ...m, ...update } : m));
-  const deleteMeta = (id: string) => setMetas(prev => prev.filter(m => m.id !== id));
+    setMetas(prev => prev.map(m => {
+      if (m.id !== id) return m;
+      const updated = { ...m, ...update };
+      if (user) syncQueue.enqueue('actualizar meta', () => supabaseService.upsertMeta(user.id, updated));
+      return updated;
+    }));
+  const deleteMeta = (id: string) => {
+    setMetas(prev => prev.filter(m => m.id !== id));
+    if (user) syncQueue.enqueue('eliminar meta', () => supabaseService.deleteMeta(id, user.id));
+  };
   const abonarMeta = (id: string, monto: number) =>
     setMetas(prev => prev.map(m => {
       if (m.id !== id) return m;
       const nuevo = Math.min(m.montoActual + monto, m.montoObjetivo);
-      return { ...m, montoActual: nuevo, completada: nuevo >= m.montoObjetivo };
+      const updated = { ...m, montoActual: nuevo, completada: nuevo >= m.montoObjetivo };
+      if (user) syncQueue.enqueue('abonar meta', () => supabaseService.upsertMeta(user.id, updated));
+      return updated;
     }));
 
   // ─── Deudas ───────────────────────────────────────────────────────────────
-  const addDeuda = (deuda: Deuda) => setDeudas(prev => [deuda, ...prev]);
+  const addDeuda = (deuda: Deuda) => {
+    setDeudas(prev => [deuda, ...prev]);
+    if (user) syncQueue.enqueue('agregar deuda', () => supabaseService.upsertDeuda(user.id, deuda));
+  };
   const updateDeuda = (id: string, update: Partial<Deuda>) =>
-    setDeudas(prev => prev.map(d => d.id === id ? { ...d, ...update } : d));
-  const deleteDeuda = (id: string) => setDeudas(prev => prev.filter(d => d.id !== id));
+    setDeudas(prev => prev.map(d => {
+      if (d.id !== id) return d;
+      const updated = { ...d, ...update };
+      if (user) syncQueue.enqueue('actualizar deuda', () => supabaseService.upsertDeuda(user.id, updated));
+      return updated;
+    }));
+  const deleteDeuda = (id: string) => {
+    setDeudas(prev => prev.filter(d => d.id !== id));
+    if (user) syncQueue.enqueue('eliminar deuda', () => supabaseService.deleteDeuda(id, user.id));
+  };
   const pagarDeuda = (id: string, pago: PagoDeuda) =>
     setDeudas(prev => prev.map(d => {
       if (d.id !== id) return d;
       const nuevoSaldo = Math.max(0, d.saldo - pago.monto);
-      return {
+      const updated = {
         ...d,
         saldo: nuevoSaldo,
         saldada: nuevoSaldo <= 0,
         pagos: [pago, ...d.pagos],
       };
+      if (user) syncQueue.enqueue('pagar deuda', () => supabaseService.upsertDeuda(user.id, updated));
+      return updated;
     }));
 
   // ─── Gastos Recurrentes ───────────────────────────────────────────────────
-  const addRecurrente = (r: GastoRecurrente) => setRecurrentes(prev => [r, ...prev]);
+  const addRecurrente = (r: GastoRecurrente) => {
+    setRecurrentes(prev => [r, ...prev]);
+    if (user) syncQueue.enqueue('agregar recurrente', () => supabaseService.upsertRecurrente(user.id, r));
+  };
   const updateRecurrente = (id: string, update: Partial<GastoRecurrente>) =>
-    setRecurrentes(prev => prev.map(r => r.id === id ? { ...r, ...update } : r));
-  const deleteRecurrente = (id: string) => setRecurrentes(prev => prev.filter(r => r.id !== id));
+    setRecurrentes(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const updated = { ...r, ...update };
+      if (user) syncQueue.enqueue('actualizar recurrente', () => supabaseService.upsertRecurrente(user.id, updated));
+      return updated;
+    }));
+  const deleteRecurrente = (id: string) => {
+    setRecurrentes(prev => prev.filter(r => r.id !== id));
+    if (user) syncQueue.enqueue('eliminar recurrente', () => supabaseService.deleteRecurrente(id, user.id));
+  };
   const toggleRecurrente = (id: string) =>
-    setRecurrentes(prev => prev.map(r => r.id === id ? { ...r, activo: !r.activo } : r));
+    setRecurrentes(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const updated = { ...r, activo: !r.activo };
+      if (user) syncQueue.enqueue('toggle recurrente', () => supabaseService.upsertRecurrente(user.id, updated));
+      return updated;
+    }));
 
   const resetAll = async () => {
     if (user) {
@@ -658,6 +714,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     user,
     syncStatus,
     syncPendingCount,
+    syncFailureMessage,
+    clearSyncFailure: () => setSyncFailureMessage(null),
     transactions,
     categories,
     saldoDisponible,

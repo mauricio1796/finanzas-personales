@@ -1,25 +1,23 @@
 // Configuración centralizada de la app.
 // NUNCA poner secrets aquí — solo la URL pública del Worker.
 
-// La URL del Worker se lee primero de la variable de entorno EXPO_PUBLIC_WORKER_URL,
-// con fallback al placeholder para detectarlo en runtime.
 const WORKER_URL_ENV = process.env.EXPO_PUBLIC_WORKER_URL ?? '';
+const WORKER_TOKEN_ENV = process.env.EXPO_PUBLIC_WORKER_TOKEN ?? '';
 
-if (!WORKER_URL_ENV || WORKER_URL_ENV.includes('TU_USUARIO')) {
+if (!WORKER_URL_ENV) {
   console.warn(
-    '[FinancyAI] ⚠️  WORKER_URL no configurada. ' +
-    'Define EXPO_PUBLIC_WORKER_URL en .env.local con la URL real de tu Cloudflare Worker. ' +
-    'Finn usará modo local hasta que se configure.'
+    '[FinancyAI] ⚠️  EXPO_PUBLIC_WORKER_URL no configurada en .env.local. Finn usará modo local.'
   );
 }
 
 export const CONFIG = {
-  // URL del Cloudflare Worker
-  // 1. Crea el archivo .env.local en finanzas-personales/
-  // 2. Agrega: EXPO_PUBLIC_WORKER_URL=https://financyai-proxy.TU_SUBDOMINIO.workers.dev
-  WORKER_URL: WORKER_URL_ENV || 'https://financyai-proxy.ricardo-mosquerab.workers.dev',
+  WORKER_URL: WORKER_URL_ENV,
 
-  // Versión de la app (para headers de diagnóstico)
+  // Token de app que el Worker puede verificar (no es un secret de API, es un identificador de origen)
+  // Agrega en .env.local: EXPO_PUBLIC_WORKER_TOKEN=financyai-mobile-v1
+  // Y en el Worker: verifica que el header X-App-Token coincida con tu valor esperado
+  WORKER_TOKEN: WORKER_TOKEN_ENV || 'financyai-mobile-v1',
+
   APP_VERSION: '1.1.0',
 
   // Timeouts (ms)
@@ -28,7 +26,7 @@ export const CONFIG = {
 
   // Límites de chat
   MAX_HISTORIAL_MENSAJES: 20,
-  MAX_TOKENS_RESPUESTA:   700, // aumentado para respuestas más completas con contexto enriquecido
+  MAX_TOKENS_RESPUESTA:   700,
 
   // Rate limiting cliente (ms entre llamadas consecutivas)
   MIN_MS_ENTRE_MENSAJES: 1_000,

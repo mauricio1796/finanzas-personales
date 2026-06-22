@@ -46,6 +46,8 @@ const SECTIONS: DrawerSection[] = [
   {
     title: 'MÓDULOS',
     items: [
+      { key: 'compartido',   label: 'Compartido 💑',  icon: 'users'       },
+      { key: 'escanear',     label: 'Escanear recibo', icon: 'camera'      },
       { key: 'gamificacion', label: 'Gamificación', icon: 'award'       },
       { key: 'retos',        label: 'Retos',        icon: 'zap'         },
       { key: 'academia',     label: 'Academia',     icon: 'book-open'   },

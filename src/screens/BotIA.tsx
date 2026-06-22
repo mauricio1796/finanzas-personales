@@ -31,9 +31,11 @@ import {
   type MensajeChat,
 } from '../services/RealAIService';
 import { ejecutarHerramienta, previewEliminar, type FinnToolCall, type FinnToolResult } from '../services/AgentService';
-import { VoiceButton } from '../components/ui/VoiceButton';
+import { VoiceButton }    from '../components/ui/VoiceButton';
+import { FinnVozModal }   from '../components/ui/FinnVozModal';
 import { catalogoItemToCategory, CATALOGO_CATEGORIAS, getPaletaItem } from '../constants/catalogoCategorias';
-import { THEME } from '../constants/theme';
+import { THEME }  from '../constants/theme';
+import { CONFIG } from '../constants/config';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -219,6 +221,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
   const [catsSeleccionadas, setCatsSeleccionadas] = useState<Set<string>>(new Set());
   const [confirmacionId,    setConfirmacionId]    = useState<string | null>(null);
   const [pendingAction,     setPendingAction]     = useState<PendingAction | null>(null);
+  const [vozModalVisible,   setVozModalVisible]   = useState(false);
 
   // ── Ping Worker + saludo inicial ──────────────────────────────────────────
   useEffect(() => {
@@ -465,8 +468,14 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
           </View>
         </View>
 
-        {/* Placeholder right for layout balance */}
-        <View style={{ width: 32 }} />
+        {/* Voice mode button */}
+        <Pressable
+          onPress={() => setVozModalVisible(true)}
+          style={st.vozBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Icon name="mic" size={19} color={PRIMARY} />
+        </Pressable>
       </View>
 
       {/* ── Messages ── */}
@@ -547,6 +556,28 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
           </View>
         </View>
       </Modal>
+
+      {/* ── Finn Voice Modal ── */}
+      <FinnVozModal
+        visible={vozModalVisible}
+        onClose={() => setVozModalVisible(false)}
+        onTurnComplete={(transcript, respuesta) => {
+          const userMsg: Message  = { id: Date.now().toString() + '_u', text: transcript, sender: 'user', timestamp: new Date() };
+          const finnMsg: Message  = { id: Date.now().toString() + '_f', text: respuesta,  sender: 'bot',  timestamp: new Date() };
+          setMessages(prev => [...prev, userMsg, finnMsg]);
+          historialRef.current = [
+            ...historialRef.current,
+            { role: 'user',      content: transcript },
+            { role: 'assistant', content: respuesta  },
+          ].slice(-CONFIG.MAX_HISTORIAL_MENSAJES);
+        }}
+        historial={historialRef.current}
+        transactions={transactions as any}
+        categories={categories as any}
+        profile={profile}
+        goal={goal}
+        extra={{}}
+      />
 
       {/* ── Input bar ── */}
       <View style={[st.inputWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
@@ -642,6 +673,14 @@ const st = StyleSheet.create({
     } : {}),
   },
   backBtn: { width: 32, alignItems: 'flex-start' },
+  vozBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: PRIMARY_SOFT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerCenter: {
     flexDirection: 'row',
     alignItems: 'center',

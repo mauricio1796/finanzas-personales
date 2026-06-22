@@ -553,10 +553,10 @@ class AIService {
     let level = 1;
     let title = 'Principiante';
 
-    if (experience >= 1000) level = 5;
-    if (experience >= 800) level = 4;
-    if (experience >= 500) level = 3;
-    if (experience >= 200) level = 2;
+    if (experience >= 1000)      level = 5;
+    else if (experience >= 800)  level = 4;
+    else if (experience >= 500)  level = 3;
+    else if (experience >= 200)  level = 2;
 
     const titles = ['Principiante', 'Aprendiz', 'Gestor', 'Experto', 'Inversionista'];
     title = titles[level - 1];

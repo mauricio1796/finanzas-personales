@@ -27,6 +27,7 @@ import { DrawerMenu } from '../../components/layout/DrawerMenu';
 import { NotificationsPanel } from '../../components/ui/NotificationsPanel';
 import { useNotificacionesInApp } from '../../hooks/useNotificacionesInApp';
 import { Transaction } from '../../types';
+import { InsightDiarioCard } from '../../features/proactive-alerts/InsightDiarioCard';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtCOP = (n: number) =>
@@ -932,6 +933,9 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
             </ScrollView>
           </View>
         )}
+
+        {/* ── Finn alertas proactivas ────────────────────────────────── */}
+        <InsightDiarioCard onOpenBot={onOpenBot} />
 
         {/* ── Finn insight ───────────────────────────────────────────── */}
         {aiInsight && (
