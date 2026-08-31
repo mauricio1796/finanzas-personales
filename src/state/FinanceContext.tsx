@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { InteractionManager } from 'react-native';
 import { storageService } from '../services/storage/StorageService';
 import { supabaseService } from '../services/supabase/SupabaseService';
 import type { ServerData } from '../services/supabase/SupabaseService';
 import { syncQueue, type SyncStatus } from '../services/SyncQueueService';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
+import { computeGamification, reconcileXp, buildUserLevel } from '../services/GamificacionService';
 import { getIngresoEfectivoMes } from '../utils/ingresoUtils';
 import { inyectarSubcategoriasDefecto } from '../models/Category';
 import {
@@ -65,6 +67,8 @@ interface FinanceContextType {
   setProfile: (profile: FinancialProfile) => void;
   setGoal: (goal: FinancialGoal) => void;
   setUserLevel: (level: UserLevel) => void;
+  /** Suma un bono de XP puntual (sobre el XP derivado del motor). Monótono. */
+  awardXp: (amount: number) => void;
   addTransaction: (tx: Transaction) => void;
   deleteTransaction: (id: string) => void;
   updateTransaction: (id: string, update: Partial<Transaction>) => void;
@@ -271,11 +275,18 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => { if (goal) storageService.saveGoal(goal); }, [goal]);
   useEffect(() => { if (userLevel) storageService.saveUserLevel(userLevel); }, [userLevel]);
   useEffect(() => {
-    if (categories.length) {
-      storageService.saveCategories(categories);
+    if (!categories.length) return;
+    storageService.saveCategories(categories);
+    // No reprogramar notificaciones durante el onboarding: compite con la
+    // animación de transición entre pasos y deja la pantalla en blanco.
+    // OnboardingMontos las reprograma explícitamente al confirmar presupuestos.
+    if (!isOnboarded) return;
+    // Diferir fuera del frame de render para no bloquear transiciones de UI.
+    const task = InteractionManager.runAfterInteractions(() => {
       reprogramarTodasLasNotificaciones(categories);
-    }
-  }, [categories]);
+    });
+    return () => task.cancel();
+  }, [categories, isOnboarded]);
   useEffect(() => { if (user) storageService.saveUser(user); }, [user]);
   useEffect(() => { storageService.saveLeccionesCompletadas(leccionesCompletadas); }, [leccionesCompletadas]);
   useEffect(() => { storageService.saveRetosCompletados(retosCompletados); }, [retosCompletados]);
@@ -284,6 +295,31 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => { storageService.saveMetas(metas); }, [metas]);
   useEffect(() => { storageService.saveDeudas(deudas); }, [deudas]);
   useEffect(() => { storageService.saveRecurrentes(recurrentes); }, [recurrentes]);
+
+  // ─── Motor de gamificación: fuente única de verdad para XP / nivel ─────────
+  // Deriva el XP desde los datos reales (transacciones, pagos, retos, lecciones,
+  // logros) y lo reconcilia de forma monótona con lo ya guardado: el progreso
+  // nunca retrocede. Sustituye a los incrementos dispersos de `experience`.
+  useEffect(() => {
+    if (isLoading) return;
+    const snap = computeGamification({
+      transactions,
+      categories,
+      goal,
+      leccionesCompletadas,
+      retosCompletados,
+    });
+    setUserLevelState(prev => {
+      const xp = reconcileXp(prev?.experience, snap.xpTotal);
+      if (prev && prev.experience === xp && prev.level === snap.nivel.level) return prev;
+      const next = buildUserLevel(prev, xp, user?.id ?? 'local');
+      if (user) {
+        const uid = user.id;
+        syncQueue.enqueue('sincronizar nivel', () => supabaseService.upsertUserLevel(uid, next));
+      }
+      return next;
+    });
+  }, [isLoading, transactions, categories, goal, leccionesCompletadas, retosCompletados, user]);
 
   // ─── importServerData: carga datos del servidor en el contexto local ───────
   // Llamado desde index.tsx después de un login o registro exitoso.
@@ -345,11 +381,26 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const setUserLevel = (l: UserLevel) => {
-    setUserLevelState(l);
+    // Reconstruye para que nivel/título queden siempre coherentes con el XP.
+    const next = buildUserLevel(l, l.experience, l.userId || user?.id || 'local');
+    setUserLevelState(next);
     if (user) {
       const uid = user.id;
-      syncQueue.enqueue('actualizar nivel', () => supabaseService.upsertUserLevel(uid, l));
+      syncQueue.enqueue('actualizar nivel', () => supabaseService.upsertUserLevel(uid, next));
     }
+  };
+
+  const awardXp = (amount: number) => {
+    if (!amount || amount <= 0) return;
+    setUserLevelState(prev => {
+      const xp = reconcileXp(prev?.experience, (prev?.experience ?? 0) + amount);
+      const next = buildUserLevel(prev, xp, user?.id ?? 'local');
+      if (user) {
+        const uid = user.id;
+        syncQueue.enqueue('sumar XP', () => supabaseService.upsertUserLevel(uid, next));
+      }
+      return next;
+    });
   };
 
   const addTransaction = (tx: Transaction) => {
@@ -428,14 +479,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       return next;
     });
-    if (xp > 0 && userLevel) {
-      const next = { ...userLevel, experience: userLevel.experience + xp };
-      setUserLevelState(next);
-      if (user) {
-        const uid = user.id;
-        syncQueue.enqueue('actualizar XP lección', () => supabaseService.upsertUserLevel(uid, next));
-      }
-    }
+    // El XP lo deriva el motor de gamificación a partir de `leccionesCompletadas`.
+    void xp;
   };
 
   const iniciarReto = (retoId: string) => {
@@ -462,14 +507,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const uid = user.id;
       syncQueue.enqueue('limpiar reto activo', () => supabaseService.upsertUserData(uid, { retoActivo: null }));
     }
-    if (xp && xp > 0 && userLevel) {
-      const next = { ...userLevel, experience: userLevel.experience + xp };
-      setUserLevelState(next);
-      if (user) {
-        const uid = user.id;
-        syncQueue.enqueue('actualizar XP reto', () => supabaseService.upsertUserLevel(uid, next));
-      }
-    }
+    // El XP lo deriva el motor de gamificación a partir de `retosCompletados`.
+    void xp;
   };
 
   const abandonarReto = () => {
@@ -491,14 +530,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // ─── Category management ──────────────────────────────────────────────────
   const addCategory = (cat: Category) => {
     setCategoriesState(prev => [...prev, cat]);
-    if (userLevel) {
-      const next = { ...userLevel, experience: userLevel.experience + 20 };
-      setUserLevelState(next);
-      if (user) {
-        const uid = user.id;
-        syncQueue.enqueue('XP nueva categoría', () => supabaseService.upsertUserLevel(uid, next));
-      }
-    }
     if (user) {
       const uid = user.id;
       syncQueue.enqueue('agregar categoría', () => supabaseService.upsertCategory(uid, cat));
@@ -515,14 +546,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       return updated;
     }));
-    if (userLevel) {
-      const next = { ...userLevel, experience: userLevel.experience + 10 };
-      setUserLevelState(next);
-      if (user) {
-        const uid = user.id;
-        syncQueue.enqueue('XP actualizar categoría', () => supabaseService.upsertUserLevel(uid, next));
-      }
-    }
   };
 
   const deleteCategory = (id: string) => {
@@ -565,14 +588,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return updated;
       });
     });
-    if (userLevel) {
-      const next = { ...userLevel, experience: userLevel.experience + 50 };
-      setUserLevelState(next);
-      if (user) {
-        const uid = user.id;
-        syncQueue.enqueue('XP pago categoría', () => supabaseService.upsertUserLevel(uid, next));
-      }
-    }
   };
 
   const unmarkCategoryPaid = (id: string) => {
@@ -752,6 +767,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setProfile,
     setGoal,
     setUserLevel,
+    awardXp,
     addTransaction,
     deleteTransaction,
     updateTransaction,

@@ -113,7 +113,7 @@ export const AcademiaScreen: React.FC<AcademiaScreenProps> = ({ onPremiumPress, 
 const LeccionPlayer: React.FC<{ leccion: Leccion; onBack: () => void }> = ({ leccion, onBack }) => {
   const { colors } = useTheme();
   const ps = useMemo(() => makePlayerStyles(colors), [colors]);
-  const { completarLeccion, leccionesCompletadas, userLevel, setUserLevel } = useFinance();
+  const { completarLeccion, leccionesCompletadas } = useFinance();
   const [paso, setPaso] = useState(0);
   const [fase, setFase] = useState<'pasos' | 'quiz' | 'resultado'>('pasos');
   const [quizIdx, setQuizIdx] = useState(0);
@@ -157,8 +157,7 @@ const LeccionPlayer: React.FC<{ leccion: Leccion; onBack: () => void }> = ({ lec
 
   const finalizarLeccion = () => {
     if (!completada) {
-      completarLeccion(leccion.id);
-      if (userLevel) if (userLevel) setUserLevel({ ...userLevel, experience: (userLevel.experience || 0) + leccion.xpRecompensa });
+      completarLeccion(leccion.id, leccion.xpRecompensa);
     }
     setFinalizado(true);
     setFase('resultado');

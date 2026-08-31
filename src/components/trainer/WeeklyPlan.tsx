@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { Colors } from '@/constants/colors';
-import { Spacing } from '@/constants/spacing';
+import { COLORS as Colors } from '@/src/constants/colors';
+import { SPACING as Spacing } from '@/src/constants/spacing';
 import { THEME } from '../../constants/theme';
 
 interface Challenge {
@@ -128,7 +128,7 @@ export const WeeklyPlan: React.FC<WeeklyPlanProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.card,
     borderRadius: THEME.radius.md,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.text,
+    color: Colors.textPrimary,
   },
   weekLabel: {
     fontSize: 12,
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: THEME.radius.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.card,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   challengeTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.text,
+    color: Colors.textPrimary,
   },
   challengeCompletedText: {
     textDecorationLine: 'line-through',
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   },
   motivationText: {
     fontSize: 13,
-    color: Colors.text,
+    color: Colors.textPrimary,
     fontWeight: '500',
     lineHeight: 18,
   },

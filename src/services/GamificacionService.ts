@@ -1,4 +1,6 @@
-import { Transaction } from '../types';
+import { Transaction, Category, FinancialGoal, UserLevel } from '../types';
+import { LECCIONES } from './AcademiaService';
+import { RETOS_DISPONIBLES } from './RetosService';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function dateStr(d: Date): string {
@@ -310,19 +312,34 @@ export function evaluarLogros(data: LogroConditionData): Set<string> {
   return desbloqueados;
 }
 
+// XP real de una lista de lecciones/retos completados (usa la recompensa concreta
+// de cada uno; cae al valor genérico si el id ya no existe en el catálogo).
+export function xpDeLecciones(ids: string[]): number {
+  return (ids ?? []).reduce(
+    (s, id) => s + (LECCIONES.find(l => l.id === id)?.xpRecompensa ?? XP_POR_ACCION.leccion),
+    0,
+  );
+}
+export function xpDeRetos(ids: string[]): number {
+  return (ids ?? []).reduce(
+    (s, id) => s + (RETOS_DISPONIBLES.find(r => r.id === id)?.xpRecompensa ?? XP_POR_ACCION.reto),
+    0,
+  );
+}
+
 // XP total incluyendo logros desbloqueados
 export function calcularXPTotal(
   transactions:         any[],
   categoriasPagadas:    number,
-  retosCompletados:     number,
-  leccionesCompletadas: number,
+  retosCompletados:     string[],
+  leccionesCompletadas: string[],
   logrosDesbloqueados:  Set<string>,
 ): number {
   const xpBase =
     transactions.length  * XP_POR_ACCION.transaccion +
     categoriasPagadas    * XP_POR_ACCION.pago        +
-    retosCompletados     * XP_POR_ACCION.reto         +
-    leccionesCompletadas * XP_POR_ACCION.leccion;
+    xpDeRetos(retosCompletados)                      +
+    xpDeLecciones(leccionesCompletadas);
 
   const xpLogros = LOGROS
     .filter(l => logrosDesbloqueados.has(l.id))
@@ -478,4 +495,113 @@ export function getRecompensas(xpActual: number, canjeadas: string[]): Recompens
     disponible:  xpActual >= n.xpRequired,
     canjeada:    canjeadas.includes(n.unlock.id),
   }));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MOTOR UNIFICADO DE GAMIFICACIÓN — fuente única de verdad
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Todo el XP/nivel/logros de la app se deriva desde aquí, a partir de los datos
+// reales del usuario. El resultado es determinista y monótono: `reconcileXp`
+// garantiza que el XP nunca retroceda aunque se borren transacciones.
+
+export interface GamificationInput {
+  transactions:         Transaction[];
+  categories:           Category[];
+  goal:                 FinancialGoal | null;
+  leccionesCompletadas: string[];
+  retosCompletados:     string[];
+}
+
+export interface GamificationSnapshot {
+  xpBase:          number;
+  xpLogros:        number;
+  xpTotal:         number;
+  unlockedLogros:  Set<string>;
+  nivel:           NivelConfig;
+  nivelSiguiente:  NivelConfig | null;
+  progreso:        number;
+  rachaActual:     number;
+  mejorRacha:      number;
+  diasTotales:     number;
+}
+
+export function computeGamification(input: GamificationInput): GamificationSnapshot {
+  const transactions          = input.transactions ?? [];
+  const categories            = input.categories ?? [];
+  const leccionesCompletadas  = input.leccionesCompletadas ?? [];
+  const retosCompletados      = input.retosCompletados ?? [];
+  const categoriasPagadas     = categories.filter(c => c.pagado).length;
+
+  const rachaActual = calcularRachaActual(transactions);
+  const mejorRacha  = calcularMejorRacha(transactions);
+  const diasTotales = calcularDiasTotales(transactions);
+
+  const unlockedLogros = evaluarLogros({
+    transactions,
+    categories,
+    rachaActual,
+    mejorRacha,
+    leccionesCompletadas,
+    retosCompletados,
+    goal: input.goal,
+    xpTotal: 0,
+    diasTotales,
+  });
+
+  const xpBase =
+    transactions.length * XP_POR_ACCION.transaccion +
+    categoriasPagadas   * XP_POR_ACCION.pago        +
+    xpDeRetos(retosCompletados)                     +
+    xpDeLecciones(leccionesCompletadas);
+
+  const xpLogros = LOGROS
+    .filter(l => unlockedLogros.has(l.id))
+    .reduce((s, l) => s + l.xp, 0);
+
+  const xpTotal = xpBase + xpLogros;
+
+  return {
+    xpBase,
+    xpLogros,
+    xpTotal,
+    unlockedLogros,
+    nivel:          getNivelActual(xpTotal),
+    nivelSiguiente: getNivelSiguiente(xpTotal),
+    progreso:       getProgresoNivel(xpTotal),
+    rachaActual,
+    mejorRacha,
+    diasTotales,
+  };
+}
+
+// El XP almacenado actúa como "piso": sólo puede subir. Los bonos manuales
+// (p. ej. logros del resumen mensual) sobreviven a los recálculos.
+export function reconcileXp(storedXp: number | undefined | null, computedXp: number): number {
+  return Math.max(Math.round(storedXp || 0), Math.round(computedXp || 0));
+}
+
+function genId(userId: string): string {
+  const c = (globalThis as any).crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  return `lvl_${userId}_${Date.now()}`;
+}
+
+// Construye un UserLevel coherente: nivel y título SIEMPRE derivados del XP.
+export function buildUserLevel(
+  prev: UserLevel | null,
+  xp: number,
+  userId: string,
+): UserLevel {
+  const nivel = getNivelActual(xp);
+  const now = new Date().toISOString();
+  return {
+    id:         prev?.id ?? genId(userId),
+    userId:     userId,
+    level:      nivel.level,
+    experience: Math.round(xp),
+    title:      nivel.title,
+    createdAt:  prev?.createdAt ?? now,
+    updatedAt:  now,
+  };
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { Colors } from '@/constants/colors';
-import { Spacing } from '@/constants/spacing';
+import { COLORS as Colors } from '@/src/constants/colors';
+import { SPACING as Spacing } from '@/src/constants/spacing';
 import { THEME } from '../../constants/theme';
 
 interface CategoryAnalysis {
@@ -150,7 +150,7 @@ export const PatternAnalysis: React.FC<PatternAnalysisProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.card,
     borderRadius: THEME.radius.md,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.text,
+    color: Colors.textPrimary,
   },
   comparisonContainer: {
     backgroundColor: Colors.background,
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   comparisonAmount: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.text,
+    color: Colors.textPrimary,
   },
   comparisonArrow: {
     alignItems: 'center',
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   categoryName: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.text,
+    color: Colors.textPrimary,
   },
   categoryAmount: {
     fontSize: 12,

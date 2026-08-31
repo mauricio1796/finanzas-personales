@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, FeatherName } from '../components/ui/Icon';
@@ -25,6 +25,18 @@ export const RetosScreen: React.FC<RetosScreenProps> = ({ onPremiumPress, onBack
   const diasRestantes  = retoActivo && retoActivoData ? getDiasRestantes(retoActivo.fechaInicio, retoActivoData.duracionDias) : 0;
   const retosDisponibles = RETOS_DISPONIBLES.filter(r => r.id !== retoActivo?.retoId);
 
+  // Verificación real: el reto se completa solo cuando el progreso —medido
+  // contra las transacciones del usuario— llega al 100 %.
+  useEffect(() => {
+    if (
+      retoActivo && retoActivoData &&
+      progresoActivo >= 100 &&
+      !retosCompletados.includes(retoActivoData.id)
+    ) {
+      completarReto(retoActivoData.id, retoActivoData.xpRecompensa);
+    }
+  }, [progresoActivo, retoActivo, retoActivoData, retosCompletados, completarReto]);
+
   const handleIniciarReto = (reto: RetoComunidad) => {
     if (reto.isPremium && !premium.isPremium) { onPremiumPress?.(); return; }
     if (retoActivo) {
@@ -42,6 +54,13 @@ export const RetosScreen: React.FC<RetosScreenProps> = ({ onPremiumPress, onBack
 
   const handleCompletarReto = () => {
     if (!retoActivoData) return;
+    if (progresoActivo < 100) {
+      Alert.alert(
+        'Aún no cumples la meta',
+        'Llevas ' + Math.round(progresoActivo) + '% del reto. Se marcará automáticamente en cuanto lo completes, según tus movimientos.',
+      );
+      return;
+    }
     completarReto(retoActivoData.id, retoActivoData.xpRecompensa);
     Alert.alert('Reto completado', '¡Felicidades! +' + retoActivoData.xpRecompensa + ' XP ganados.');
   };

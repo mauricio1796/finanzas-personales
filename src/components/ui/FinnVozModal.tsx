@@ -78,8 +78,8 @@ function WaveBar({ delay, active, color = PRIMARY }: WaveBarProps) {
     if (active) {
       h.value = withRepeat(
         withSequence(
-          withTiming(6 + Math.random() * 28, { duration: 280 + delay * 40, easing: Easing.inOut(Easing.sine) }),
-          withTiming(6,                       { duration: 280 + delay * 40, easing: Easing.inOut(Easing.sine) }),
+          withTiming(6 + Math.random() * 28, { duration: 280 + delay * 40, easing: Easing.inOut(Easing.sin) }),
+          withTiming(6,                       { duration: 280 + delay * 40, easing: Easing.inOut(Easing.sin) }),
         ),
         -1,
         false,
@@ -129,8 +129,8 @@ export function FinnVozModal({
     if (estado === 'grabando') {
       pulse.value = withRepeat(
         withSequence(
-          withTiming(1.18, { duration: 700, easing: Easing.inOut(Easing.sine) }),
-          withTiming(1,    { duration: 700, easing: Easing.inOut(Easing.sine) }),
+          withTiming(1.18, { duration: 700, easing: Easing.inOut(Easing.sin) }),
+          withTiming(1,    { duration: 700, easing: Easing.inOut(Easing.sin) }),
         ),
         -1,
         false,

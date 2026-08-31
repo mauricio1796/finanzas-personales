@@ -203,7 +203,6 @@ export const ReceiptScanScreen: React.FC<Props> = ({ onGastoRegistrado, onCancel
             style={[s.btnPrimario, { backgroundColor: colors.primary }]}
             onPress={() => procesarImagen('camara')}
             activeOpacity={0.85}
-            disabled={estado === 'procesando'}
           >
             <Icon name="camera" size={20} color="#fff" />
             <Text style={s.btnPrimarioTxt}>Tomar foto</Text>
@@ -213,7 +212,6 @@ export const ReceiptScanScreen: React.FC<Props> = ({ onGastoRegistrado, onCancel
             style={[s.btnSecundario, { borderColor: colors.border, backgroundColor: colors.card }]}
             onPress={() => procesarImagen('galeria')}
             activeOpacity={0.85}
-            disabled={estado === 'procesando'}
           >
             <Icon name="image" size={20} color={colors.primary} />
             <Text style={[s.btnSecundarioTxt, { color: colors.primary }]}>Elegir de galería</Text>

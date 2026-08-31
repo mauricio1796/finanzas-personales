@@ -264,23 +264,39 @@ export default function HomeScreen() {
     }
   }, [isOnboarded]);
 
+  // Animación de entrada al cambiar de paso. Se ejecuta desde un efecto (no de
+  // forma imperativa dentro de goNext/goBack) para que un re-render pesado
+  // durante la transición no deje la pantalla con opacity=0 permanentemente.
+  useEffect(() => {
+    onboardingAnim.setValue(0);
+    const anim = Animated.timing(onboardingAnim, {
+      toValue: 1,
+      duration: 260,
+      useNativeDriver: true,
+    });
+    anim.start(({ finished }) => {
+      if (!finished) onboardingAnim.setValue(1);
+    });
+    // Red de seguridad: si la animación se interrumpe (unmount / cambio de paso
+    // encadenado), nunca dejamos el contenido oculto.
+    return () => {
+      anim.stop();
+      onboardingAnim.setValue(1);
+    };
+  }, [onboardingStep]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const goNext = () => {
     const idx = ONBOARDING_STEPS.indexOf(onboardingStep);
     if (idx < ONBOARDING_STEPS.length - 1) {
-      const nextStep = ONBOARDING_STEPS[idx + 1];
       updateOnboardingStep(idx + 1);
-      onboardingAnim.setValue(0);
-      setOnboardingStep(nextStep);
-      Animated.timing(onboardingAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
+      setOnboardingStep(ONBOARDING_STEPS[idx + 1]);
     }
   };
 
   const goBack = () => {
     const idx = ONBOARDING_STEPS.indexOf(onboardingStep);
     if (idx > 0) {
-      onboardingAnim.setValue(0);
       setOnboardingStep(ONBOARDING_STEPS[idx - 1]);
-      Animated.timing(onboardingAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
     }
   };
 

@@ -567,8 +567,8 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
           setMessages(prev => [...prev, userMsg, finnMsg]);
           historialRef.current = [
             ...historialRef.current,
-            { role: 'user',      content: transcript },
-            { role: 'assistant', content: respuesta  },
+            { role: 'user' as const,      content: transcript },
+            { role: 'assistant' as const, content: respuesta  },
           ].slice(-CONFIG.MAX_HISTORIAL_MENSAJES);
         }}
         historial={historialRef.current}

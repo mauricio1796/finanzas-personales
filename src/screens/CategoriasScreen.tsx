@@ -216,7 +216,7 @@ const CategoriaCard: React.FC<CategoriaCardProps> = React.memo(({
         ]}
       >
         <View style={s.accionesRow}>
-          {ACCIONES.filter(a => !a.hide).map(a => (
+          {ACCIONES.map(a => (
             <TouchableOpacity
               key={a.label}
               style={[s.accionBtn, { backgroundColor: a.bg }]}

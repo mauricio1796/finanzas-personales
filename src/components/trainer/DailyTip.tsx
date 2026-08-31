@@ -7,9 +7,9 @@ import {
   Share,
   Alert,
 } from 'react-native';
-import { Colors } from '@/constants/colors';
-import { Spacing } from '@/constants/spacing';
-import { StorageService } from '@/services/StorageService';
+import { COLORS as Colors } from '@/src/constants/colors';
+import { SPACING as Spacing } from '@/src/constants/spacing';
+import { storageService as StorageService } from '@/src/services/storage/StorageService';
 import { THEME } from '../../constants/theme';
 
 interface DailyTipProps {
@@ -134,7 +134,7 @@ export const DailyTip: React.FC<DailyTipProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.card,
     borderRadius: THEME.radius.md,
     overflow: 'hidden',
     borderWidth: 1,
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.text,
+    color: Colors.textPrimary,
   },
   date: {
     fontSize: 11,
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   tipText: {
     fontSize: 13,
     lineHeight: 20,
-    color: Colors.text,
+    color: Colors.textPrimary,
     fontWeight: '500',
   },
   actions: {
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.text,
+    color: Colors.textPrimary,
   },
   shareButton: {
     backgroundColor: Colors.primary,

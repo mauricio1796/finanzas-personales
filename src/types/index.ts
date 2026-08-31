@@ -161,9 +161,9 @@ export interface Achievement {
 export interface UserLevel {
   id: string;
   userId: string;
-  level: number; // 1-5
+  level: number; // 1-10 (ver NIVELES en GamificacionService)
   experience: number;
-  title: 'Principiante' | 'Aprendiz' | 'Gestor' | 'Experto' | 'Inversionista';
+  title: string; // título del nivel actual, derivado del XP
   createdAt: string;
   updatedAt: string;
 }

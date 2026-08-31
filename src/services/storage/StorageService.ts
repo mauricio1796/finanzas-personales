@@ -102,6 +102,25 @@ class StorageService {
   async getDeudas(): Promise<Deuda[] | null> { return this.getData<Deuda[]>(this.KEYS.DEUDAS); }
   async saveRecurrentes(recurrentes: GastoRecurrente[]): Promise<void> { return this.saveData(this.KEYS.RECURRENTES, recurrentes); }
   async getRecurrentes(): Promise<GastoRecurrente[] | null> { return this.getData<GastoRecurrente[]>(this.KEYS.RECURRENTES); }
+
+  // Generic string key/value helpers (usados por features livianas: tips, gamificación local)
+  async getValue(key: string): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem('@financy_kv_' + key);
+    } catch (error) {
+      console.error('Error getting value with key ' + key + ':', error);
+      return null;
+    }
+  }
+
+  async saveValue(key: string, value: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem('@financy_kv_' + key, value);
+    } catch (error) {
+      console.error('Error saving value with key ' + key + ':', error);
+      throw error;
+    }
+  }
 }
 
 export const storageService = new StorageService();

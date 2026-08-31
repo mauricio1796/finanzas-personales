@@ -54,7 +54,7 @@ const STEP = 10000;
 // ── CategoryCard ──────────────────────────────────────────────────────────────
 
 interface CategoryCardProps {
-  cat: { id: string; name: string; icon: string; color?: string };
+  cat: { id: string; name: string; icon?: string; color?: string };
   budget: number;
   diaPago: number | undefined;
   onBudgetChange: (v: number) => void;

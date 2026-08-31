@@ -165,7 +165,7 @@ const TABS: { key: Tab; label: string }[] = [
 export const ResumenMensualScreen: React.FC<Props> = ({ onBack, onNavigate, mesOverride }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { transactions, categories, profile, userLevel, setUserLevel } = useFinance();
+  const { transactions, categories, profile, awardXp } = useFinance();
 
   const monthlySalary = profile?.monthlySalary ?? 0;
 
@@ -219,9 +219,9 @@ export const ResumenMensualScreen: React.FC<Props> = ({ onBack, onNavigate, mesO
 
   const handleCloseLogro = () => {
     setShowLogro(false);
-    // Grant XP
-    if (resumen.logroDesbloqueado && userLevel) {
-      setUserLevel({ ...userLevel, experience: userLevel.experience + resumen.logroDesbloqueado.xp });
+    // Bono de XP por el logro mensual (el motor lo conserva de forma monótona).
+    if (resumen.logroDesbloqueado) {
+      awardXp(resumen.logroDesbloqueado.xp);
     }
   };
 

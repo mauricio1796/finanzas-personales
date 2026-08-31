@@ -1,11 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, View, ViewStyle } from 'react-native';
+import { Animated, View, ViewStyle, DimensionValue } from 'react-native';
 import { useTheme } from '../../state/ThemeContext';
 
 // ── Single skeleton block ──────────────────────────────────────────────────────
 
 interface SkeletonProps {
-  width: number | string;
+  width: DimensionValue;
   height: number;
   borderRadius?: number;
   style?: ViewStyle;

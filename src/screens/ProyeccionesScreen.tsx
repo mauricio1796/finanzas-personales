@@ -216,6 +216,7 @@ export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }
 
 const makeStyles = (colors: AppColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.card },
   headerTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
   scroll: { padding: 16, paddingBottom: 32, gap: 14 },

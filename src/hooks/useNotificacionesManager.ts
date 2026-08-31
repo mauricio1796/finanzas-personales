@@ -41,11 +41,11 @@ export function useNotificacionesManager() {
         categories, transactions, now.getMonth(), now.getFullYear(),
       );
 
-      if (goal && goal.amount > 0) {
+      if (goal && (goal.targetAmount ?? 0) > 0) {
         const metricas = calcularMetricasFinancieras(
           transactions, categories, salary, now.getMonth(), now.getFullYear(),
         );
-        await verificarMetaAlcanzada(metricas, goal.amount, metricas.ahorroProyectado);
+        await verificarMetaAlcanzada(metricas, goal.targetAmount ?? 0, metricas.ahorroProyectado);
       }
     };
 
@@ -78,11 +78,11 @@ export function useNotificacionesManager() {
       ).catch(() => {});
     }
 
-    if (nuevaTx.type === 'income' && goal && goal.amount > 0) {
+    if (nuevaTx.type === 'income' && goal && (goal.targetAmount ?? 0) > 0) {
       const metricas = calcularMetricasFinancieras(
         transactions, categories, salary, now.getMonth(), now.getFullYear(),
       );
-      verificarMetaAlcanzada(metricas, goal.amount, metricas.ahorroProyectado).catch(() => {});
+      verificarMetaAlcanzada(metricas, goal.targetAmount ?? 0, metricas.ahorroProyectado).catch(() => {});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactions.length]);

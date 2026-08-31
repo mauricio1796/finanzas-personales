@@ -47,6 +47,7 @@ export interface NotifData {
   screen:       string;
   categoriaId?: string;
   extra?:       Record<string, any>;
+  [key: string]: unknown;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

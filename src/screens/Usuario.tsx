@@ -9,6 +9,7 @@ import { useFinance } from '@/src/core/context/FinanceContext';
 import { useTheme } from '../state/ThemeContext';
 import { Icon } from '../components/ui/Icon';
 import { THEME } from '../constants/theme';
+import { getNivelActual, getNivelSiguiente, getProgresoNivel } from '../services/GamificacionService';
 
 const formatCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
 
@@ -46,11 +47,17 @@ export function Usuario({ onReset, onStartTour, onNavigate }: UsuarioProps) {
 
   const px = width < 768 ? 20 : 28;
 
-  const xpProgress = userLevel ? (userLevel.experience % 1000) / 1000 : 0;
-  const level = userLevel?.level ?? 1;
-  const title = userLevel?.title ?? 'Principiante';
-  const xpCurrent = userLevel?.experience ?? 0;
-  const xpNext = level * 1000;
+  // Nivel/XP derivados del motor de gamificación (fuente única de verdad).
+  const xpTotal = userLevel?.experience ?? 0;
+  const nivelActual = getNivelActual(xpTotal);
+  const nivelSiguiente = getNivelSiguiente(xpTotal);
+  const level = nivelActual.level;
+  const title = nivelActual.title;
+  const xpProgress = getProgresoNivel(xpTotal);
+  const xpCurrent = Math.max(0, Math.round(xpTotal - nivelActual.xpRequired));
+  const xpNext = nivelSiguiente
+    ? nivelSiguiente.xpRequired - nivelActual.xpRequired
+    : xpCurrent;
 
   const unlockedCount = achievements.filter(a => a.unlocked).length;
 

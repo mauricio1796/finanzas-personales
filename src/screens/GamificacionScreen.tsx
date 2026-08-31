@@ -12,6 +12,7 @@ import {
   calcularRachaSemanal, getHabitos, getLeaderboard,
   getNivelActual, getNivelSiguiente, getProgresoNivel, getUnlocksDesbloqueados,
   LOGROS, NIVELES, evaluarLogros, calcularXPTotal,
+  xpDeRetos, xpDeLecciones,
   XP_POR_ACCION, RARITY_STYLE,
 } from '../services/GamificacionService';
 import { THEME } from '../constants/theme';
@@ -72,15 +73,18 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
 
   const unlockedIds = useMemo(() => evaluarLogros(logroData), [logroData]);
 
-  const xpActual = useMemo(() =>
-    calcularXPTotal(
+  const xpActual = useMemo(() => {
+    const derivado = calcularXPTotal(
       transactions,
       categoriasPagadas,
-      (retosCompletados ?? []).length,
-      (leccionesCompletadas ?? []).length,
+      retosCompletados ?? [],
+      leccionesCompletadas ?? [],
       unlockedIds,
-    ),
-  [transactions, categoriasPagadas, retosCompletados, leccionesCompletadas, unlockedIds]);
+    );
+    // Coincide con el resto de la app (motor de gamificación) y es monótono.
+    return Math.max(userLevel?.experience ?? 0, derivado);
+  },
+  [transactions, categoriasPagadas, retosCompletados, leccionesCompletadas, unlockedIds, userLevel?.experience]);
 
   const nivelActual   = useMemo(() => getNivelActual(xpActual),   [xpActual]);
   const nivelSiguiente = useMemo(() => getNivelSiguiente(xpActual), [xpActual]);
@@ -153,8 +157,8 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
   const xpBreakdown = [
     { label: 'Transacciones',    xp: transactions.length * XP_POR_ACCION.transaccion,                   icon: 'trending-down', color: '#6366F1' },
     { label: 'Pagos cumplidos',  xp: categoriasPagadas * XP_POR_ACCION.pago,                            icon: 'check-circle',  color: '#10B981' },
-    { label: 'Retos completados',xp: (retosCompletados ?? []).length * XP_POR_ACCION.reto,              icon: 'zap',           color: '#F59E0B' },
-    { label: 'Lecciones',        xp: (leccionesCompletadas ?? []).length * XP_POR_ACCION.leccion,       icon: 'book-open',     color: '#8B5CF6' },
+    { label: 'Retos completados',xp: xpDeRetos(retosCompletados ?? []),                                 icon: 'zap',           color: '#F59E0B' },
+    { label: 'Lecciones',        xp: xpDeLecciones(leccionesCompletadas ?? []),                         icon: 'book-open',     color: '#8B5CF6' },
     { label: 'Logros',           xp: LOGROS.filter(l => unlockedIds.has(l.id)).reduce((s,l) => s+l.xp,0), icon: 'award', color: '#EF4444' },
   ].filter(b => b.xp > 0);
 

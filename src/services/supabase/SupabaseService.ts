@@ -1,4 +1,5 @@
 import { supabase, isSupabaseReady } from '../../lib/supabase';
+import { getNivelActual } from '../GamificacionService';
 import type { Transaction, Category, FinancialProfile, FinancialGoal, UserLevel, Meta, Deuda, GastoRecurrente } from '../../types';
 import type { PremiumState, RetoActivo } from '../../state/FinanceContext';
 
@@ -127,12 +128,16 @@ function rowToGoal(r: Record<string, any>, userId: string): FinancialGoal {
 }
 
 function rowToUserLevel(r: Record<string, any>, userId: string): UserLevel {
+  // `experience` es la fuente de verdad; nivel y título se re-derivan siempre
+  // (la columna `level` puede venir recortada por el CHECK 1..5 de la BD).
+  const experience = Number(r.experience) || 0;
+  const nivel = getNivelActual(experience);
   return {
     id: r.id as string,
     userId,
-    level: r.level as number,
-    experience: r.experience as number,
-    title: r.title as UserLevel['title'],
+    level: nivel.level,
+    experience,
+    title: nivel.title,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
@@ -405,11 +410,13 @@ class SupabaseService {
   async upsertUserLevel(userId: string, level: UserLevel): Promise<void> {
     const db = this.db;
     if (!db) return;
+    // CHECK (level between 1 and 10) — migración 20260831_gamification_levels.sql.
+    // `experience` es la fuente de verdad; nivel/título se re-derivan al leer.
     await db.from('user_levels').upsert(
       {
         user_id: userId,
-        level: Math.max(1, Math.min(5, level.level)),
-        experience: Math.max(0, level.experience),
+        level: Math.max(1, Math.min(10, level.level)),
+        experience: Math.max(0, Math.round(level.experience)),
         title: level.title,
       },
       { onConflict: 'user_id' }

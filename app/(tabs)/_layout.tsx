@@ -11,6 +11,10 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarLabel: () => null,
+        // La app usa su propia barra inferior (BottomNavBar). Ocultamos la
+        // tab bar de expo-router para que no ocupe espacio abajo y empuje
+        // el menú custom hacia arriba.
+        tabBarStyle: { display: 'none' },
       }}>
       <Tabs.Screen
         name="index"
