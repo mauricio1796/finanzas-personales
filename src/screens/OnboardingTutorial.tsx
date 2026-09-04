@@ -278,13 +278,13 @@ export default function OnboardingTutorial({ visible, onComplete }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
     zIndex: 1000,
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   content: {
     backgroundColor: THEME.colors.surface,

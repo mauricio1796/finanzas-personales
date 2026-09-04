@@ -42,19 +42,28 @@ create trigger on_profiles_updated
   before update on public.profiles
   for each row execute function public.handle_updated_at();
 
--- Auto-crear perfil cuando el usuario se registra
+-- Auto-crear perfil cuando el usuario se registra.
+-- Envuelto en EXCEPTION: un fallo aquí nunca debe bloquear el signup
+-- ("Database error saving new user" si este trigger aborta).
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
   insert into public.profiles (id, name)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1))
+    coalesce(
+      nullif(new.raw_user_meta_data->>'name', ''),
+      nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+      'Usuario'
+    )
   )
   on conflict (id) do nothing;
   return new;
+exception when others then
+  raise warning 'handle_new_user failed for %: %', new.id, sqlerrm;
+  return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created

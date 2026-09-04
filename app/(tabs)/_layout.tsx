@@ -8,7 +8,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: Colors[colorScheme === 'dark' ? 'dark' : 'light'].tint,
         headerShown: false,
         tabBarLabel: () => null,
         // La app usa su propia barra inferior (BottomNavBar). Ocultamos la

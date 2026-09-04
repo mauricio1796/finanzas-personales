@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "finanzaspersonales",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.financyai.finanzaspersonales",
@@ -44,11 +43,10 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "single-page",
+      "output": "single",
       "favicon": "./assets/images/favicon.png",
       "bundler": "metro"
     },
@@ -77,18 +75,24 @@
         }
       ],
       [
-        "expo-av",
-        {
-          "microphonePermission": "FinancyAI usa el micrófono para que puedas registrar gastos e ingresos con tu voz."
-        }
-      ],
-      [
         "expo-image-picker",
         {
           "photosPermission": "FinancyAI accede a tu galería para que puedas escanear fotos de recibos y facturas.",
           "cameraPermission": "FinancyAI usa la cámara para escanear recibos y registrar gastos automáticamente."
         }
-      ]
+      ],
+      "expo-font",
+      "expo-image",
+      "expo-sharing",
+      "expo-status-bar",
+      "expo-web-browser",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "FinancyAI usa el micrófono para que puedas registrar gastos e ingresos con tu voz."
+        }
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,

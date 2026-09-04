@@ -116,7 +116,7 @@ export const ModalCategoria: React.FC<Props> = ({ visible, editing, existingCoun
 };
 
 const makeStyles = (colors: AppColors) => StyleSheet.create({
-  backdrop:       { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.4)" },
+  backdrop:       { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.4)" },
   kavWrap:        { flex: 1, justifyContent: "flex-end" },
   sheet:          { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "90%" as any },
   handle:         { width: 36, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: "center", marginTop: 10, marginBottom: 4 },

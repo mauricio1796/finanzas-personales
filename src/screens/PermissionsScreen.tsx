@@ -4,7 +4,7 @@ import {
   Animated, Linking, Platform,
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { Audio } from 'expo-av';
+import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
 import { useTheme } from '../state/ThemeContext';
 import { storageService } from '../services/storage/StorageService';
 
@@ -52,7 +52,7 @@ async function checkNotifications(): Promise<PermStatus> {
 
 async function checkMicrophone(): Promise<PermStatus> {
   if (Platform.OS === 'web') return 'granted';
-  const { status } = await Audio.getPermissionsAsync();
+  const { status } = await getRecordingPermissionsAsync();
   if (status === 'granted') return 'granted';
   if (status === 'denied') return 'denied';
   return 'idle';
@@ -66,7 +66,7 @@ async function requestNotifications(): Promise<PermStatus> {
 }
 
 async function requestMicrophone(): Promise<PermStatus> {
-  const { status } = await Audio.requestPermissionsAsync();
+  const { status } = await requestRecordingPermissionsAsync();
   return status === 'granted' ? 'granted' : 'denied';
 }
 

@@ -252,7 +252,7 @@ const PANEL_MAX_H = SCREEN_H * 0.78;
 
 const s = StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(10,10,20,0.55)',
   },
   sheet: {

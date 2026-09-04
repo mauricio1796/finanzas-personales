@@ -837,7 +837,7 @@ const s = StyleSheet.create({
     borderTopRightRadius: 20,
   },
   glassRim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 20,
     borderWidth: 1,
   },

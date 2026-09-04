@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { AudioModule, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { CONFIG } from '../constants/config';
@@ -21,12 +21,12 @@ export interface CategoriaVoz {
 
 // ── Recording state ───────────────────────────────────────────────────────────
 
-let activeRecording: Audio.Recording | null = null;
+let activeRecorder: InstanceType<typeof AudioModule.AudioRecorder> | null = null;
 
 export async function pedirPermisosAudio(): Promise<boolean> {
   try {
-    const { status } = await Audio.requestPermissionsAsync();
-    return status === 'granted';
+    const { granted } = await requestRecordingPermissionsAsync();
+    return granted;
   } catch {
     return false;
   }
@@ -38,50 +38,49 @@ export async function iniciarGrabacion(): Promise<boolean> {
     if (!granted) return false;
 
     // Limpiar cualquier grabación colgada antes de iniciar
-    if (activeRecording) {
-      try { await activeRecording.stopAndUnloadAsync(); } catch { /* ignore */ }
-      activeRecording = null;
+    if (activeRecorder) {
+      try { await activeRecorder.stop(); } catch { /* ignore */ }
+      activeRecorder = null;
     }
 
     // Desactivar primero para resetear la sesión iOS limpiamente
     try {
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: false });
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: false });
     } catch { /* ignore */ }
 
     // Pequeña pausa para que iOS libere la sesión anterior
     await new Promise<void>(res => setTimeout(res, 100));
 
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS:   true,
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
+    await setAudioModeAsync({
+      allowsRecording:   true,
+      playsInSilentMode: true,
     });
 
-    const { recording } = await Audio.Recording.createAsync(
-      Audio.RecordingOptionsPresets.HIGH_QUALITY,
-    );
-    activeRecording = recording;
+    const recorder = new AudioModule.AudioRecorder(RecordingPresets.HIGH_QUALITY);
+    await recorder.prepareToRecordAsync();
+    recorder.record();
+    activeRecorder = recorder;
     return true;
   } catch (e) {
     console.warn('[VoiceService] iniciarGrabacion:', e);
     // Intentar resetear el modo de audio si falló
-    try { await Audio.setAudioModeAsync({ allowsRecordingIOS: false }); } catch { /* ignore */ }
-    activeRecording = null;
+    try { await setAudioModeAsync({ allowsRecording: false }); } catch { /* ignore */ }
+    activeRecorder = null;
     return false;
   }
 }
 
 export async function detenerGrabacion(): Promise<string | null> {
-  const rec = activeRecording;
-  activeRecording = null;
+  const rec = activeRecorder;
+  activeRecorder = null;
   if (!rec) return null;
   try {
-    await rec.stopAndUnloadAsync();
-    const uri = rec.getURI() ?? null;
-    try { await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: false }); } catch { /* ignore */ }
+    await rec.stop();
+    const uri = rec.uri ?? null;
+    try { await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: false }); } catch { /* ignore */ }
     return uri;
   } catch {
-    try { await Audio.setAudioModeAsync({ allowsRecordingIOS: false }); } catch { /* ignore */ }
+    try { await setAudioModeAsync({ allowsRecording: false }); } catch { /* ignore */ }
     return null;
   }
 }

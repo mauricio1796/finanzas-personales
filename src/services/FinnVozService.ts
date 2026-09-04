@@ -2,11 +2,11 @@
  * FinnVozService — Orchestrates voice conversation with Finn.
  *
  * Flow per turn:
- *   1. Record audio (expo-av, reuses VoiceService)
+ *   1. Record audio (expo-audio, reuses VoiceService)
  *   2. Transcribe → Worker /transcribe  (Whisper)
  *   3. Send text   → enviarMensajeAFinn (Claude)
  *   4. Synthesize  → Worker /tts        (OpenAI TTS)
- *   5. Play back   → expo-av Audio.Sound
+ *   5. Play back   → expo-audio AudioPlayer
  *
  * Worker /tts contract (must be deployed on Cloudflare Worker):
  *   POST /tts
@@ -17,7 +17,7 @@
  * API keys (OpenAI) live ONLY in the Worker — never in the client bundle.
  */
 
-import { Audio }       from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import { CONFIG }      from '../constants/config';
 import {
@@ -32,8 +32,8 @@ import type { ContextoPersonalizado } from './RealAIService';
 
 // ── Active sound handle (only one at a time) ──────────────────────────────────
 
-let _activeSoundUri: string | null    = null;
-let _activeSound:    Audio.Sound | null = null;
+let _activeSoundUri: string | null      = null;
+let _activeSound:    AudioPlayer | null = null;
 
 // ── TTS ───────────────────────────────────────────────────────────────────────
 
@@ -82,7 +82,7 @@ export async function sintetizarTexto(texto: string): Promise<string | null> {
 }
 
 /**
- * Write base64 audio to a temp file and play it with expo-av.
+ * Write base64 audio to a temp file and play it with expo-audio.
  * Returns a cleanup function that stops + unloads the sound.
  */
 export async function reproducirAudioBase64(
@@ -95,7 +95,7 @@ export async function reproducirAudioBase64(
     // Stop any currently playing sound first
     await detenerAudioActual();
 
-    // Write to temp file (expo-av needs a URI on native)
+    // Write to temp file (expo-audio needs a URI on native)
     const uri = `${FileSystem.cacheDirectory}finn_voz_${Date.now()}.mp3`;
     await FileSystem.writeAsStringAsync(uri, base64, {
       encoding: FileSystem.EncodingType.Base64,
@@ -103,33 +103,34 @@ export async function reproducirAudioBase64(
     _activeSoundUri = uri;
 
     // Set audio mode for playback (no mic allowed simultaneously)
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS:   false,
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
+    await setAudioModeAsync({
+      allowsRecording:   false,
+      playsInSilentMode: true,
     });
 
-    const { sound } = await Audio.Sound.createAsync(
-      { uri },
-      { shouldPlay: true, volume: 1.0 },
-      (status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          onFinish?.();
-          sound.unloadAsync().catch(() => {});
-          FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
-          if (_activeSoundUri === uri) {
-            _activeSoundUri = null;
-            _activeSound    = null;
-          }
-        }
-      },
-    );
+    const sound = createAudioPlayer({ uri });
+    sound.volume = 1.0;
 
+    const subscription = sound.addListener('playbackStatusUpdate', (status) => {
+      if (status.isLoaded && status.didJustFinish) {
+        subscription.remove();
+        onFinish?.();
+        sound.remove();
+        FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+        if (_activeSoundUri === uri) {
+          _activeSoundUri = null;
+          _activeSound    = null;
+        }
+      }
+    });
+
+    sound.play();
     _activeSound = sound;
 
     return async () => {
-      try { await sound.stopAsync(); } catch { /* ignore */ }
-      try { await sound.unloadAsync(); } catch { /* ignore */ }
+      try { sound.pause(); } catch { /* ignore */ }
+      try { subscription.remove(); } catch { /* ignore */ }
+      try { sound.remove(); } catch { /* ignore */ }
       FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
       if (_activeSoundUri === uri) {
         _activeSoundUri = null;
@@ -148,8 +149,8 @@ export async function detenerAudioActual(): Promise<void> {
   _activeSoundUri = null;
 
   if (sound) {
-    try { await sound.stopAsync(); }    catch { /* ignore */ }
-    try { await sound.unloadAsync(); }  catch { /* ignore */ }
+    try { sound.pause(); }  catch { /* ignore */ }
+    try { sound.remove(); } catch { /* ignore */ }
   }
   if (uri) {
     FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});

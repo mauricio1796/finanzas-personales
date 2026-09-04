@@ -126,7 +126,7 @@ export const TransactionDetailSheet: React.FC<Props> = ({ transaction, onClose }
 
 const styles = StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   sheet: {
     position: 'absolute',
