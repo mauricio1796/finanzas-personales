@@ -7,7 +7,7 @@ import {
 } from '../utils/ingresoUtils';
 import { procesarMensajeUsuario } from './ai/AIService';
 import { finnMemoryService } from './FinnMemoryService';
-import { CONFIG } from '../constants/config';
+import { CONFIG, WORKER_HEADERS } from '../constants/config';
 import type { SharedSpaceSummary } from '../features/shared-finances/types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -168,11 +168,7 @@ async function llamarWorker(
   try {
     const response = await fetch(CONFIG.WORKER_URL, {
       method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'X-App-Version': CONFIG.APP_VERSION,
-        'X-App-Token':   CONFIG.WORKER_TOKEN,
-      },
+      headers: WORKER_HEADERS,
       body: JSON.stringify({ system, messages: mensajes, max_tokens: maxTokens }),
       signal: controller.signal,
     });
@@ -360,7 +356,7 @@ async function llamarWorkerAgente(
   try {
     const response = await fetch(CONFIG.WORKER_URL, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'X-App-Version': CONFIG.APP_VERSION },
+      headers: WORKER_HEADERS,
       body:    JSON.stringify({ system, messages: mensajes, max_tokens: maxTokens, use_tools: true }),
       signal:  controller.signal,
     });

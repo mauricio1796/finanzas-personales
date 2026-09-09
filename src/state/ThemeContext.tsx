@@ -280,6 +280,26 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const base    = isDark ? DARK_COLORS : LIGHT_COLORS;
     const palette = ACCENT_PALETTES[accentKey];
 
+    // ── Hero / header: base oscuro "azul-noche" teñido por el color de acento.
+    // Se mantiene el look oscuro tipo hero en TODOS los acentos y en ambos modos,
+    // pero el matiz cambia según la apariencia elegida por el usuario.
+    const mixHex = (hex: string, target: string, t: number): string => {
+      const parse = (h: string) => {
+        const s = h.replace('#', '');
+        return [0, 2, 4].map(i => parseInt(s.slice(i, i + 2), 16));
+      };
+      const [r1, g1, b1] = parse(hex);
+      const [r2, g2, b2] = parse(target);
+      const m = (a: number, b: number) => Math.max(0, Math.min(255, Math.round(a + (b - a) * t)));
+      const h = (n: number) => n.toString(16).padStart(2, '0');
+      return `#${h(m(r1, r2))}${h(m(g1, g2))}${h(m(b1, b2))}`;
+    };
+    const NIGHT     = isDark ? '#090C16' : '#111528';
+    const accentRaw = accentKey === 'indigo' ? '#6156E8' : palette.primary;
+    const heroBg    = mixHex(accentRaw, NIGHT, isDark ? 0.90 : 0.86);
+    const heroTop   = mixHex(accentRaw, NIGHT, isDark ? 0.93 : 0.90);
+    const heroBot   = mixHex(accentRaw, NIGHT, isDark ? 0.82 : 0.76);
+
     let themed: AppColors = base;
     if (accentKey !== 'indigo') {
       themed = isDark
@@ -291,7 +311,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             primaryText:  palette.primaryText_dm,
             tabActive:    palette.tabActive_dm,
             tabActiveBg:  palette.primaryLight_dm,
-            headerBg:     palette.headerBg_dm,
             ai:           palette.primaryDark_dm,
             aiLight:      palette.primaryLight_dm,
             aiText:       palette.primaryText_dm,
@@ -304,12 +323,19 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             primaryText:  palette.primaryText,
             tabActive:    palette.primary,
             tabActiveBg:  palette.primaryLight,
-            headerBg:     palette.headerBg,
             ai:           palette.primary,
             aiLight:      palette.primaryLight,
             aiText:       palette.primaryText,
           };
     }
+
+    // Hero / header teñido — aplica a todos los acentos y ambos modos.
+    themed = {
+      ...themed,
+      headerBg:         heroBg,
+      heroGradientFrom: heroTop,
+      heroGradientTo:   heroBot,
+    };
 
     return themed;
   }, [isDark, accentKey]);

@@ -474,12 +474,12 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
         {/* ── Balance Card ─────────────────────────────────────────── */}
         {(() => {
           // ── Colores según cardStyle ────────────────────────────────
-          let cardBg       = accentColor;
+          let cardBg       = colors.headerBg;
           let cardBorder   = 'transparent';
           let cardBorderW  = 0;
           let textColor    = '#FFFFFF';
-          let sub          = 'rgba(255,255,255,0.75)';
-          let subCardBg    = 'rgba(255,255,255,0.15)';
+          let sub          = 'rgba(255,255,255,0.68)';
+          let subCardBg    = 'rgba(255,255,255,0.10)';
           if (cardStyle === 'minimal') {
             cardBg = isDark ? '#1C1C1F' : '#FFFFFF'; cardBorder = accentColor; cardBorderW = 2;
             textColor = isDark ? '#F4F4F5' : '#111827'; sub = isDark ? '#A1A1AA' : '#6B7280'; subCardBg = isDark ? '#252528' : '#F4F3F8';
@@ -737,15 +737,15 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
             return (
               <View style={{
                 backgroundColor: colors.card,
-                borderRadius: 18,
-                padding: 18,
+                borderRadius: 22,
+                padding: 20,
                 marginBottom: 14,
-                borderWidth: 0.5,
-                borderColor: globalPct >= 80 ? globalColor : colors.border,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.07,
-                shadowRadius: 10,
+                borderWidth: globalPct >= 80 ? 1 : 0,
+                borderColor: globalColor,
+                shadowColor: '#0B1220',
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.05,
+                shadowRadius: 24,
                 elevation: 3,
               }}>
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -1293,9 +1293,9 @@ const s = StyleSheet.create({
     gap: 8,
   },
   heroIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: THEME.radius.lg,
+    width: 38,
+    height: 38,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: THEME.colors.surfaceSecondary,
@@ -1322,12 +1322,17 @@ const s = StyleSheet.create({
     lineHeight: 11,
   },
 
-  // Balance Card — purple
+  // Balance Card — hero oscuro
   balanceCard: {
-    backgroundColor: '#6156E8',
-    borderRadius: 20,
-    padding: 24,
+    backgroundColor: '#17203A',
+    borderRadius: 26,
+    padding: 22,
     marginTop: 20,
+    shadowColor: '#0B1220',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.20,
+    shadowRadius: 28,
+    elevation: 10,
   },
   balanceLabel: {
     fontSize: 11,
@@ -1359,10 +1364,12 @@ const s = StyleSheet.create({
   },
   balanceSubCard: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 14,
+    padding: 13,
     gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   balanceSubLabel: {
     fontSize: 12,
@@ -1459,22 +1466,22 @@ const s = StyleSheet.create({
     flex: 1,
   },
   quickActionCircle: {
-    width: 52,
-    height: 52,
+    width: 54,
+    height: 54,
     borderRadius: THEME.radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   quickActionLabel: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: '500',
   },
 
   // Finn insight
   insightCard: {
-    borderRadius: 14,
-    borderWidth: 0.5,
-    padding: 14,
+    borderRadius: 18,
+    borderWidth: 0,
+    padding: 16,
     marginBottom: 16,
   },
   insightRow: {
@@ -1515,10 +1522,10 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    borderRadius: 14,
-    borderWidth: 0.5,
+    borderRadius: 16,
+    borderWidth: 0,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 13,
     marginBottom: 20,
   },
   alertIcon: {
@@ -1544,12 +1551,13 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
+    letterSpacing: -0.3,
     color: THEME.colors.textPrimary,
   },
   sectionLink: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: THEME.colors.primary,
   },
@@ -1565,21 +1573,21 @@ const s = StyleSheet.create({
   monthPill: {
     borderRadius: 100,
     paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
   monthPillText: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 12.5,
+    fontWeight: '600',
   },
 
   // Category card
   catCard: {
-    borderRadius: 14,
-    borderWidth: 0.5,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 8,
-    gap: 6,
+    borderRadius: 18,
+    borderWidth: 0,
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+    marginBottom: 10,
+    gap: 8,
   },
   catTopRow: {
     flexDirection: 'row',
@@ -1658,19 +1666,19 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 14,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
+    shadowColor: '#0B1220',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 24,
     elevation: 3,
   },
   txIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -1680,7 +1688,7 @@ const s = StyleSheet.create({
     gap: 3,
   },
   txName: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '600',
     color: THEME.colors.textPrimary,
   },

@@ -92,8 +92,9 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
   },
   title: {
-    fontSize: 17,
-    fontWeight: '500',
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: -0.3,
     flex: 1,
     textAlign: 'center',
     marginHorizontal: 8,

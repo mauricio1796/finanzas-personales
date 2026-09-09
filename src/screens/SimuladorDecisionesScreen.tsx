@@ -509,7 +509,7 @@ const s = StyleSheet.create({
   header:          { paddingHorizontal: 20, paddingBottom: 20 },
   headerNav:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   backBtn:         { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  headerTitle:     { fontSize: 17, fontWeight: '500', color: '#fff' },
+  headerTitle:     { fontSize: 20, fontWeight: '700', letterSpacing: -0.3, color: '#fff' },
   headerSub:       { fontSize: 13, color: 'rgba(255,255,255,0.75)', textAlign: 'center', lineHeight: 18, marginBottom: 14 },
   statsRow:        { flexDirection: 'row', gap: 8 },
   statPill:        { flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 12, padding: 10, alignItems: 'center' },

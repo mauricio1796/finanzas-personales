@@ -1128,7 +1128,7 @@ const s = StyleSheet.create({
   // Header
   header:       { paddingHorizontal: 20, paddingBottom: 20 },
   headerTop:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle:  { fontSize: 18, fontWeight: '500', color: '#fff' },
+  headerTitle:  { fontSize: 21, fontWeight: '700', color: '#fff', letterSpacing: -0.3 },
   headerBtns:   { flexDirection: 'row', gap: 8 },
   headerBtn:         { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   headerBtnCatalog:  { width: 'auto' as any, paddingHorizontal: 10, flexDirection: 'row', gap: 4 },

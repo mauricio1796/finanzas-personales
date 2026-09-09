@@ -4,9 +4,11 @@ import {
   TextInput,
   View,
   Animated,
+  Easing,
   Dimensions,
   Keyboard,
   ScrollView,
+  Alert,
   BackHandler,
   Platform,
 } from 'react-native';
@@ -21,6 +23,7 @@ import { FinancialFeed } from '../../src/screens/FinancialFeed/FinancialFeed';
 import { SplashScreen } from '../../src/screens/SplashScreen';
 import { QuickAddSheet } from '../../src/components/ui/QuickAddSheet';
 import { FinnTour, FINN_TOUR_STEPS } from '../../src/components/ui/FinnTour';
+import { GuidedDemo } from '../../src/components/ui/GuidedDemo';
 import { storageService } from '../../src/services/storage/StorageService';
 import { authService } from '../../src/services/supabase/AuthService';
 import { supabaseService } from '../../src/services/supabase/SupabaseService';
@@ -74,7 +77,8 @@ import {
 import { PermissionsScreen } from '../../src/screens/PermissionsScreen';
 import { PinSetupScreen }   from '../../src/screens/PinSetupScreen';
 import { PinEntryScreen }   from '../../src/screens/PinEntryScreen';
-import { savePin, hasPin, verifyPin, clearPin } from '../../src/services/PinService';
+import { savePin, hasPin, verifyPin, clearPin, saveRememberedUser, clearRememberedUser } from '../../src/services/PinService';
+import { calcularRachaActual } from '../../src/services/GamificacionService';
 import { SharedFinancesEntryScreen } from '../../src/features/shared-finances/screens/SharedFinancesEntryScreen';
 import { ReceiptScanScreen } from '../../src/features/receipt-scan/screens/ReceiptScanScreen';
 
@@ -144,6 +148,18 @@ export default function HomeScreen() {
     }
   }, [showSplash]);
 
+  // Persistir el "usuario recordado" (datos NO sensibles) para la pantalla de bloqueo
+  useEffect(() => {
+    if (user?.name) {
+      saveRememberedUser({
+        name:  user.name,
+        email: user.email,
+        level: userLevel?.level,
+        title: userLevel?.title,
+      });
+    }
+  }, [user?.name, user?.email, userLevel?.level, userLevel?.title]);
+
   // ==================== PERMISSIONS (solo nativo) ====================
   const [showPermissions, setShowPermissions] = useState(false);
 
@@ -184,6 +200,7 @@ export default function HomeScreen() {
   const [navHistory, setNavHistory] = useState<string[]>([]);
   const [quickAddMode, setQuickAddMode] = useState<'income' | 'expense' | null>(null);
   const [showTour, setShowTour] = useState(false);
+  const [showDemo, setShowDemo] = useState(false);
   const [botInitialMessage, setBotInitialMessage] = useState<string | undefined>(undefined);
   const [resumenMensualMes, setResumenMensualMes] = useState<{ mes: number; año: number } | undefined>(undefined);
   const { toast, mostrar: mostrarToast, ocultar: ocultarToast } = useToast();
@@ -203,30 +220,99 @@ export default function HomeScreen() {
   // Tab scroll-to-top refs
   const tabScrollRef = useRef<ScrollView | null>(null);
 
-  const ejecutarTransicion = useCallback((callback: () => void, goingBack = false) => {
+  const handleScrollToTop = useCallback(() => {
+    tabScrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, []);
+
+  // Distancia de desplazamiento horizontal en cada transición (push/pop)
+  const SLIDE_OFFSET = Math.min(SCREEN_W * 0.16, 90);
+
+  // Candado: evita que dos transiciones se pisen y dejen la pantalla "pegada"
+  const isTransitioningRef = useRef(false);
+
+  type TransitionDir = 'forward' | 'back' | 'tab';
+
+  // ── Salida de la pantalla actual ──────────────────────────────────────────
+  // Ejecuta `callback` (el cambio de pantalla) SIEMPRE, incluso si la animación
+  // se interrumpe: un temporizador de respaldo garantiza el commit. La entrada
+  // de la nueva pantalla la maneja el efecto de abajo (nunca queda en opacity 0).
+  const ejecutarTransicion = useCallback((callback: () => void, dir: TransitionDir = 'forward') => {
+    if (isTransitioningRef.current) return;
+    isTransitioningRef.current = true;
+
+    let committed = false;
+    const commit = () => {
+      if (committed) return;
+      committed = true;
+      if (dir !== 'tab') {
+        slideAnim.setValue(dir === 'back' ? -SLIDE_OFFSET : SLIDE_OFFSET);
+      }
+      callback();
+    };
+
     Animated.parallel([
-      Animated.timing(fadeAnim,  { toValue: 0, duration: 100, useNativeDriver: true }),
-      Animated.timing(slideAnim, {
-        toValue: goingBack ? SCREEN_W * 0.3 : -SCREEN_W * 0.08,
-        duration: 100,
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 150,
+        easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      callback();
-      slideAnim.setValue(goingBack ? -SCREEN_W * 0.08 : SCREEN_W * 0.08);
-      Animated.parallel([
-        Animated.timing(fadeAnim,  { toValue: 1, duration: 180, useNativeDriver: true }),
-        Animated.spring(slideAnim, { toValue: 0, tension: 80, friction: 12, useNativeDriver: true }),
-      ]).start();
-    });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      Animated.timing(slideAnim, {
+        toValue: dir === 'tab' ? 0 : (dir === 'back' ? SLIDE_OFFSET : -SLIDE_OFFSET),
+        duration: 150,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(commit);
+
+    // Respaldo: si el callback de la animación no dispara, forzamos el commit
+    setTimeout(commit, 240);
+  }, [SLIDE_OFFSET]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Entrada de la nueva pantalla ──────────────────────────────────────────
+  // Se dispara con CADA cambio de `currentScreen` (venga de navegarA, volver,
+  // tabs, notificaciones o cierre de mes). Garantiza fade-in y libera el candado.
+  useEffect(() => {
+    fadeAnim.setValue(0);
+    const anim = Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        damping: 20,
+        stiffness: 160,
+        mass: 0.9,
+        useNativeDriver: true,
+      }),
+    ]);
+    anim.start(() => { isTransitioningRef.current = false; });
+
+    // Red de seguridad: pase lo que pase, la pantalla queda visible y navegable
+    const safety = setTimeout(() => {
+      fadeAnim.setValue(1);
+      slideAnim.setValue(0);
+      isTransitioningRef.current = false;
+    }, 550);
+
+    return () => {
+      anim.stop();
+      clearTimeout(safety);
+      fadeAnim.setValue(1);
+      slideAnim.setValue(0);
+      isTransitioningRef.current = false;
+    };
+  }, [currentScreen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const navegarA = useCallback((screen: string) => {
     if (screen === currentScreen) return;
     ejecutarTransicion(() => {
       setNavHistory(prev => [...prev, currentScreen].slice(-10));
       setCurrentScreen(screen as ScreenName);
-    }, false);
+    }, 'forward');
   }, [currentScreen, ejecutarTransicion]);
 
   const volver = useCallback(() => {
@@ -234,21 +320,16 @@ export default function HomeScreen() {
     ejecutarTransicion(() => {
       setNavHistory(h => h.slice(0, -1));
       setCurrentScreen(prev as ScreenName);
-    }, true);
+    }, 'back');
   }, [navHistory, ejecutarTransicion]);
 
   const navegarATab = useCallback((screen: string) => {
-    setNavHistory([]);
-    Animated.timing(fadeAnim, { toValue: 0, duration: 80, useNativeDriver: true })
-      .start(() => {
-        setCurrentScreen(screen as ScreenName);
-        Animated.timing(fadeAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-      });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleScrollToTop = useCallback(() => {
-    tabScrollRef.current?.scrollTo({ y: 0, animated: true });
-  }, []);
+    if (screen === currentScreen) { handleScrollToTop(); return; }
+    ejecutarTransicion(() => {
+      setNavHistory([]);
+      setCurrentScreen(screen as ScreenName);
+    }, 'tab');
+  }, [currentScreen, ejecutarTransicion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ==================== ONBOARDING STEP MACHINE ====================
   const storedIdx = onboardingState?.step ?? 0;
@@ -687,6 +768,12 @@ export default function HomeScreen() {
     setTimeout(() => setShowTour(true), 300);
   };
 
+  const handleStartDemo = () => {
+    setShowTour(false);
+    setCurrentScreen('dashboard');
+    setTimeout(() => setShowDemo(true), 300);
+  };
+
   const handleNavigateToSection = (section: string) => {
     if (section === 'quick_income') { setQuickAddMode('income'); return; }
     if (section === 'quick_expense') { setQuickAddMode('expense'); return; }
@@ -719,15 +806,31 @@ export default function HomeScreen() {
 
   // ==================== 1. PIN ENTRY (usuario que regresa — antes que todo) ====================
   // Si el usuario ya está en storage Y tiene PIN → pedirlo antes que nada
-  if (user && pinExists && !isUnlocked && Platform.OS !== 'web') {
+  if (user && pinExists && !isUnlocked) {
+    const rachaDias = calcularRachaActual(transactions);
     return (
       <MobileShell>
         <PinEntryScreen
           userName={user.name}
           userEmail={user.email}
+          userLevel={userLevel?.level}
+          userTitle={userLevel?.title}
+          streakDays={rachaDias}
+          finnNews={
+            rachaDias >= 3
+              ? `¡Llevas ${rachaDias} días cuidando tu plata! Entra y revisamos cómo vas. 💪`
+              : undefined
+          }
           onSuccess={() => setIsUnlocked(true)}
           onForgotPin={async () => {
             await clearPin();
+            setPinExists(false);
+            setIsUnlocked(false);
+            setUser(null);
+          }}
+          onSwitchUser={async () => {
+            await clearPin();
+            await clearRememberedUser();
             setPinExists(false);
             setIsUnlocked(false);
             setUser(null);
@@ -809,6 +912,23 @@ export default function HomeScreen() {
             setPinExists(true);
             setIsUnlocked(true);
             setShowPinSetup(false);
+
+            // Ofrecer desbloqueo biométrico si el dispositivo lo soporta
+            try {
+              const { getBiometricAvailability, setBiometricEnabled } = await import('../../src/services/PinService');
+              const { available, kind } = await getBiometricAvailability();
+              if (available) {
+                const etiqueta = kind === 'face' ? 'Face ID' : 'tu huella';
+                Alert.alert(
+                  `¿Desbloquear con ${etiqueta}?`,
+                  'Podrás entrar a FinancyAI sin escribir el PIN cada vez.',
+                  [
+                    { text: 'Ahora no', style: 'cancel' },
+                    { text: 'Activar', onPress: () => setBiometricEnabled(true) },
+                  ],
+                );
+              }
+            } catch { /* noop */ }
           }}
         />
       </MobileShell>
@@ -871,6 +991,7 @@ export default function HomeScreen() {
             <Usuario
               onReset={handleReset}
               onStartTour={handleStartTour}
+              onStartDemo={handleStartDemo}
               onNavigate={navegarA}
             />
           )}
@@ -963,6 +1084,13 @@ export default function HomeScreen() {
         steps={FINN_TOUR_STEPS}
         visible={showTour}
         onFinish={handleTourFinish}
+      />
+
+      <GuidedDemo
+        visible={showDemo}
+        voiceEnabled
+        onNavigate={navegarA}
+        onFinish={() => setShowDemo(false)}
       />
 
       {/* Quick Add Bottom Sheet */}

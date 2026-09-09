@@ -1,7 +1,7 @@
 import { AudioModule, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
-import { CONFIG } from '../constants/config';
+import { CONFIG, WORKER_HEADERS } from '../constants/config';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -99,7 +99,7 @@ export async function transcribirAudio(uri: string): Promise<string> {
   try {
     const response = await fetch(`${CONFIG.WORKER_URL}/transcribe`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: WORKER_HEADERS,
       body:    JSON.stringify({ audio: base64 }),
       signal:  controller.signal,
     });
@@ -126,7 +126,7 @@ export async function parsearTextoATransaccion(
 
     const response = await fetch(`${CONFIG.WORKER_URL}/voice`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: WORKER_HEADERS,
       body:    JSON.stringify(body),
       signal:  controller.signal,
     });

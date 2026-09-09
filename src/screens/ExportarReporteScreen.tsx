@@ -447,7 +447,7 @@ const s = StyleSheet.create({
     width: 38, height: 38, borderRadius: 19,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { fontSize: 17, fontWeight: '700' },
+  headerTitle: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },
 
   scroll: { padding: 16 },
 

@@ -56,7 +56,7 @@ interface Props {
 // ── Component ─────────────────────────────────────────────────────────────────
 export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
   const insets = useSafeAreaInsets();
-  const { colors, isDark, accentColor } = useTheme();
+  const { colors, isDark } = useTheme();
   const { transactions, categories, profile, goal } = useFinance();
 
   const now    = useMemo(() => new Date(), []);
@@ -747,9 +747,9 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
 
       {/* ── Gradient hero header ── */}
       <LinearGradient
-        colors={isDark
-          ? [accentColor + 'CC', accentColor + '88', bg]
-          : [accentColor, accentColor + 'DD', accentColor + '22']}
+        colors={[colors.heroGradientFrom, colors.heroGradientTo]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={[cs.hero, { paddingTop: insets.top + 12 }]}
       >
         <View style={cs.heroRow}>
@@ -843,7 +843,9 @@ const HeroKpi: React.FC<{ label: string; value: string; positive: boolean }> = (
 
 const KpiCard: React.FC<{ label: string; value: string; color: string; icon: string; bg: string }> = ({ label, value, color, icon, bg }) => (
   <View style={[cs.kpiCard, { backgroundColor: bg }]}>
-    <Icon name={icon as any} size={16} color={color} />
+    <View style={[cs.kpiIconChip, { backgroundColor: color + '22' }]}>
+      <Icon name={icon as any} size={14} color={color} />
+    </View>
     <Text style={[cs.kpiVal, { color }]}>{value}</Text>
     <Text style={[cs.kpiLabel, { color: color + 'AA' }]}>{label}</Text>
   </View>
@@ -877,20 +879,23 @@ const cs = StyleSheet.create({
   root: { flex: 1 },
 
   // Hero
-  hero: { paddingHorizontal: 20, paddingBottom: 20 },
-  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  heroBack: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 12 },
-  heroTitle: { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
-  heroSub: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 1 },
-  heroAction: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 12 },
-  heroStrip: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 16, padding: 14, alignItems: 'center' },
-  heroStripDivider: { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.25)' },
+  hero: {
+    paddingHorizontal: 20, paddingBottom: 24,
+    borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
+  },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
+  heroBack: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12 },
+  heroTitle: { fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.4 },
+  heroSub: { fontSize: 12.5, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+  heroAction: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12 },
+  heroStrip: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 18, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)' },
+  heroStripDivider: { width: 1, height: 34, backgroundColor: 'rgba(255,255,255,0.18)' },
 
   // Month bar
-  monthBar: { borderBottomWidth: 1 },
-  monthBarContent: { paddingHorizontal: 16, paddingVertical: 8, gap: 6, flexDirection: 'row' },
-  monthPill: { borderRadius: 100, paddingHorizontal: 14, paddingVertical: 6 },
-  monthPillText: { fontSize: 12, fontWeight: '500' },
+  monthBar: { borderBottomWidth: 0 },
+  monthBarContent: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 6, gap: 8, flexDirection: 'row' },
+  monthPill: { borderRadius: 100, paddingHorizontal: 16, paddingVertical: 8 },
+  monthPillText: { fontSize: 12.5, fontWeight: '600' },
 
   // Tab bar
   tabBar: { flexDirection: 'row', borderBottomWidth: 1 },
@@ -899,23 +904,24 @@ const cs = StyleSheet.create({
   tabLabel: { fontSize: 10, letterSpacing: 0.2 },
 
   // Content
-  content: { padding: 16, gap: 0 },
+  content: { padding: 18, gap: 0 },
 
   // Card
   card: {
-    borderRadius: 20, padding: 18, marginBottom: 14,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
+    borderRadius: 24, padding: 20, marginBottom: 16,
+    shadowColor: '#0B1220', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05, shadowRadius: 24, elevation: 3,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  cardTitle: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
-  cardSub: { fontSize: 11, fontWeight: '400' },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  cardTitle: { fontSize: 17, fontWeight: '700', letterSpacing: -0.3 },
+  cardSub: { fontSize: 12, fontWeight: '400', marginTop: 2 },
 
   // KPI row
-  kpiRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  kpiCard: { flex: 1, borderRadius: 14, padding: 14, alignItems: 'center', gap: 4 },
-  kpiVal: { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },
-  kpiLabel: { fontSize: 10, fontWeight: '500' },
+  kpiRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  kpiCard: { flex: 1, borderRadius: 18, padding: 16, alignItems: 'flex-start', gap: 3 },
+  kpiIconChip: { width: 28, height: 28, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  kpiVal: { fontSize: 20, fontWeight: '800', letterSpacing: -0.6 },
+  kpiLabel: { fontSize: 11, fontWeight: '500' },
 
   // Donut legend
   legendList: { gap: 8, marginTop: 4 },
@@ -932,9 +938,9 @@ const cs = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '600' },
 
   // Period pills
-  pillRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  pill: { borderRadius: 100, paddingHorizontal: 16, paddingVertical: 7 },
-  pillText: { fontSize: 12, fontWeight: '600' },
+  pillRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  pill: { borderRadius: 100, paddingHorizontal: 16, paddingVertical: 9 },
+  pillText: { fontSize: 12.5, fontWeight: '700' },
 
   // Stat strip
   statStrip: { flexDirection: 'row', borderRadius: 12, padding: 12 },

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,33 +8,52 @@ import {
   Dimensions,
   Vibration,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../state/ThemeContext';
+import { Icon } from '../components/ui/Icon';
+import {
+  getBiometricAvailability,
+  isBiometricEnabled,
+  authenticateBiometric,
+  type BiometricKind,
+} from '../services/PinService';
 
 const { width: W } = Dimensions.get('window');
-const DIGIT_SIZE = (W - 48 - 48) / 4;
+const KEY_SIZE = Math.min((W - 48 - 40) / 3, 78);
 const MAX_ATTEMPTS = 5;
 
 // ── PinDots ───────────────────────────────────────────────────────────────────
-function PinDots({ count, shake, hasError, primary, error, border }: {
-  count: number; shake: Animated.Value; hasError: boolean;
-  primary: string; error: string; border: string;
+function PinDots({ pin, reveal, shake, hasError, primary, error, border, textPrimary }: {
+  pin: string; reveal: boolean; shake: Animated.Value; hasError: boolean;
+  primary: string; error: string; border: string; textPrimary: string;
 }) {
   return (
     <Animated.View style={[st.dotsRow, { transform: [{ translateX: shake }] }]}>
-      {[0, 1, 2, 3].map(i => (
-        <View
-          key={i}
-          style={[
-            st.pinDot,
-            { borderColor: border },
-            i < count && !hasError && { backgroundColor: primary, borderColor: primary },
-            i < count && hasError  && { backgroundColor: error,   borderColor: error   },
-          ]}
-        />
-      ))}
+      {[0, 1, 2, 3].map(i => {
+        const filled = i < pin.length;
+        if (reveal && filled) {
+          return (
+            <Text key={i} style={[st.revealDigit, { color: hasError ? error : textPrimary }]}>
+              {pin[i]}
+            </Text>
+          );
+        }
+        return (
+          <View
+            key={i}
+            style={[
+              st.pinDot,
+              { borderColor: border },
+              filled && !hasError && { backgroundColor: primary, borderColor: primary },
+              filled && hasError  && { backgroundColor: error,   borderColor: error   },
+            ]}
+          />
+        );
+      })}
     </Animated.View>
   );
 }
@@ -44,39 +63,43 @@ const PAD = [
   ['1', '2', '3'],
   ['4', '5', '6'],
   ['7', '8', '9'],
-  ['', '0', '⌫'],
+  ['bio', '0', 'del'],
 ];
 
-function NumPad({ onPress, keyBg, keyBorder, keyText, subText }: {
+function NumPad({ onPress, showBio, bioIcon, keyBg, keyText, subText }: {
   onPress: (k: string) => void;
-  keyBg: string; keyBorder: string; keyText: string; subText: string;
+  showBio: boolean; bioIcon: React.ComponentProps<typeof Icon>['name'];
+  keyBg: string; keyText: string; subText: string;
 }) {
   return (
     <View style={st.pad}>
       {PAD.map((row, r) => (
         <View key={r} style={st.padRow}>
-          {row.map((key, c) =>
-            key === '' ? (
-              <View key={c} style={st.padEmpty} />
-            ) : (
+          {row.map((key, c) => {
+            if (key === 'bio') {
+              return showBio ? (
+                <Pressable key={c} style={st.padGhost} onPress={() => onPress('bio')} hitSlop={8}>
+                  <Icon name={bioIcon} size={26} color={keyText} />
+                </Pressable>
+              ) : <View key={c} style={st.padGhost} />;
+            }
+            if (key === 'del') {
+              return (
+                <Pressable key={c} style={st.padGhost} onPress={() => onPress('del')} hitSlop={8}>
+                  <Icon name="delete" size={24} color={subText} />
+                </Pressable>
+              );
+            }
+            return (
               <Pressable
                 key={c}
-                style={({ pressed }) => [
-                  st.padKey,
-                  { backgroundColor: keyBg, borderColor: keyBorder },
-                  pressed && st.padKeyPressed,
-                ]}
+                style={({ pressed }) => [st.padKey, { backgroundColor: keyBg }, pressed && st.padKeyPressed]}
                 onPress={() => onPress(key)}
               >
-                <Text style={[
-                  key === '⌫' ? st.padBackspace : st.padText,
-                  { color: key === '⌫' ? subText : keyText },
-                ]}>
-                  {key}
-                </Text>
+                <Text style={[st.padText, { color: keyText }]}>{key}</Text>
               </Pressable>
-            )
-          )}
+            );
+          })}
         </View>
       ))}
     </View>
@@ -85,31 +108,73 @@ function NumPad({ onPress, keyBg, keyBorder, keyText, subText }: {
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 export interface PinEntryScreenProps {
-  userName?:   string;
-  userEmail?:  string;
-  onSuccess:   () => void;
-  onForgotPin: () => void;
-  verifyPin:   (pin: string) => Promise<boolean>;
+  userName?:    string;
+  userEmail?:   string;
+  userLevel?:   number;
+  userTitle?:   string;
+  streakDays?:  number;
+  finnNews?:    string;
+  onSuccess:    () => void;
+  onForgotPin:  () => void;
+  onSwitchUser: () => void;
+  verifyPin:    (pin: string) => Promise<boolean>;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function PinEntryScreen({ userName, userEmail, onSuccess, onForgotPin, verifyPin }: PinEntryScreenProps) {
+export function PinEntryScreen({
+  userName, userEmail, userLevel, userTitle, streakDays, finnNews,
+  onSuccess, onForgotPin, onSwitchUser, verifyPin,
+}: PinEntryScreenProps) {
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
 
   const [pin,      setPin]      = useState('');
   const [attempts, setAttempts] = useState(0);
   const [hasError, setHasError] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [checking, setChecking] = useState(false);
+  const [reveal,   setReveal]   = useState(false);
 
-  const shake    = useRef(new Animated.Value(0)).current;
-  const logoAnim = useRef(new Animated.Value(0)).current;
+  const [bioKind,    setBioKind]    = useState<BiometricKind>('none');
+  const [bioEnabled, setBioEnabled] = useState(false);
+  const bioTried = useRef(false);
 
+  const shake = useRef(new Animated.Value(0)).current;
+  const enter = useRef(new Animated.Value(0)).current;
+
+  const firstName = userName?.trim().split(' ')[0];
+  const initials  = (userName ?? 'U').trim().split(/\s+/).slice(0, 2).map(s => s[0]?.toUpperCase()).join('');
+
+  const bioLabel = bioKind === 'face' ? 'Face ID'
+    : bioKind === 'iris' ? 'reconocimiento de iris'
+    : 'huella';
+  const bioIcon: React.ComponentProps<typeof Icon>['name'] =
+    bioKind === 'face' ? 'smile' : 'unlock';
+
+  const tryBiometric = useCallback(async () => {
+    const ok = await authenticateBiometric(`Desbloquea FinancyAI, ${firstName ?? ''}`.trim());
+    if (ok) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      onSuccess();
+    }
+  }, [firstName, onSuccess]);
+
+  // Entrada + disponibilidad biométrica + auto-prompt
   useEffect(() => {
-    Animated.spring(logoAnim, {
-      toValue: 1, tension: 60, friction: 10, useNativeDriver: true,
-    }).start();
+    Animated.spring(enter, { toValue: 1, tension: 55, friction: 10, useNativeDriver: true }).start();
+
+    (async () => {
+      const [{ available, kind }, enabled] = await Promise.all([
+        getBiometricAvailability(),
+        isBiometricEnabled(),
+      ]);
+      setBioKind(available ? kind : 'none');
+      setBioEnabled(available && enabled);
+      if (available && enabled && !bioTried.current) {
+        bioTried.current = true;
+        setTimeout(tryBiometric, 350);
+      }
+    })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const doShake = () => {
@@ -127,16 +192,15 @@ export function PinEntryScreen({ userName, userEmail, onSuccess, onForgotPin, ve
   const handleKey = async (key: string) => {
     if (checking) return;
 
-    if (key === '⌫') {
+    if (key === 'bio') { tryBiometric(); return; }
+    if (key === 'del') {
       setPin(p => p.slice(0, -1));
-      setHasError(false);
-      setErrorMsg('');
+      setHasError(false); setErrorMsg('');
       return;
     }
     if (pin.length >= 4) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-
     const next = pin + key;
     setPin(next);
 
@@ -149,101 +213,167 @@ export function PinEntryScreen({ userName, userEmail, onSuccess, onForgotPin, ve
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         onSuccess();
       } else {
-        const newAttempts = attempts + 1;
-        setAttempts(newAttempts);
+        const n = attempts + 1;
+        setAttempts(n);
         setHasError(true);
         doShake();
-
-        const remaining = MAX_ATTEMPTS - newAttempts;
+        const remaining = MAX_ATTEMPTS - n;
         if (remaining <= 0) {
-          setErrorMsg('Demasiados intentos. Inicia sesión con tu correo.');
+          setErrorMsg('Demasiados intentos. Ingresa con tu correo.');
           setTimeout(onForgotPin, 1500);
         } else {
-          setErrorMsg(`PIN incorrecto. ${remaining} intento${remaining !== 1 ? 's' : ''} restante${remaining !== 1 ? 's' : ''}`);
-          setTimeout(() => {
-            setPin('');
-            setHasError(false);
-            setErrorMsg('');
-          }, 900);
+          setErrorMsg(`PIN incorrecto · ${remaining} intento${remaining !== 1 ? 's' : ''} restante${remaining !== 1 ? 's' : ''}`);
+          setTimeout(() => { setPin(''); setHasError(false); setErrorMsg(''); }, 900);
         }
       }
     }
   };
 
-  const firstName = userName?.trim().split(' ')[0];
+  const fadeUp = {
+    opacity: enter,
+    transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+  };
 
   return (
-    <View style={[st.root, { backgroundColor: colors.background, paddingTop: insets.top + 32, paddingBottom: insets.bottom + 16 }]}>
-      {/* Blobs */}
-      <View style={[st.blobTL, { backgroundColor: colors.primaryLight }]} />
-      <View style={[st.blobBR, { backgroundColor: colors.primaryLight }]} />
+    <View style={[st.root, { backgroundColor: colors.background }]}>
+      <ScrollView
+        contentContainerStyle={[st.scroll, { paddingTop: insets.top + 14, paddingBottom: insets.bottom + 22 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Hero oscuro ── */}
+        <Animated.View style={fadeUp}>
+          <LinearGradient
+            colors={[colors.heroGradientFrom, colors.heroGradientTo]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={st.hero}
+          >
+            <View style={st.heroTop}>
+              <View style={st.logoTile}>
+                <Text style={st.logoText}>Fi</Text>
+              </View>
+              <View style={st.brandPill}>
+                <Icon name="zap" size={11} color="#fff" />
+                <Text style={st.brandPillText}>Copiloto Financiero</Text>
+              </View>
+            </View>
 
-      <ScrollView contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled">
-        <View style={st.content}>
+            <Text style={st.heroTitle}>
+              ¡Hola de nuevo{firstName ? `, ${firstName}` : ''}! 🚀
+            </Text>
+            <Text style={st.heroSub}>Tu plata bajo control, tus metas en modo cohete.</Text>
 
-          {/* Avatar animado */}
-          <Animated.View style={{
-            transform: [
-              { scale: logoAnim },
-              { translateY: logoAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) },
-            ],
-            opacity: logoAnim,
-          }}>
-            <View style={[st.avatar, { backgroundColor: colors.primaryLight }]}>
-              <Text style={[st.avatarText, { color: colors.primary }]}>FI</Text>
+            {!!streakDays && streakDays > 0 && (
+              <View style={st.streakChip}>
+                <Text style={st.streakText}>🔥 Racha activa: {streakDays} día{streakDays !== 1 ? 's' : ''} de ahorro</Text>
+              </View>
+            )}
+          </LinearGradient>
+        </Animated.View>
+
+        {/* ── Usuario recordado ── */}
+        <Animated.View style={[fadeUp, st.userCard, { backgroundColor: colors.card }]}>
+          <View style={[st.userAvatar, { backgroundColor: colors.primaryLight }]}>
+            <Text style={[st.userInitials, { color: colors.primary }]}>{initials}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={st.userNameRow}>
+              <Text style={[st.userName, { color: colors.textPrimary }]} numberOfLines={1}>
+                {userName ?? 'Tu cuenta'}
+              </Text>
+              <Icon name="check-circle" size={15} color={colors.income} />
+            </View>
+            <Text style={[st.userLevel, { color: colors.textSecondary }]} numberOfLines={1}>
+              {userLevel ? `Nivel ${userLevel}` : 'Nivel 1'}{userTitle ? `: ${userTitle}` : ''}
+            </Text>
+          </View>
+          <Pressable onPress={onSwitchUser} style={[st.switchBtn, { borderColor: colors.border }]} hitSlop={8}>
+            <Text style={[st.switchText, { color: colors.textSecondary }]}>Cambiar</Text>
+          </Pressable>
+        </Animated.View>
+
+        {/* ── Botón biométrico ── */}
+        {bioKind !== 'none' && bioEnabled && (
+          <Animated.View style={fadeUp}>
+            <Pressable
+              onPress={tryBiometric}
+              style={({ pressed }) => [
+                st.bioBtn,
+                { borderColor: colors.primary, backgroundColor: pressed ? colors.primaryLight : 'transparent' },
+              ]}
+            >
+              <Icon name={bioIcon} size={20} color={colors.primary} />
+              <Text style={[st.bioText, { color: colors.primary }]}>
+                Ingresar con {bioLabel === 'Face ID' ? 'Face ID' : `tu ${bioLabel}`}
+              </Text>
+            </Pressable>
+          </Animated.View>
+        )}
+
+        {/* ── Noticia de Finn ── */}
+        {!!finnNews && (
+          <Animated.View style={[fadeUp, st.finnCard, { backgroundColor: colors.primaryLight }]}>
+            <View style={[st.finnAvatar, { backgroundColor: colors.primary }]}>
+              <Icon name="zap" size={13} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[st.finnLabel, { color: colors.primary }]}>FINN IA · NOTICIA FRESCA</Text>
+              <Text style={[st.finnText, { color: colors.primaryText }]}>{finnNews}</Text>
             </View>
           </Animated.View>
+        )}
 
-          {/* Card */}
-          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-
-            <Text style={[st.brand, { color: colors.textPrimary }]}>FinancyAI</Text>
-            {firstName && (
-              <Text style={[st.greeting, { color: colors.textSecondary }]}>Bienvenido, {firstName}</Text>
-            )}
-            <Text style={[st.instruction, { color: colors.textTertiary }]}>Ingresa tu PIN de 4 dígitos</Text>
-
-            {/* Email badge */}
-            {userEmail && (
-              <View style={[st.emailBadge, { backgroundColor: colors.primaryLight, borderColor: colors.border }]}>
-                <Text style={[st.emailText, { color: colors.primary }]}>✉ {userEmail}</Text>
-              </View>
-            )}
-
-            {/* PIN dots */}
-            <PinDots
-              count={pin.length}
-              shake={shake}
-              hasError={hasError}
-              primary={colors.primary}
-              error={colors.expense}
-              border={colors.border}
-            />
-
-            {/* Error */}
-            {errorMsg ? (
-              <View style={[st.errorBox, { backgroundColor: colors.expenseLight, borderColor: colors.expense }]}>
-                <Text style={[st.errorText, { color: colors.expense }]}>⚠ {errorMsg}</Text>
-              </View>
-            ) : (
-              <View style={{ height: 44 }} />
-            )}
-
-            {/* Teclado */}
-            <NumPad
-              onPress={handleKey}
-              keyBg={colors.inputBg}
-              keyBorder={colors.border}
-              keyText={colors.textPrimary}
-              subText={colors.textTertiary}
-            />
-
-            {/* Olvidé mi PIN */}
-            <Pressable onPress={onForgotPin} style={st.forgotBtn}>
-              <Text style={[st.forgotText, { color: colors.primary }]}>¿Olvidaste tu PIN? Ingresa con correo</Text>
+        {/* ── Tarjeta de PIN ── */}
+        <Animated.View style={[fadeUp, st.pinCard, { backgroundColor: colors.card }]}>
+          <View style={st.pinHeaderRow}>
+            <Text style={[st.pinTitle, { color: colors.textPrimary }]}>PIN de seguridad</Text>
+            <Pressable onPress={() => setReveal(r => !r)} hitSlop={8} style={st.revealBtn}>
+              <Icon name={reveal ? 'eye-off' : 'eye'} size={15} color={colors.primary} />
+              <Text style={[st.revealText, { color: colors.primary }]}>{reveal ? 'Ocultar' : 'Ver PIN'}</Text>
             </Pressable>
-
           </View>
+
+          <PinDots
+            pin={pin}
+            reveal={reveal}
+            shake={shake}
+            hasError={hasError}
+            primary={colors.primary}
+            error={colors.expense}
+            border={colors.border}
+            textPrimary={colors.textPrimary}
+          />
+
+          {errorMsg ? (
+            <View style={[st.errorBox, { backgroundColor: colors.expenseLight }]}>
+              <Icon name="alert-triangle" size={13} color={colors.expense} />
+              <Text style={[st.errorText, { color: colors.expense }]}>{errorMsg}</Text>
+            </View>
+          ) : (
+            <View style={{ height: 38 }} />
+          )}
+
+          <NumPad
+            onPress={handleKey}
+            showBio={bioKind !== 'none' && bioEnabled}
+            bioIcon={bioIcon}
+            keyBg={colors.inputBg}
+            keyText={colors.textPrimary}
+            subText={colors.textTertiary}
+          />
+
+          <Pressable onPress={onForgotPin} style={st.forgotBtn} hitSlop={8}>
+            <Text style={[st.forgotText, { color: colors.primary }]}>¿Olvidaste tu PIN?</Text>
+            <Text style={[st.forgotHint, { color: colors.textTertiary }]}> (tranqui, en 1 min)</Text>
+          </Pressable>
+        </Animated.View>
+
+        {/* ── Footer ── */}
+        <View style={st.footer}>
+          <Icon name="shield" size={12} color={colors.textTertiary} />
+          <Text style={[st.footerText, { color: colors.textTertiary }]}>
+            Cifrado de 256 bits · Tu información está protegida
+          </Text>
         </View>
       </ScrollView>
     </View>
@@ -253,70 +383,98 @@ export function PinEntryScreen({ userName, userEmail, onSuccess, onForgotPin, ve
 // ── Styles ────────────────────────────────────────────────────────────────────
 const st = StyleSheet.create({
   root: { flex: 1 },
+  scroll: { paddingHorizontal: 20, gap: 14 },
 
-  blobTL: {
-    position: 'absolute', width: 280, height: 280, borderRadius: 140,
-    opacity: 0.5, top: -90, left: -90,
-  },
-  blobBR: {
-    position: 'absolute', width: 220, height: 220, borderRadius: 110,
-    opacity: 0.4, bottom: 0, right: -60,
-  },
-
-  scroll: { flexGrow: 1, alignItems: 'center', paddingHorizontal: 24, paddingBottom: 24 },
-
-  content: { width: '100%', alignItems: 'center' },
-
-  avatar: {
-    width: 80, height: 80, borderRadius: 40,
+  // Hero
+  hero: { borderRadius: 26, padding: 22, gap: 6 },
+  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  logoTile: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: 20,
   },
-  avatarText: { fontSize: 28, fontWeight: '900', letterSpacing: 1 },
-
-  card: {
-    width: '100%',
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 24,
-    alignItems: 'center',
+  logoText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  brandPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 100, paddingHorizontal: 10, paddingVertical: 5,
   },
-
-  brand:       { fontSize: 22, fontWeight: '800', letterSpacing: -0.3, marginBottom: 4 },
-  greeting:    { fontSize: 15, fontWeight: '600', marginBottom: 4 },
-  instruction: { fontSize: 14, marginBottom: 14 },
-
-  emailBadge: {
-    borderWidth: 1, borderRadius: 100,
-    paddingHorizontal: 14, paddingVertical: 5, marginBottom: 24,
+  brandPillText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  heroTitle: { color: '#fff', fontSize: 21, fontWeight: '800', letterSpacing: -0.4 },
+  heroSub: { color: 'rgba(255,255,255,0.68)', fontSize: 13 },
+  streakChip: {
+    alignSelf: 'flex-start', marginTop: 10,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 100, paddingHorizontal: 12, paddingVertical: 6,
   },
-  emailText: { fontSize: 12, fontWeight: '600' },
+  streakText: { color: '#fff', fontSize: 12, fontWeight: '600' },
 
-  dotsRow: { flexDirection: 'row', gap: 20, marginBottom: 8 },
-  pinDot: {
-    width: 20, height: 20, borderRadius: 10,
-    borderWidth: 2, backgroundColor: 'transparent',
+  // Remembered user
+  userCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderRadius: 20, padding: 14,
+    shadowColor: '#0B1220', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05, shadowRadius: 24, elevation: 3,
   },
+  userAvatar: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  userInitials: { fontSize: 16, fontWeight: '800' },
+  userNameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  userName: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
+  userLevel: { fontSize: 12, marginTop: 1 },
+  switchBtn: { borderWidth: 1, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 6 },
+  switchText: { fontSize: 12, fontWeight: '600' },
+
+  // Biometric
+  bioBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9,
+    borderWidth: 1.5, borderRadius: 16, paddingVertical: 15,
+  },
+  bioText: { fontSize: 14, fontWeight: '700' },
+
+  // Finn news
+  finnCard: { flexDirection: 'row', gap: 11, borderRadius: 18, padding: 14 },
+  finnAvatar: { width: 26, height: 26, borderRadius: 9, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  finnLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  finnText: { fontSize: 12.5, lineHeight: 18, marginTop: 3 },
+
+  // PIN card
+  pinCard: {
+    borderRadius: 24, padding: 20, alignItems: 'center',
+    shadowColor: '#0B1220', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05, shadowRadius: 24, elevation: 3,
+  },
+  pinHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 18 },
+  pinTitle: { fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+  revealBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  revealText: { fontSize: 12.5, fontWeight: '600' },
+
+  dotsRow: { flexDirection: 'row', gap: 20, marginBottom: 6, alignItems: 'center', height: 34 },
+  pinDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, backgroundColor: 'transparent' },
+  revealDigit: { fontSize: 26, fontWeight: '800', width: 16, textAlign: 'center' },
 
   errorBox: {
-    borderWidth: 1, borderRadius: 12,
-    paddingHorizontal: 16, paddingVertical: 10,
-    marginBottom: 4, maxWidth: W - 96,
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9, marginTop: 2,
   },
-  errorText: { fontSize: 13, fontWeight: '500', textAlign: 'center' },
+  errorText: { fontSize: 12.5, fontWeight: '500', textAlign: 'center' },
 
-  pad: { width: W - 96, gap: 14, marginTop: 4 },
-  padRow: { flexDirection: 'row', justifyContent: 'center', gap: 16 },
-  padEmpty: { width: DIGIT_SIZE, height: DIGIT_SIZE },
+  pad: { marginTop: 8, gap: 14 },
+  padRow: { flexDirection: 'row', justifyContent: 'center', gap: 20 },
   padKey: {
-    width: DIGIT_SIZE, height: DIGIT_SIZE, borderRadius: DIGIT_SIZE / 2,
-    borderWidth: 1,
+    width: KEY_SIZE, height: KEY_SIZE, borderRadius: KEY_SIZE / 2,
     alignItems: 'center', justifyContent: 'center',
   },
-  padKeyPressed: { opacity: 0.6 },
-  padText:      { fontSize: 24, fontWeight: '600' },
-  padBackspace: { fontSize: 20 },
+  padKeyPressed: { opacity: 0.55 },
+  padGhost: { width: KEY_SIZE, height: KEY_SIZE, alignItems: 'center', justifyContent: 'center' },
+  padText: { fontSize: 26, fontWeight: '600' },
 
-  forgotBtn: { marginTop: 20, paddingVertical: 8, paddingHorizontal: 16 },
-  forgotText: { fontSize: 13, fontWeight: '500', textDecorationLine: 'underline' },
+  forgotBtn: { marginTop: 18, flexDirection: 'row', alignItems: 'center' },
+  forgotText: { fontSize: 13, fontWeight: '600' },
+  forgotHint: { fontSize: 12 },
+
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 },
+  footerText: { fontSize: 11 },
 });
+
+export default PinEntryScreen;

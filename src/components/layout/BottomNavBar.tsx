@@ -6,6 +6,7 @@ import {
   Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useHaptics } from '../../hooks/useHaptics';
 import { Icon } from '../ui/Icon';
 import { useTheme } from '../../state/ThemeContext';
@@ -123,23 +124,33 @@ const FABCenter: React.FC<{ onPress: () => void }> = ({ onPress }) => {
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
         <Animated.View style={{
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          backgroundColor: colors.primary,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginTop: -20,
+          width: 58,
+          height: 58,
+          borderRadius: 20,
+          marginTop: -22,
           shadowColor: colors.primary,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.35,
-          shadowRadius: 10,
-          elevation: 8,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.4,
+          shadowRadius: 14,
+          elevation: 10,
           transform: [{ scale: scaleAnim }],
         }}>
-          <Animated.View style={{ transform: [{ rotate }] }}>
-            <Text style={{ fontSize: 28, color: '#FFFFFF', lineHeight: 32, includeFontPadding: false }}>+</Text>
-          </Animated.View>
+          <LinearGradient
+            colors={[colors.primary, colors.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              width: '100%',
+              height: '100%',
+              borderRadius: 20,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Animated.View style={{ transform: [{ rotate }] }}>
+              <Text style={{ fontSize: 28, color: '#FFFFFF', lineHeight: 32, includeFontPadding: false }}>+</Text>
+            </Animated.View>
+          </LinearGradient>
         </Animated.View>
       </TouchableOpacity>
     </View>
@@ -167,12 +178,17 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   return (
     <View style={{
       backgroundColor: colors.card,
-      borderTopWidth: 0.5,
+      borderTopWidth: isDark ? 0.5 : 0,
       borderTopColor: colors.border,
       flexDirection: 'row',
       alignItems: 'flex-start',
-      height: 64 + insets.bottom,
+      height: 66 + insets.bottom,
       paddingBottom: insets.bottom,
+      shadowColor: '#0B1220',
+      shadowOffset: { width: 0, height: -6 },
+      shadowOpacity: isDark ? 0 : 0.06,
+      shadowRadius: 16,
+      elevation: 12,
     }}>
       {LEFT_TABS.map(tab => (
         <TabItem

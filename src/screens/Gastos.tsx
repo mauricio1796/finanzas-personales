@@ -433,7 +433,7 @@ const s = StyleSheet.create({
 
   card: {
     borderRadius: 18, borderWidth: 1, padding: 20,
-    ...(Platform.OS !== 'web' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 8, elevation: 3 } : {}),
+    ...(Platform.OS !== 'web' ? { shadowColor: '#0B1220', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.06, shadowRadius: 24, elevation: 3 } : {}),
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
   cardIconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
@@ -518,7 +518,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, borderRadius: 16, paddingVertical: 16, marginTop: 10,
     backgroundColor: '#EF4444',
-    ...(Platform.OS !== 'web' ? { shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 } : {}),
+    ...(Platform.OS !== 'web' ? { shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 24, elevation: 5 } : {}),
   },
   addBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 

@@ -18,30 +18,35 @@ interface GlassCardProps {
 export const GlassCard: React.FC<GlassCardProps> = ({
   children,
   style,
-  borderRadius = 20,
+  borderRadius = 24,
   elevated = false,
 }) => {
   const { isDark, colors } = useTheme();
 
   const shadow: ViewStyle = elevated
     ? {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.18,
-        shadowRadius: 16,
+        shadowColor: '#0B1220',
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: isDark ? 0.4 : 0.12,
+        shadowRadius: 28,
         elevation: 12,
       }
     : {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: isDark ? 0.25 : 0.08,
-        shadowRadius: 8,
+        shadowColor: '#0B1220',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: isDark ? 0.28 : 0.05,
+        shadowRadius: 24,
         elevation: 4,
       };
 
   return (
     <View style={[
-      { borderRadius, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+      {
+        borderRadius,
+        backgroundColor: colors.card,
+        borderWidth: isDark ? 1 : 0,
+        borderColor: colors.border,
+      },
       shadow,
       style,
     ]}>

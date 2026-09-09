@@ -1,35 +1,42 @@
-import { Platform } from 'react-native';
+import { LIGHT_COLORS } from './colors';
+
+// ─── Design tokens ────────────────────────────────────────────────────────────
+// Los colores viven en un único lugar: `colors.ts` (LIGHT_COLORS / DARK_COLORS).
+// `THEME.colors` es sólo una vista de la paleta light para código estático que
+// no consume `useTheme()`. Para pantallas con soporte de tema usa `useTheme()`.
+
+const STATIC_COLORS = {
+  ...LIGHT_COLORS,
+  // Aliases retro-compatibles usados por pantallas antiguas
+  surface:          LIGHT_COLORS.card,
+  surfaceSecondary: LIGHT_COLORS.cardSecondary,
+};
 
 export const THEME = {
-  colors: {
-    primary:          '#6156E8',
-    primaryLight:     '#EEF0FF',
-    background:       '#F8F7FF',
-    surface:          '#FFFFFF',
-    surfaceSecondary: '#F4F3F8',
-    income:           '#1D9E75',
-    incomeLight:      '#D1FAE5',
-    expense:          '#F55B5B',
-    expenseLight:     '#FEE2E2',
-    textPrimary:      '#111827',
-    textSecondary:    '#6B7280',
-    textTertiary:     '#9CA3AF',
-    border:           '#E5E7EB',
-  },
+  colors: STATIC_COLORS,
   radius: {
-    sm:     8,
-    md:     12,
-    lg:     20,
+    sm:     10,
+    md:     14,
+    lg:     24,
+    card:   24,
+    chip:   14,
     pill:   100,
     circle: 9999,
   },
   shadow: {
     card: {
-      shadowColor:   '#000',
-      shadowOffset:  { width: 0, height: 2 },
-      shadowOpacity: 0.06,
-      shadowRadius:  16,
+      shadowColor:   '#0B1220',
+      shadowOffset:  { width: 0, height: 8 },
+      shadowOpacity: 0.05,
+      shadowRadius:  24,
       elevation:     3,
+    },
+    hero: {
+      shadowColor:   '#0B1220',
+      shadowOffset:  { width: 0, height: 12 },
+      shadowOpacity: 0.18,
+      shadowRadius:  28,
+      elevation:     10,
     },
     fab: {
       shadowColor:   '#6156E8',

@@ -251,7 +251,7 @@ const st = StyleSheet.create({
   screen:       { flex: 1 },
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1 },
   backBtn:      { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:  { flex: 1, fontSize: 18, fontWeight: '700', marginLeft: 8 },
+  headerTitle:  { flex: 1, fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginLeft: 8 },
   addBtn:       { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   empty:        { alignItems: 'center', paddingTop: 60, paddingHorizontal: 32 },
   emptyTitle:   { fontSize: 18, fontWeight: '700', marginTop: 16, marginBottom: 8 },

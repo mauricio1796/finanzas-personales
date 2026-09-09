@@ -44,6 +44,13 @@ export interface AppColors {
   headerIcon: string;
   headerXpTrack: string;
   headerXpFill: string;
+  // Hero (tarjeta oscura de saldo / cabecera destacada)
+  heroGradientFrom: string;
+  heroGradientTo: string;
+  heroText: string;
+  heroSubtext: string;
+  heroPanel: string;      // panel translúcido dentro del hero
+  heroPanelBorder: string;
   // Estados
   success: string;
   successLight: string;
@@ -92,12 +99,18 @@ export const LIGHT_COLORS: AppColors = {
   tabActive:         '#6156E8',
   tabInactive:       '#9CA3AF',
   tabActiveBg:       '#EEF0FF',
-  headerBg:          '#6156E8',
+  headerBg:          '#17203A',
   headerText:        '#FFFFFF',
   headerSubtext:     'rgba(255,255,255,0.75)',
   headerIcon:        '#FFFFFF',
   headerXpTrack:     'rgba(255,255,255,0.2)',
   headerXpFill:      '#FFFFFF',
+  heroGradientFrom:  '#151A2E',
+  heroGradientTo:    '#243049',
+  heroText:          '#FFFFFF',
+  heroSubtext:       'rgba(255,255,255,0.68)',
+  heroPanel:         'rgba(255,255,255,0.10)',
+  heroPanelBorder:   'rgba(255,255,255,0.14)',
   success:           '#1D9E75',
   successLight:      '#D1FAE5',
   danger:            '#F55B5B',
@@ -143,12 +156,18 @@ export const DARK_COLORS: AppColors = {
   tabActive:         '#818CF8',
   tabInactive:       '#71717A',
   tabActiveBg:       '#1E1B4B',
-  headerBg:          '#312E81',
+  headerBg:          '#0C0F1D',
   headerText:        '#FFFFFF',
   headerSubtext:     'rgba(255,255,255,0.6)',
   headerIcon:        '#FFFFFF',
   headerXpTrack:     'rgba(255,255,255,0.15)',
   headerXpFill:      '#A5B4FC',
+  heroGradientFrom:  '#0C0F1D',
+  heroGradientTo:    '#1A2236',
+  heroText:          '#FFFFFF',
+  heroSubtext:       'rgba(255,255,255,0.6)',
+  heroPanel:         'rgba(255,255,255,0.07)',
+  heroPanelBorder:   'rgba(255,255,255,0.10)',
   success:           '#34D399',
   successLight:      '#064E3B',
   danger:            '#F87171',

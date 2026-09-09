@@ -5,16 +5,16 @@
  *   1. Record audio (expo-audio, reuses VoiceService)
  *   2. Transcribe → Worker /transcribe  (Whisper)
  *   3. Send text   → enviarMensajeAFinn (Claude)
- *   4. Synthesize  → Worker /tts        (OpenAI TTS)
+ *   4. Synthesize  → Worker /tts        (Cloudflare Workers AI · MeloTTS)
  *   5. Play back   → expo-audio AudioPlayer
  *
- * Worker /tts contract (must be deployed on Cloudflare Worker):
+ * Worker /tts contract (deployed on Cloudflare Worker):
  *   POST /tts
  *   Body: { text: string }
  *   Headers: { "X-App-Token": "<token>", "X-App-Version": "<version>" }
- *   Response: { audio: string }  ← base64 MP3
+ *   Response: { audio: string }  ← base64 WAV (PCM 16-bit)
  *
- * API keys (OpenAI) live ONLY in the Worker — never in the client bundle.
+ * No external API keys: usa el binding AI del Worker (igual que /transcribe).
  */
 
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
@@ -95,8 +95,9 @@ export async function reproducirAudioBase64(
     // Stop any currently playing sound first
     await detenerAudioActual();
 
-    // Write to temp file (expo-audio needs a URI on native)
-    const uri = `${FileSystem.cacheDirectory}finn_voz_${Date.now()}.mp3`;
+    // Write to temp file (expo-audio needs a URI on native).
+    // MeloTTS de Workers AI devuelve WAV (PCM 16-bit), no MP3.
+    const uri = `${FileSystem.cacheDirectory}finn_voz_${Date.now()}.wav`;
     await FileSystem.writeAsStringAsync(uri, base64, {
       encoding: FileSystem.EncodingType.Base64,
     });

@@ -31,3 +31,10 @@ export const CONFIG = {
   // Rate limiting cliente (ms entre llamadas consecutivas)
   MIN_MS_ENTRE_MENSAJES: 1_000,
 } as const;
+
+/** Cabeceras estándar para toda petición al Worker (identifican la app). */
+export const WORKER_HEADERS: Record<string, string> = {
+  'Content-Type':  'application/json',
+  'X-App-Version': CONFIG.APP_VERSION,
+  'X-App-Token':   CONFIG.WORKER_TOKEN,
+};

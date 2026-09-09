@@ -169,7 +169,7 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <Animated.View style={[st.header, { paddingTop: insets.top + 8, backgroundColor: nivelActual.color, transform: [{ scale: headerScale }] }]}>
+      <Animated.View style={[st.header, { paddingTop: insets.top + 8, backgroundColor: colors.headerBg, transform: [{ scale: headerScale }] }]}>
         <View style={st.headerTop}>
           {onBack ? (
             <TouchableOpacity onPress={onBack} style={st.backBtn} hitSlop={{ top:10,bottom:10,left:10,right:10 }}>
@@ -197,7 +197,7 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
         {/* XP bar */}
         <View style={st.barWrap}>
           <View style={st.barTrack}>
-            <Animated.View style={[st.barFill, { width: xpBarAnim.interpolate({ inputRange:[0,1], outputRange:['0%','100%'] }) as any }]} />
+            <Animated.View style={[st.barFill, { backgroundColor: nivelActual.color, width: xpBarAnim.interpolate({ inputRange:[0,1], outputRange:['0%','100%'] }) as any }]} />
           </View>
           <Text style={st.barLabel}>
             {nivelSiguiente
@@ -209,7 +209,7 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
         {/* Level dots */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }} contentContainerStyle={{ gap: 6, paddingHorizontal: 2 }}>
           {NIVELES.map(n => (
-            <View key={n.level} style={[st.levelDot, xpActual >= n.xpRequired ? st.levelDotDone : st.levelDotPending]}>
+            <View key={n.level} style={[st.levelDot, xpActual >= n.xpRequired ? [st.levelDotDone, { backgroundColor: nivelActual.color }] : st.levelDotPending]}>
               <Text style={[st.levelDotText, xpActual >= n.xpRequired ? { color: '#fff' } : { color: 'rgba(255,255,255,0.4)' }]}>
                 {n.level}
               </Text>
@@ -517,7 +517,7 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const st = StyleSheet.create({
   // Header
-  header:       { paddingHorizontal: 20, paddingBottom: 16 },
+  header:       { paddingHorizontal: 20, paddingBottom: 22, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   headerTop:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   backBtn:      { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   headerCenter: { alignItems: 'center', gap: 6 },
@@ -545,7 +545,7 @@ const st = StyleSheet.create({
 
   // Layout
   scroll:      { padding: 16, gap: 12 },
-  card:        { borderRadius: 16, padding: 16, borderWidth: 1, shadowColor: '#000', shadowOffset: { width:0, height:2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  card:        { borderRadius: 16, padding: 16, borderWidth: 1, shadowColor: '#0B1220', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 24, elevation: 2 },
   cardTitle:   { fontSize: 13, fontWeight: '700', marginBottom: 12 },
   sectionLabel:{ fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 4, marginBottom: 4 },
 

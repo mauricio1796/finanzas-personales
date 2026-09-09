@@ -550,8 +550,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '500',
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
   scroll: {
     padding: 16,

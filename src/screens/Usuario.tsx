@@ -20,10 +20,11 @@ const COLLAPSE_AT = 130;
 interface UsuarioProps {
   onReset?: () => void;
   onStartTour?: () => void;
+  onStartDemo?: () => void;
   onNavigate?: (screen: string) => void;
 }
 
-export function Usuario({ onReset, onStartTour, onNavigate }: UsuarioProps) {
+export function Usuario({ onReset, onStartTour, onStartDemo, onNavigate }: UsuarioProps) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -185,7 +186,7 @@ export function Usuario({ onReset, onStartTour, onNavigate }: UsuarioProps) {
       <Animated.View
         style={[
           styles.stickyHeader,
-          { height: headerHeight, backgroundColor: colors.primary, paddingTop: insets.top },
+          { height: headerHeight, backgroundColor: colors.headerBg, paddingTop: insets.top },
         ]}
         pointerEvents="none"
       >
@@ -413,19 +414,19 @@ export function Usuario({ onReset, onStartTour, onNavigate }: UsuarioProps) {
         {/* Config section label */}
         <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>CONFIGURACIÓN</Text>
 
-        {/* Tour row */}
-        {onStartTour && (
+        {/* Tour row → Recorrido guiado (auto, con voz de Finn) */}
+        {(onStartDemo || onStartTour) && (
           <TouchableOpacity
             style={[styles.actionRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={onStartTour}
+            onPress={onStartDemo ?? onStartTour}
             activeOpacity={0.75}
           >
             <View style={[styles.actionIconCircle, { backgroundColor: colors.primaryLight }]}>
-              <Text style={{ fontSize: 16 }}>🗺️</Text>
+              <Text style={{ fontSize: 16 }}>🎬</Text>
             </View>
             <View style={styles.actionInfo}>
               <Text style={[styles.actionTitle, { color: colors.textPrimary }]}>Tour interactivo</Text>
-              <Text style={[styles.actionSub, { color: colors.textTertiary }]}>Descubre las funciones</Text>
+              <Text style={[styles.actionSub, { color: colors.textTertiary }]}>Finn recorre la app por ti, con voz</Text>
             </View>
             <Icon name="chevron-right" size={16} color={colors.textTertiary} />
           </TouchableOpacity>
@@ -518,7 +519,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.2)',
     ...(Platform.OS !== 'web'
-      ? { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 6 }
+      ? { shadowColor: '#0B1220', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 6 }
       : {}),
   },
   avatarLetter: { color: '#fff', fontWeight: '700' },
