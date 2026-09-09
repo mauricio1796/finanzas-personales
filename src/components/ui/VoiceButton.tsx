@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useTheme } from '../../state/ThemeContext';
 import { THEME } from '../../constants/theme';
 import { Icon } from './Icon';
@@ -98,8 +98,13 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({ onParsed, size = 'norm
       try {
         const texto = await transcribirAudio(uri);
         setTranscript(texto);
-      } catch {
-        setErrorMsg('No pude procesar el audio. Verifica tu conexión e intenta de nuevo.');
+      } catch (e) {
+        console.warn('[VoiceButton] transcribir:', e);
+        setErrorMsg(
+          __DEV__
+            ? `No pude procesar el audio: ${e instanceof Error ? e.message : String(e)}`
+            : 'No pude procesar el audio. Verifica tu conexión e intenta de nuevo.',
+        );
       }
     } else {
       setErrorMsg('No se pudo capturar el audio. Intenta de nuevo.');

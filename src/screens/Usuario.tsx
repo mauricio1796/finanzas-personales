@@ -101,7 +101,7 @@ export function Usuario({ onReset, onStartTour, onStartDemo, onNavigate }: Usuar
 
   const exportToCSV = async () => {
     try {
-      const FileSystem = (await import('expo-file-system' as any)) as any;
+      const FileSystem = (await import('expo-file-system/legacy' as any)) as any;
       const Sharing = (await import('expo-sharing' as any)) as any;
 
       const header = 'Fecha,Tipo,Categoria,Monto,Descripcion\n';

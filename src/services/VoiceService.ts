@@ -1,6 +1,6 @@
 import { AudioModule, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { CONFIG, WORKER_HEADERS } from '../constants/config';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -103,7 +103,11 @@ export async function transcribirAudio(uri: string): Promise<string> {
       body:    JSON.stringify({ audio: base64 }),
       signal:  controller.signal,
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) {
+      const detalle = await response.text().catch(() => '');
+      console.warn('[VoiceService] /transcribe fallo:', response.status, detalle);
+      throw new Error(`HTTP ${response.status} ${detalle}`.trim());
+    }
     const data = await response.json() as any;
     return typeof data.transcript === 'string' ? data.transcript : '';
   } finally {

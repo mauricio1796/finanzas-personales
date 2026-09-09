@@ -9,13 +9,34 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Speech from 'expo-speech';
 import { useTheme } from '../../state/ThemeContext';
 import { Icon } from './Icon';
-import {
-  sintetizarTexto,
-  reproducirAudioBase64,
-  detenerAudioActual,
-} from '../../services/FinnVozService';
+
+// Voz de Finn para el recorrido: TTS on-device en español latinoamericano.
+// (El TTS del Worker/MeloTTS solo tiene español de España.)
+const DEMO_VOICE_LANG = Platform.select({ ios: 'es-MX', android: 'es-US', default: 'es-MX' })!;
+
+/** Habla el texto y resuelve cuando termina (o al cancelarse). */
+function hablarDemo(texto: string): Promise<void> {
+  return new Promise<void>(resolve => {
+    let done = false;
+    const finishOnce = () => { if (!done) { done = true; resolve(); } };
+    try {
+      Speech.stop();
+      Speech.speak(texto, {
+        language: DEMO_VOICE_LANG,
+        rate: 1.0,
+        pitch: 1.0,
+        onDone: finishOnce,
+        onStopped: finishOnce,
+        onError: finishOnce,
+      });
+    } catch {
+      finishOnce();
+    }
+  });
+}
 
 // ─── Guion del recorrido ─────────────────────────────────────────────────────
 export interface DemoStep {
@@ -128,7 +149,7 @@ export function GuidedDemo({
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
     try { await audioStop.current(); } catch { /* noop */ }
     audioStop.current = async () => {};
-    try { await detenerAudioActual(); } catch { /* noop */ }
+    try { Speech.stop(); } catch { /* noop */ }
   }, []);
 
   const finish = useCallback(async () => {
@@ -171,18 +192,12 @@ export function GuidedDemo({
 
     if (voiceEnabled && Platform.OS !== 'web') {
       try {
-        const b64 = await sintetizarTexto(step.caption);
-        if (b64 && alive(runId)) {
-          await new Promise<void>(resolve => {
-            let done = false;
-            const finishOnce = () => { if (!done) { done = true; resolve(); } };
-            reproducirAudioBase64(b64, finishOnce)
-              .then(cl => { audioStop.current = cl; })
-              .catch(finishOnce);
-            timerRef.current = setTimeout(finishOnce, 16_000); // salvavidas
-          });
-          holdMs = 600;
-        }
+        audioStop.current = async () => { try { Speech.stop(); } catch { /* noop */ } };
+        await Promise.race([
+          hablarDemo(step.caption),
+          new Promise<void>(resolve => { timerRef.current = setTimeout(resolve, 16_000); }), // salvavidas
+        ]);
+        if (alive(runId)) holdMs = 600;
       } catch { /* sigue con dwellMs */ }
     }
 

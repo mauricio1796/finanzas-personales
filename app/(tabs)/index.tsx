@@ -388,7 +388,8 @@ export default function HomeScreen() {
     if (!user) return;
     storageService.getTourDone().then(done => {
       if (!done) {
-        const t = setTimeout(() => setShowTour(true), 600);
+        // Primera vez: mostrar el recorrido interactivo (tipo video), no el tour estático
+        const t = setTimeout(() => setShowDemo(true), 600);
         return () => clearTimeout(t);
       }
     });
@@ -1090,7 +1091,7 @@ export default function HomeScreen() {
         visible={showDemo}
         voiceEnabled
         onNavigate={navegarA}
-        onFinish={() => setShowDemo(false)}
+        onFinish={() => { setShowDemo(false); storageService.setTourDone(true).catch(() => {}); }}
       />
 
       {/* Quick Add Bottom Sheet */}
