@@ -9,7 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { THEME } from '../constants/theme';
 
-export type ScreenName = 'dashboard' | 'ingresos' | 'gastos' | 'categorias' | 'estadisticas' | 'bot' | 'perfil' | 'explorar' | 'historial' | 'resumenSemanal' | 'gamificacion' | 'configuracion' | 'personalizacion' | 'retos' | 'calendario' | 'academia' | 'proyecciones' | 'resumenMensual' | 'simulador' | 'exportar' | 'widget' | 'metas' | 'deudas' | 'recurrentes' | 'compartido' | 'escanear' | 'alertas-preferencias';
+export type ScreenName = 'dashboard' | 'ingresos' | 'gastos' | 'categorias' | 'estadisticas' | 'bot' | 'perfil' | 'explorar' | 'historial' | 'resumenSemanal' | 'gamificacion' | 'configuracion' | 'personalizacion' | 'retos' | 'calendario' | 'academia' | 'proyecciones' | 'resumenMensual' | 'simulador' | 'exportar' | 'widget' | 'metas' | 'deudas' | 'recurrentes' | 'compartido' | 'escanear' | 'alertas-preferencias' | 'premium';
 
 interface NavigationProps {
   currentScreen: ScreenName;

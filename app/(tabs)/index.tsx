@@ -33,6 +33,7 @@ import { ResumenSemanalScreen } from '../../src/screens/ResumenSemanalScreen';
 import { ResumenMensualScreen } from '../../src/screens/ResumenMensualScreen';
 import { SimuladorDecisionesScreen } from '../../src/screens/SimuladorDecisionesScreen';
 import { ExportarReporteScreen } from '../../src/screens/ExportarReporteScreen';
+import { PremiumScreen } from '../../src/screens/PremiumScreen';
 import { WidgetConfigScreen } from '../../src/screens/WidgetConfigScreen';
 import { deberiasMostrarResumen } from '../../src/utils/resumenMensualUtils';
 import { GamificacionScreen } from '../../src/screens/GamificacionScreen';
@@ -1024,16 +1025,16 @@ export default function HomeScreen() {
             <AlertasPreferencesScreen onBack={volver} />
           )}
           {currentScreen === 'retos' && (
-            <RetosScreen onBack={volver} />
+            <RetosScreen onBack={volver} onPremiumPress={() => navegarA('premium')} />
           )}
           {currentScreen === 'calendario' && (
             <CalendarioScreen onBack={volver} />
           )}
           {currentScreen === 'academia' && (
-            <AcademiaScreen onBack={volver} />
+            <AcademiaScreen onBack={volver} onPremiumPress={() => navegarA('premium')} />
           )}
           {currentScreen === 'proyecciones' && (
-            <ProyeccionesScreen onBack={volver} />
+            <ProyeccionesScreen onBack={volver} onPremiumPress={() => navegarA('premium')} />
           )}
           {currentScreen === 'resumenMensual' && (
             <ResumenMensualScreen
@@ -1046,13 +1047,16 @@ export default function HomeScreen() {
             <SimuladorDecisionesScreen onBack={volver} onNavigate={navegarA} />
           )}
           {currentScreen === 'exportar' && (
-            <ExportarReporteScreen onBack={volver} />
+            <ExportarReporteScreen onBack={volver} onNavigate={navegarA} />
+          )}
+          {currentScreen === 'premium' && (
+            <PremiumScreen onBack={volver} />
           )}
           {currentScreen === 'widget' && Platform.OS !== 'web' && (
             <WidgetConfigScreen onBack={volver} />
           )}
           {currentScreen === 'metas' && (
-            <MetasScreen onBack={volver} />
+            <MetasScreen onBack={volver} onPremiumPress={() => navegarA('premium')} />
           )}
           {currentScreen === 'deudas' && (
             <DeudasScreen onBack={volver} />

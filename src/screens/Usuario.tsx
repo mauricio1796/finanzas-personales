@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFinance } from '@/src/core/context/FinanceContext';
 import { useTheme } from '../state/ThemeContext';
 import { Icon } from '../components/ui/Icon';
+import { PremiumBadge } from '../components/ui/PremiumBadge';
 import { THEME } from '../constants/theme';
 import { getNivelActual, getNivelSiguiente, getProgresoNivel } from '../services/GamificacionService';
 
@@ -28,7 +29,7 @@ export function Usuario({ onReset, onStartTour, onStartDemo, onNavigate }: Usuar
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { user, userLevel, achievements, transactions, updateUserSalary, resetAll } = useFinance();
+  const { user, userLevel, achievements, transactions, updateUserSalary, resetAll, premium, setPremium } = useFinance();
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedSalary, setEditedSalary] = useState(user?.monthlySalary?.toString() || '');
@@ -411,6 +412,70 @@ export function Usuario({ onReset, onStartTour, onStartDemo, onNavigate }: Usuar
           ))}
         </View>
 
+        {/* Mi plan */}
+        <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>MI PLAN</Text>
+        {premium.isPremium ? (
+          <View style={[styles.actionRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.actionIconCircle, { backgroundColor: colors.primaryLight }]}>
+              <Icon name="award" size={16} color={colors.primary} />
+            </View>
+            <View style={styles.actionInfo}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.actionTitle, { color: colors.textPrimary }]}>FinancyAI Premium</Text>
+                <PremiumBadge />
+              </View>
+              <Text style={[styles.actionSub, { color: colors.textTertiary }]}>
+                Tienes acceso a todas las herramientas avanzadas
+                {premium.fechaVencimiento ? ` · vence ${new Date(premium.fechaVencimiento).toLocaleDateString('es-CO')}` : ''}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => onNavigate?.('premium')} hitSlop={8}>
+              <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.actionRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => onNavigate?.('premium')}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.actionIconCircle, { backgroundColor: colors.primaryLight }]}>
+              <Icon name="zap" size={16} color={colors.primary} />
+            </View>
+            <View style={styles.actionInfo}>
+              <Text style={[styles.actionTitle, { color: colors.textPrimary }]}>Plan Free</Text>
+              <Text style={[styles.actionSub, { color: colors.textTertiary }]}>Accede a las funciones esenciales de FinancyAI</Text>
+            </View>
+            <View style={[styles.upgradePill, { backgroundColor: colors.primary }]}>
+              <Text style={styles.upgradePillText}>Ver Premium</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {__DEV__ && (
+          <View style={[styles.devRow, { borderColor: colors.border }]}>
+            <Text style={[styles.devLabel, { color: colors.textTertiary }]}>DEV · forzar plan</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                style={[styles.devBtn, { borderColor: colors.border }, !premium.isPremium && { backgroundColor: colors.primary }]}
+                onPress={() => setPremium({ isPremium: false, plan: null, fechaInicio: null, fechaVencimiento: null })}
+              >
+                <Text style={[styles.devBtnText, { color: !premium.isPremium ? '#fff' : colors.textSecondary }]}>Free</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.devBtn, { borderColor: colors.border }, premium.isPremium && { backgroundColor: colors.primary }]}
+                onPress={() => setPremium({
+                  isPremium: true, plan: 'anual',
+                  fechaInicio: new Date().toISOString(),
+                  fechaVencimiento: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                })}
+              >
+                <Text style={[styles.devBtnText, { color: premium.isPremium ? '#fff' : colors.textSecondary }]}>Premium</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* Config section label */}
         <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>CONFIGURACIÓN</Text>
 
@@ -493,6 +558,16 @@ const CARD_SHADOW = Platform.OS !== 'web'
   : {};
 
 const styles = StyleSheet.create({
+  upgradePill: { borderRadius: 100, paddingHorizontal: 12, paddingVertical: 7 },
+  upgradePillText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  devRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderStyle: 'dashed', borderRadius: 14,
+    paddingHorizontal: 14, paddingVertical: 10, marginBottom: 14,
+  },
+  devLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  devBtn: { borderWidth: 1, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 6 },
+  devBtnText: { fontSize: 12, fontWeight: '700' },
   root: { flex: 1 },
   content: { gap: 16 },
 

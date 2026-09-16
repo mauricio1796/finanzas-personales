@@ -62,7 +62,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   const {
     user, transactions, categories, profile, goal, userLevel,
     addTransaction: ctxAdd, deleteTransaction: ctxDelete,
-    metas, deudas,
+    metas, deudas, premium,
   } = useFinance();
 
   // ── Date constants ──────────────────────────────────────────────────────────
@@ -688,6 +688,35 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
             </View>
           ))}
         </View>
+
+        {/* ── Upsell Premium discreto (solo Free) ───────────────────────── */}
+        {!premium.isPremium && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => onNavigate('premium')}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 12,
+              backgroundColor: colors.primaryLight, borderRadius: 18,
+              padding: 14, marginBottom: 16,
+            }}
+          >
+            <View style={{
+              width: 38, height: 38, borderRadius: 12, backgroundColor: colors.primary,
+              alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <Icon name="zap" size={18} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13.5, fontWeight: '700', color: colors.textPrimary }}>
+                Desbloquea el análisis avanzado de tus finanzas
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                Proyecciones, simulador, metas ilimitadas y más con Premium
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={16} color={colors.primary} />
+          </TouchableOpacity>
+        )}
 
         {/* ── Presupuesto por Categoría — sección principal ───────────── */}
         <View style={{ marginBottom: 8 }}>

@@ -9,6 +9,7 @@ import { useFinance } from '../state';
 import { useTheme } from '../state/ThemeContext';
 import { THEME } from '../constants/theme';
 import { Icon } from '../components/ui/Icon';
+import { PremiumLock } from '../components/ui/PremiumLock';
 import {
   generarYCompartirPDF,
   guardarPDFLocal,
@@ -51,15 +52,16 @@ function formatFecha(iso: string): string {
 
 interface Props {
   onBack: () => void;
+  onNavigate?: (screen: string) => void;
   mesInicial?: { mes: number; año: number };
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export const ExportarReporteScreen: React.FC<Props> = ({ onBack, mesInicial }) => {
+export const ExportarReporteScreen: React.FC<Props> = ({ onBack, onNavigate, mesInicial }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { transactions, categories, profile, goal, user } = useFinance();
+  const { transactions, categories, profile, goal, user, premium } = useFinance();
 
   // ── Month list (last 12) ───────────────────────────────────────────────────
   const hoy    = new Date();
@@ -204,6 +206,26 @@ export const ExportarReporteScreen: React.FC<Props> = ({ onBack, mesInicial }) =
   const progressW  = progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
   const estadoIcon = estado === 'listo' ? 'check-circle' : estado === 'error' ? 'alert-circle' : 'file-text';
   const estadoColor = estado === 'listo' ? colors.income : estado === 'error' ? colors.expense : colors.primary;
+
+  if (!premium.isPremium) {
+    return (
+      <View style={[s.root, { backgroundColor: colors.background }]}>
+        <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border, paddingTop: insets.top + 12 }]}>
+          <TouchableOpacity onPress={onBack} style={[s.backBtn, { backgroundColor: colors.inputBg }]}>
+            <Icon name="arrow-left" size={18} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Exportar Reporte</Text>
+          <View style={{ width: 38 }} />
+        </View>
+        <PremiumLock
+          title="Exportar reportes en PDF"
+          description="Genera y comparte un reporte financiero completo de cualquier mes, listo para guardar o imprimir."
+          onUpgrade={() => onNavigate?.('premium')}
+          onDismiss={onBack}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>

@@ -59,7 +59,7 @@ export const ExplorarScreen: React.FC<ExplorarScreenProps> = ({ onBack }) => {
       <View style={styles.content}>
         {activeTab === 'academia'     && <AcademiaScreen onPremiumPress={() => setShowPremium(true)} />}
         {activeTab === 'calendario'   && <CalendarioScreen />}
-        {activeTab === 'proyecciones' && <ProyeccionesScreen />}
+        {activeTab === 'proyecciones' && <ProyeccionesScreen onPremiumPress={() => setShowPremium(true)} />}
         {activeTab === 'retos'        && <RetosScreen onPremiumPress={() => setShowPremium(true)} />}
       </View>
     </View>

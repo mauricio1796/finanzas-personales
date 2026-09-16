@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFinance } from '../state';
 import { useTheme } from '../state/ThemeContext';
 import { Icon } from '../components/ui/Icon';
+import { PremiumLock } from '../components/ui/PremiumLock';
 import { useHaptics } from '../hooks/useHaptics';
 import { useSwipeBack } from '../hooks/useSwipeBack';
 import { useBottomPadding } from '../hooks/useBottomPadding';
@@ -56,7 +57,7 @@ interface Props {
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export const SimuladorDecisionesScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
-  const { transactions, categories, profile } = useFinance();
+  const { transactions, categories, profile, premium } = useFinance();
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const haptics = useHaptics();
@@ -146,6 +147,25 @@ export const SimuladorDecisionesScreen: React.FC<Props> = ({ onBack, onNavigate 
   }, []);
 
   // ── Render ────────────────────────────────────────────────────────────────────
+
+  if (!premium.isPremium) {
+    return (
+      <View style={[s.root, { backgroundColor: colors.background }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 8 }}>
+          <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>
+            <Icon name="arrow-left" size={20} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={{ flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginRight: 20 }}>Simulador</Text>
+        </View>
+        <PremiumLock
+          title="Simulador de decisiones"
+          description="Antes de gastar, pregúntale al simulador: '¿puedo comprar esto sin descuadrar mi mes?' y recibe un veredicto basado en tus datos reales."
+          onUpgrade={() => onNavigate('premium')}
+          onDismiss={onBack}
+        />
+      </View>
+    );
+  }
 
   return (
     <Animated.View

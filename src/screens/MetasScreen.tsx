@@ -7,8 +7,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFinance } from '../state';
 import { useTheme } from '../state/ThemeContext';
 import { Icon } from '../components/ui/Icon';
+import { PremiumBadge } from '../components/ui/PremiumBadge';
 import type { Meta } from '../types';
 import { THEME } from '../constants/theme';
+
+const METAS_GRATIS = 1;
 
 const EMOJIS = ['🎯','🏠','✈️','🚗','💍','📚','💻','🏋️','🌴','💰','🎓','🎮'];
 const COLORS  = ['#6366F1','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#14B8A6','#F97316'];
@@ -132,14 +135,22 @@ const AbonoModal: React.FC<AbonoModalProps> = ({ meta, onClose, onAbono }) => {
   );
 };
 
-interface MetasScreenProps { onBack: () => void; }
+interface MetasScreenProps { onBack: () => void; onPremiumPress?: () => void; }
 
-export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack }) => {
+export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress }) => {
   const insets                                        = useSafeAreaInsets();
   const { colors }                                    = useTheme();
-  const { metas, addMeta, deleteMeta, abonarMeta }    = useFinance();
+  const { metas, addMeta, deleteMeta, abonarMeta, premium } = useFinance();
   const [showForm, setShowForm]                       = useState(false);
   const [abonoTarget, setAbonoTarget]                 = useState<Meta | null>(null);
+
+  const activasCount   = metas.filter(m => !m.completada).length;
+  const alcanzoLimite  = !premium.isPremium && activasCount >= METAS_GRATIS;
+
+  const handlePressAdd = () => {
+    if (alcanzoLimite) { onPremiumPress?.(); return; }
+    setShowForm(true);
+  };
 
   const handleSave = (data: Omit<Meta, 'id' | 'creadaEn' | 'completada' | 'montoActual'>) => {
     addMeta({
@@ -162,8 +173,8 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack }) => {
           <Icon name="arrow-left" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[st.headerTitle, { color: colors.textPrimary }]}>Mis Metas</Text>
-        <TouchableOpacity testID="metas-add-btn" onPress={() => setShowForm(true)} style={[st.addBtn, { backgroundColor: colors.primaryLight }]}>
-          <Icon name="plus" size={20} color={colors.primary} />
+        <TouchableOpacity testID="metas-add-btn" onPress={handlePressAdd} style={[st.addBtn, { backgroundColor: colors.primaryLight }]}>
+          <Icon name={alcanzoLimite ? 'lock' : 'plus'} size={20} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -217,6 +228,25 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack }) => {
           </>
         )}
 
+        {alcanzoLimite && (
+          <TouchableOpacity
+            onPress={() => onPremiumPress?.()}
+            activeOpacity={0.85}
+            style={[st.upsellCard, { backgroundColor: colors.primaryLight, borderColor: colors.primary + '33' }]}
+          >
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                <PremiumBadge />
+                <Text style={[st.upsellTitle, { color: colors.textPrimary }]}>Metas ilimitadas</Text>
+              </View>
+              <Text style={[st.upsellSub, { color: colors.textSecondary }]}>
+                En Free puedes tener {METAS_GRATIS} meta activa. Con Premium creas todas las que quieras.
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={18} color={colors.primary} />
+          </TouchableOpacity>
+        )}
+
         {completadas.length > 0 && (
           <>
             <Text style={[st.sectionLabel, { color: colors.textTertiary, marginTop: 24 }]}>COMPLETADAS</Text>
@@ -248,6 +278,13 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack }) => {
 };
 
 const st = StyleSheet.create({
+  upsellCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderRadius: 18, borderWidth: 1,
+    padding: 14, marginTop: 4, marginBottom: 12,
+  },
+  upsellTitle: { fontSize: 13.5, fontWeight: '700' },
+  upsellSub:   { fontSize: 12, lineHeight: 17 },
   screen:       { flex: 1 },
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1 },
   backBtn:      { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },

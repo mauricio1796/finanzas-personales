@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Polyline, Circle } from 'react-native-svg';
 import { Icon } from '../components/ui/Icon';
+import { PremiumLock } from '../components/ui/PremiumLock';
 import { useFinance } from '../state/FinanceContext';
 import { useTheme } from '../state/ThemeContext';
 import { calcularMeta, calcularCredito, simularReduccion, proyectarMesProximo, detectarTendencia } from '../services/ProyeccionService';
@@ -70,7 +71,7 @@ function StepRow({ label, value, min, max, step, formato, onChange }: StepRowPro
   );
 }
 
-export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
+export const ProyeccionesScreen: React.FC<{ onBack?: () => void; onPremiumPress?: () => void }> = ({ onBack, onPremiumPress }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -110,11 +111,12 @@ export const ProyeccionesScreen: React.FC<{ onBack?: () => void }> = ({ onBack }
           <Text style={[styles.headerTitle, onBack && { flex: 1, textAlign: 'center' }]}>Proyecciones</Text>
           <Icon name="trending-up" size={20} color={colors.primary} />
         </View>
-        <View style={styles.lockContainer}>
-          <Icon name="lock" size={48} color={colors.border} />
-          <Text style={styles.lockTitle}>Funcion Premium</Text>
-          <Text style={styles.lockSub}>Simula escenarios financieros, calcula cuotas de credito y proyecta tu ahorro con CDTs colombianos.</Text>
-        </View>
+        <PremiumLock
+          title="Proyecciones"
+          description="Simula escenarios financieros, calcula cuotas de crédito y proyecta tu ahorro con CDTs colombianos."
+          onUpgrade={() => onPremiumPress?.()}
+          onDismiss={onBack}
+        />
       </View>
     );
   }
