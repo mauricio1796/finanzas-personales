@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { TourRegistry, TourMeasure } from '../../utils/TourRegistry';
 import { THEME } from '../../constants/theme';
+import { useTheme } from '../../state/ThemeContext';
 
 // ─── Step definition ─────────────────────────────────────────────────────────
 export interface FinnTourStep {
@@ -147,6 +148,7 @@ export const FinnTour: React.FC<FinnTourProps> = ({
   onFinish,
 }) => {
   const { width: W, height: H } = useWindowDimensions();
+  const { colors } = useTheme();
   const [stepIndex, setStepIndex] = useState(0);
   const [spot, setSpot] = useState<SpotRect | null>(null);
 
@@ -306,7 +308,7 @@ export const FinnTour: React.FC<FinnTourProps> = ({
           style={[
             s.panel_card,
             panelAnchor,
-            { opacity: panelOpacity, transform: [{ translateY: panelTranslate }] },
+            { backgroundColor: colors.card, opacity: panelOpacity, transform: [{ translateY: panelTranslate }] },
           ]}
         >
           {/* Header row */}
@@ -314,49 +316,49 @@ export const FinnTour: React.FC<FinnTourProps> = ({
             <View style={s.headerLeft}>
               <FinnAvatar size={44} />
               <View style={s.headerMeta}>
-                <Text style={s.headerName}>Finn</Text>
-                <Text style={s.headerRole}>Asesor Financiero IA</Text>
+                <Text style={[s.headerName, { color: colors.textPrimary }]}>Finn</Text>
+                <Text style={[s.headerRole, { color: colors.textSecondary }]}>Asesor Financiero IA</Text>
               </View>
             </View>
 
             {/* Skip */}
             <TouchableOpacity
-              style={s.skipBtn}
+              style={[s.skipBtn, { backgroundColor: colors.cardSecondary }]}
               onPress={onFinish}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={s.skipText}>Saltar</Text>
+              <Text style={[s.skipText, { color: colors.textSecondary }]}>Saltar</Text>
             </TouchableOpacity>
           </View>
 
           {/* Divider */}
-          <View style={s.divider} />
+          <View style={[s.divider, { backgroundColor: colors.borderSubtle }]} />
 
           {/* Step label */}
-          <Text style={s.stepLabel}>Paso {stepIndex + 1} de {steps.length}</Text>
+          <Text style={[s.stepLabel, { color: colors.primary }]}>Paso {stepIndex + 1} de {steps.length}</Text>
 
           {/* Title */}
-          <Text style={s.title}>{currentStep?.title}</Text>
+          <Text style={[s.title, { color: colors.textPrimary }]}>{currentStep?.title}</Text>
 
           {/* Body */}
-          <Text style={s.body}>{currentStep?.body}</Text>
+          <Text style={[s.body, { color: colors.textSecondary }]}>{currentStep?.body}</Text>
 
           {/* Progress bar */}
-          <View style={s.progressTrack}>
-            <Animated.View style={[s.progressFill, { width: progressWidth }]} />
+          <View style={[s.progressTrack, { backgroundColor: colors.border }]}>
+            <Animated.View style={[s.progressFill, { backgroundColor: colors.primary, width: progressWidth }]} />
           </View>
 
           {/* Navigation */}
           <View style={s.nav}>
             {!isFirst ? (
-              <TouchableOpacity style={s.prevBtn} onPress={goPrev}>
-                <Text style={s.prevText}>Anterior</Text>
+              <TouchableOpacity style={[s.prevBtn, { borderColor: colors.border }]} onPress={goPrev}>
+                <Text style={[s.prevText, { color: colors.textSecondary }]}>Anterior</Text>
               </TouchableOpacity>
             ) : (
               <View />
             )}
             <TouchableOpacity
-              style={[s.nextBtn, isLast && s.nextBtnFinish]}
+              style={[s.nextBtn, { backgroundColor: colors.primary, shadowColor: colors.primary }, isLast && [s.nextBtnFinish, { backgroundColor: colors.income, shadowColor: colors.income }]]}
               onPress={goNext}
             >
               <Text style={s.nextText}>

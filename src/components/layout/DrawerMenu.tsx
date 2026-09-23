@@ -15,6 +15,7 @@ import { useFinance } from '../../state';
 import { useTheme } from '../../state/ThemeContext';
 import { Icon } from '../ui/Icon';
 import type { FeatherName } from '../ui/Icon';
+import { getNivelActual, getNivelSiguiente, getProgresoNivel } from '../../services/GamificacionService';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,21 @@ export const DrawerMenu: React.FC<DrawerMenuProps> = ({ visible, onClose, onNavi
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const [showing, setShowing] = useState(false);
 
+  // ── XP animado: cuenta hacia el nuevo valor en vez de saltar, para que la
+  // recompensa se sienta "en el momento" cuando se gana XP en cualquier pantalla.
+  const targetXp = userLevel?.experience ?? 0;
+  const xpAnim = useRef(new Animated.Value(targetXp)).current;
+  const [xpMostrado, setXpMostrado] = useState(targetXp);
+
+  useEffect(() => {
+    const id = xpAnim.addListener(({ value }) => setXpMostrado(Math.round(value)));
+    return () => xpAnim.removeListener(id);
+  }, [xpAnim]);
+
+  useEffect(() => {
+    Animated.timing(xpAnim, { toValue: targetXp, duration: 700, useNativeDriver: false }).start();
+  }, [targetXp]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (visible) {
       setShowing(true);
@@ -102,7 +118,11 @@ export const DrawerMenu: React.FC<DrawerMenuProps> = ({ visible, onClose, onNavi
     }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const xpPct = ((userLevel?.experience ?? 0) % 1000) / 10;
+  const nivelActual    = getNivelActual(xpMostrado);
+  const nivelSiguiente = getNivelSiguiente(xpMostrado);
+  const xpPct = getProgresoNivel(xpMostrado) * 100;
+  const xpEnNivel = xpMostrado - nivelActual.xpRequired;
+  const xpParaSiguiente = nivelSiguiente ? nivelSiguiente.xpRequired - nivelActual.xpRequired : xpEnNivel;
   const initials = (user?.name ?? 'U')
     .split(' ')
     .slice(0, 2)
@@ -126,27 +146,29 @@ export const DrawerMenu: React.FC<DrawerMenuProps> = ({ visible, onClose, onNavi
       </Animated.View>
 
       {/* Slide-in panel */}
-      <Animated.View style={[s.panel, { transform: [{ translateX: slideAnim }] }]}>
+      <Animated.View style={[s.panel, { backgroundColor: colors.card, transform: [{ translateX: slideAnim }] }]}>
         {/* ── Header ── */}
-        <View style={[s.header, { paddingTop: insets.top + 20 }]}>
-          <View style={s.avatarCircle}>
-            <Text style={s.avatarLetter}>{initials}</Text>
+        <View style={[s.header, { backgroundColor: colors.primaryLight, borderBottomColor: colors.border, paddingTop: insets.top + 20 }]}>
+          <View style={[s.avatarCircle, { backgroundColor: colors.card }]}>
+            <Text style={[s.avatarLetter, { color: colors.primary }]}>{initials}</Text>
           </View>
-          <Text style={s.userName} numberOfLines={1}>
+          <Text style={[s.userName, { color: colors.textPrimary }]} numberOfLines={1}>
             {user?.name ?? 'Usuario'}
           </Text>
-          <Text style={s.userSub}>
-            Nivel {userLevel?.level ?? 1} · {userLevel?.title ?? 'Principiante'}
+          <Text style={[s.userSub, { color: colors.textSecondary }]}>
+            Nivel {nivelActual.level} · {nivelActual.title}
           </Text>
 
           {/* XP bar */}
           <View style={s.xpWrap}>
             <View style={s.xpRow}>
-              <Text style={s.xpLabel}>Progreso XP</Text>
-              <Text style={s.xpLabel}>{(userLevel?.experience ?? 0) % 1000} / 1000</Text>
+              <Text style={[s.xpLabel, { color: colors.textTertiary }]}>Progreso XP</Text>
+              <Text style={[s.xpLabel, { color: colors.textTertiary }]}>
+                {nivelSiguiente ? `${xpEnNivel} / ${xpParaSiguiente}` : 'Nivel máximo'}
+              </Text>
             </View>
-            <View style={s.xpTrack}>
-              <View style={[s.xpFill, { width: `${xpPct}%` as any }]} />
+            <View style={[s.xpTrack, { backgroundColor: colors.border }]}>
+              <View style={[s.xpFill, { backgroundColor: colors.primary, width: `${Math.min(xpPct, 100)}%` as any }]} />
             </View>
           </View>
         </View>
@@ -160,9 +182,9 @@ export const DrawerMenu: React.FC<DrawerMenuProps> = ({ visible, onClose, onNavi
           {SECTIONS.map((section, si) => (
             <View key={section.title}>
               {/* Separator between sections */}
-              {si > 0 && <View style={s.separator} />}
+              {si > 0 && <View style={[s.separator, { backgroundColor: colors.borderSubtle }]} />}
 
-              <Text style={s.sectionTitle}>{section.title}</Text>
+              <Text style={[s.sectionTitle, { color: colors.textTertiary }]}>{section.title}</Text>
 
               {section.items.map(item => (
                 <TouchableOpacity
@@ -174,9 +196,9 @@ export const DrawerMenu: React.FC<DrawerMenuProps> = ({ visible, onClose, onNavi
                   style={s.item}
                   activeOpacity={0.7}
                 >
-                  <Icon name={item.icon} size={20} color="#9CA3AF" />
-                  <Text style={s.itemLabel}>{item.label}</Text>
-                  <Icon name="chevron-right" size={14} color="#E5E7EB" />
+                  <Icon name={item.icon} size={20} color={colors.textTertiary} />
+                  <Text style={[s.itemLabel, { color: colors.textSecondary }]}>{item.label}</Text>
+                  <Icon name="chevron-right" size={14} color={colors.border} />
                 </TouchableOpacity>
               ))}
             </View>

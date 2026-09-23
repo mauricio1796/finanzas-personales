@@ -5,25 +5,14 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '../components/ui/Icon';
 import {
   useTheme,
-  AccentKey,
   FontScaleKey,
-  NumFormatKey,
-  CardStyleKey,
-  BalanceLayoutKey,
-  ACCENT_PALETTES,
-  ACCENT_LABELS,
   FONT_SCALES,
   FONT_SCALE_LABELS,
-  NUM_FORMAT_LABELS,
-  CARD_STYLE_LABELS,
-  BALANCE_LAYOUT_LABELS,
-  BALANCE_LAYOUT_ICONS,
   buildFormatAmount,
 } from '../state/ThemeContext';
 
@@ -34,137 +23,34 @@ interface PersonalizacionScreenProps {
 }
 
 // ─── Live preview card ────────────────────────────────────────────────────────
+// Muestra cómo se ve el tamaño de texto elegido sobre el tema activo (claro/oscuro),
+// con la tarjeta de balance clásica — el resto de opciones (acento, formato,
+// estilo de tarjeta, layout) se quitaron para no salirse del alcance documentado.
 
-const PreviewCard: React.FC<{
-  accentKey:     AccentKey;
-  fontScale:     number;
-  numFormat:     NumFormatKey;
-  cardStyle:     CardStyleKey;
-  balanceLayout: BalanceLayoutKey;
-  isDark:        boolean;
-}> = ({ accentKey, fontScale, numFormat, cardStyle, balanceLayout, isDark }) => {
-  const palette = ACCENT_PALETTES[accentKey];
-  const primary = isDark ? palette.primaryDark_dm : palette.primary;
+const PreviewCard: React.FC<{ fontScale: number; isDark: boolean; primary: string }> = ({ fontScale, isDark, primary }) => {
   const bg      = isDark ? '#0F0F11' : '#F8F7FF';
   const cardBg  = isDark ? '#1C1C1F' : '#FFFFFF';
   const textMain= isDark ? '#F4F4F5' : '#111827';
   const textSub = isDark ? '#A1A1AA' : '#6B7280';
   const border  = isDark ? '#2E2E33' : '#E5E7EB';
 
-  const fmt = buildFormatAmount(numFormat);
+  const fmt = buildFormatAmount('cop');
   const fs  = (base: number) => Math.round(base * fontScale);
 
-  // Balance card style colours
-  let balanceBg = primary;
-  let balanceText = '#FFFFFF';
-  let balanceBorder = 'transparent';
-  if (cardStyle === 'minimal') {
-    balanceBg    = cardBg;
-    balanceText  = textMain;
-    balanceBorder = primary;
-  } else if (cardStyle === 'dark') {
-    balanceBg    = isDark ? '#0A0A0F' : '#111827';
-    balanceText  = '#FFFFFF';
-  } else if (cardStyle === 'glass') {
-    balanceBg    = primary + '22';
-    balanceText  = isDark ? '#FFFFFF' : textMain;
-    balanceBorder = primary + '55';
-  }
-
-  const t  = balanceText;
-  const tB = balanceText + 'BB';
-  const tC = balanceText + 'CC';
-  const progW = 0.55; // 55% spent mock
-
-  // ── Balance card content by layout ──────────────────────────────────────────
-  const renderBalance = () => {
-    if (balanceLayout === 'compacta') {
-      return (
-        <View style={[pv.balCard, { backgroundColor: balanceBg, borderWidth: cardStyle === 'minimal' || cardStyle === 'glass' ? 2 : 0, borderColor: balanceBorder, gap: 8 }]}>
-          <Text style={[pv.balLabel, { color: tB, fontSize: fs(8) }]}>DISPONIBLE AHORA</Text>
-          <Text style={[pv.balAmount, { color: t, fontSize: fs(17) }]}>{fmt(2_850_000)}</Text>
-          {/* Progress bar */}
-          <View style={{ height: 4, backgroundColor: balanceText + '33', borderRadius: 2, overflow: 'hidden' }}>
-            <View style={{ width: `${progW * 100}%`, height: '100%', backgroundColor: balanceText, borderRadius: 2 }} />
-          </View>
-          {/* 3 stats */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
-            {[['↑', fmt(3_200_000)], ['↓', fmt(350_000)], ['📅', '16d']].map(([icon, val], i) => (
-              <View key={i} style={{ alignItems: 'center' }}>
-                <Text style={{ color: tC, fontSize: fs(8) }}>{icon}</Text>
-                <Text style={{ color: t, fontSize: fs(8), fontWeight: '700' }}>{val}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      );
-    }
-
-    if (balanceLayout === 'anillo') {
-      return (
-        <View style={[pv.balCard, { backgroundColor: balanceBg, borderWidth: cardStyle === 'minimal' || cardStyle === 'glass' ? 2 : 0, borderColor: balanceBorder, flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
-          {/* Ring */}
-          <View style={{ width: 52, height: 52, borderRadius: 26, borderWidth: 6, borderColor: balanceText + '33', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-            <View style={{ position: 'absolute', width: 52, height: 52, borderRadius: 26, borderWidth: 6, borderColor: balanceText, borderRightColor: 'transparent', borderBottomColor: 'transparent', transform: [{ rotate: '-45deg' }] }} />
-            <Text style={{ color: t, fontSize: fs(8), fontWeight: '800' }}>55%</Text>
-          </View>
-          {/* Info col */}
-          <View style={{ flex: 1, gap: 4 }}>
-            <Text style={[pv.balLabel, { color: tB, fontSize: fs(7) }]}>DISPONIBLE</Text>
-            <Text style={[pv.balAmount, { color: t, fontSize: fs(14) }]}>{fmt(2_850_000)}</Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Text style={{ color: tC, fontSize: fs(8) }}>↑ {fmt(3_200_000)}</Text>
-              <Text style={{ color: tC, fontSize: fs(8) }}>↓ {fmt(350_000)}</Text>
-            </View>
-          </View>
-        </View>
-      );
-    }
-
-    if (balanceLayout === 'horizontal') {
-      return (
-        <View style={[pv.balCard, { backgroundColor: balanceBg, borderWidth: cardStyle === 'minimal' || cardStyle === 'glass' ? 2 : 0, borderColor: balanceBorder, flexDirection: 'row', gap: 10 }]}>
-          {/* Left col */}
-          <View style={{ flex: 1, gap: 4 }}>
-            <Text style={[pv.balLabel, { color: tB, fontSize: fs(7) }]}>DISPONIBLE</Text>
-            <Text style={[pv.balAmount, { color: t, fontSize: fs(13) }]}>{fmt(2_850_000)}</Text>
-            <View style={{ height: 3, backgroundColor: balanceText + '33', borderRadius: 2, overflow: 'hidden', marginTop: 2 }}>
-              <View style={{ width: `${progW * 100}%`, height: '100%', backgroundColor: balanceText, borderRadius: 2 }} />
-            </View>
-          </View>
-          {/* Right col */}
-          <View style={{ gap: 4, justifyContent: 'center' }}>
-            {[['Ingresos', fmt(3_200_000)], ['Gastos', fmt(350_000)], ['Ahorro', '10%'], ['Días', '16']].map(([label, val]) => (
-              <View key={label} style={{ alignItems: 'flex-end' }}>
-                <Text style={{ color: tC, fontSize: fs(7) }}>{label}</Text>
-                <Text style={{ color: t, fontSize: fs(8), fontWeight: '700' }}>{val}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      );
-    }
-
-    // clasica (default)
-    return (
-      <View style={[pv.balCard, { backgroundColor: balanceBg, borderWidth: cardStyle === 'minimal' || cardStyle === 'glass' ? 2 : 0, borderColor: balanceBorder }]}>
-        <Text style={[pv.balLabel, { color: tB, fontSize: fs(9) }]}>DISPONIBLE AHORA</Text>
-        <Text style={[pv.balAmount, { color: t, fontSize: fs(20) }]}>{fmt(2_850_000)}</Text>
+  return (
+    <View style={[pv.wrap, { backgroundColor: bg, borderColor: border }]}>
+      <View style={[pv.balCard, { backgroundColor: primary }]}>
+        <Text style={[pv.balLabel, { color: '#FFFFFFBB', fontSize: fs(9) }]}>DISPONIBLE AHORA</Text>
+        <Text style={[pv.balAmount, { color: '#FFFFFF', fontSize: fs(20) }]}>{fmt(2_850_000)}</Text>
         <View style={pv.balRow}>
           <View style={pv.balChip}>
-            <Text style={[pv.balChipText, { color: tC, fontSize: fs(9) }]}>↑ {fmt(3_200_000)}</Text>
+            <Text style={[pv.balChipText, { color: '#FFFFFFCC', fontSize: fs(9) }]}>↑ {fmt(3_200_000)}</Text>
           </View>
           <View style={pv.balChip}>
-            <Text style={[pv.balChipText, { color: tC, fontSize: fs(9) }]}>↓ {fmt(350_000)}</Text>
+            <Text style={[pv.balChipText, { color: '#FFFFFFCC', fontSize: fs(9) }]}>↓ {fmt(350_000)}</Text>
           </View>
         </View>
       </View>
-    );
-  };
-
-  return (
-    <View style={[pv.wrap, { backgroundColor: bg }]}>
-      {renderBalance()}
 
       {/* Mock transactions */}
       <View style={[pv.card, { backgroundColor: cardBg, borderColor: border }]}>
@@ -192,31 +78,12 @@ const PreviewCard: React.FC<{
           <Text style={[pv.txAmt, { color: '#1D9E75', fontSize: fs(12) }]}>+{fmt(3_200_000)}</Text>
         </View>
       </View>
-
-      {/* Mock nav bar */}
-      <View style={[pv.nav, { backgroundColor: cardBg, borderTopColor: border }]}>
-        {(['dashboard', 'bot', 'add', 'explorar', 'perfil'] as const).map((tab, i) => {
-          const isActive = i === 0;
-          const icons = ['home', 'message-circle', 'plus', 'compass', 'user'];
-          return (
-            <View key={tab} style={pv.navItem}>
-              <View style={[pv.navIconWrap, isActive && { backgroundColor: primary + '18' }]}>
-                <Icon
-                  name={icons[i] as any}
-                  size={fs(13)}
-                  color={isActive ? primary : (isDark ? '#71717A' : '#9CA3AF')}
-                />
-              </View>
-            </View>
-          );
-        })}
-      </View>
     </View>
   );
 };
 
 const pv = StyleSheet.create({
-  wrap:      { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB' },
+  wrap:      { borderRadius: 16, overflow: 'hidden', borderWidth: 1, gap: 0 },
   balCard:   { padding: 16, gap: 6 },
   balLabel:  { fontWeight: '700', letterSpacing: 0.5 },
   balAmount: { fontWeight: '800', letterSpacing: -1 },
@@ -230,19 +97,19 @@ const pv = StyleSheet.create({
   txName:    { fontWeight: '600' },
   txCat:     { fontWeight: '400' },
   txAmt:     { fontWeight: '700' },
-  nav:       { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 10, borderTopWidth: 1 },
-  navItem:   { alignItems: 'center', justifyContent: 'center' },
-  navIconWrap: { padding: 6, borderRadius: 10 },
 });
 
 // ─── Section helpers ──────────────────────────────────────────────────────────
 
-const SectionTitle: React.FC<{ label: string; sub?: string }> = ({ label, sub }) => (
-  <View style={s.sectionHeader}>
-    <Text style={s.sectionTitle}>{label}</Text>
-    {sub && <Text style={s.sectionSub}>{sub}</Text>}
-  </View>
-);
+const SectionTitle: React.FC<{ label: string; sub?: string }> = ({ label, sub }) => {
+  const { colors } = useTheme();
+  return (
+    <View style={s.sectionHeader}>
+      <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>{label}</Text>
+      {sub && <Text style={[s.sectionSub, { color: colors.textSecondary }]}>{sub}</Text>}
+    </View>
+  );
+};
 
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
@@ -251,40 +118,16 @@ export const PersonalizacionScreen: React.FC<PersonalizacionScreenProps> = ({ on
   const insets = useSafeAreaInsets();
   const {
     isDark, colors,
-    accentKey, setAccentKey,
     fontScaleKey, setFontScaleKey,
-    numFormat, setNumFormat,
-    cardStyle, setCardStyle,
-    balanceLayout, setBalanceLayout,
     fontScale,
   } = useTheme();
 
-  // Local preview state mirrors live state
-  const [prevAccent,    setPrevAccent]    = useState<AccentKey>(accentKey);
+  // Local preview state mirrora el estado real
   const [prevFontScale, setPrevFontScale] = useState<FontScaleKey>(fontScaleKey);
-  const [prevNumFormat, setPrevNumFormat] = useState<NumFormatKey>(numFormat);
-  const [prevCardStyle,     setPrevCardStyle]     = useState<CardStyleKey>(cardStyle);
-  const [prevBalanceLayout, setPrevBalanceLayout] = useState<BalanceLayoutKey>(balanceLayout);
 
-  const applyAccent = (k: AccentKey) => {
-    setPrevAccent(k);
-    setAccentKey(k);
-  };
   const applyFont = (k: FontScaleKey) => {
     setPrevFontScale(k);
     setFontScaleKey(k);
-  };
-  const applyFormat = (k: NumFormatKey) => {
-    setPrevNumFormat(k);
-    setNumFormat(k);
-  };
-  const applyCard = (k: CardStyleKey) => {
-    setPrevCardStyle(k);
-    setCardStyle(k);
-  };
-  const applyLayout = (k: BalanceLayoutKey) => {
-    setPrevBalanceLayout(k);
-    setBalanceLayout(k);
   };
 
   const fs = (base: number) => Math.round(base * fontScale);
@@ -308,12 +151,9 @@ export const PersonalizacionScreen: React.FC<PersonalizacionScreenProps> = ({ on
           VISTA PREVIA
         </Text>
         <PreviewCard
-          accentKey={prevAccent}
           fontScale={FONT_SCALES[prevFontScale]}
-          numFormat={prevNumFormat}
-          cardStyle={prevCardStyle}
-          balanceLayout={prevBalanceLayout}
           isDark={isDark}
+          primary={colors.primary}
         />
       </View>
 
@@ -324,40 +164,7 @@ export const PersonalizacionScreen: React.FC<PersonalizacionScreenProps> = ({ on
       >
 
         {/* ──────────────────────────────────────────────────────
-            1. COLOR DE ACENTO
-        ────────────────────────────────────────────────────── */}
-        <SectionTitle
-          label="Color principal"
-          sub="Define el color de acento en toda la aplicación"
-        />
-
-        <View style={[s.card, { backgroundColor: colors.card }]}>
-          <View style={s.accentGrid}>
-            {(Object.keys(ACCENT_PALETTES) as AccentKey[]).map(key => {
-              const palette = ACCENT_PALETTES[key];
-              const color   = isDark ? palette.primaryDark_dm : palette.primary;
-              const active  = prevAccent === key;
-              return (
-                <TouchableOpacity
-                  key={key}
-                  style={[s.accentItem, active && { borderColor: color, borderWidth: 2 }, { backgroundColor: colors.cardSecondary }]}
-                  onPress={() => applyAccent(key)}
-                  activeOpacity={0.75}
-                >
-                  <View style={[s.accentDot, { backgroundColor: color }]}>
-                    {active && <Text style={s.accentCheck}>✓</Text>}
-                  </View>
-                  <Text style={[s.accentLabel, { color: active ? color : colors.textSecondary, fontSize: fs(11) }]}>
-                    {ACCENT_LABELS[key]}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* ──────────────────────────────────────────────────────
-            2. TAMAÑO DE TIPOGRAFÍA
+            TAMAÑO DE TIPOGRAFÍA
         ────────────────────────────────────────────────────── */}
         <SectionTitle
           label="Tamaño de texto"
@@ -398,162 +205,15 @@ export const PersonalizacionScreen: React.FC<PersonalizacionScreenProps> = ({ on
           })}
         </View>
 
-        {/* ──────────────────────────────────────────────────────
-            3. FORMATO DE NÚMEROS
-        ────────────────────────────────────────────────────── */}
-        <SectionTitle
-          label="Formato de cantidades"
-          sub="Cómo se muestran los valores monetarios"
-        />
-
-        <View style={[s.card, { backgroundColor: colors.card }]}>
-          {(Object.keys(NUM_FORMAT_LABELS) as NumFormatKey[]).map((key, i, arr) => {
-            const active = prevNumFormat === key;
-            const descs: Record<NumFormatKey, string> = {
-              cop:     'Estilo colombiano con puntos',
-              usd:     'Estilo americano con comas',
-              compact: 'Millones y miles abreviados',
-              plain:   'Con código de moneda COP',
-            };
-            return (
-              <TouchableOpacity
-                key={key}
-                style={[
-                  s.optionRow,
-                  i < arr.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-                ]}
-                onPress={() => applyFormat(key)}
-                activeOpacity={0.7}
-              >
-                <View style={s.optionLeft}>
-                  <View>
-                    <Text style={[s.optionName, { color: active ? colors.primary : colors.textPrimary, fontSize: fs(14), fontWeight: '700' }]}>
-                      {NUM_FORMAT_LABELS[key]}
-                    </Text>
-                    <Text style={[s.optionDesc, { color: colors.textTertiary, fontSize: fs(11) }]}>
-                      {descs[key]}
-                    </Text>
-                  </View>
-                </View>
-                <View style={[s.radioOuter, { borderColor: active ? colors.primary : colors.border }]}>
-                  {active && <View style={[s.radioInner, { backgroundColor: colors.primary }]} />}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* ──────────────────────────────────────────────────────
-            4. ESTILO DE TARJETA DE BALANCE
-        ────────────────────────────────────────────────────── */}
-        <SectionTitle
-          label="Estilo del balance"
-          sub="Apariencia de la tarjeta de balance principal"
-        />
-
-        <View style={[s.card, { backgroundColor: colors.card }]}>
-          <View style={s.cardStyleGrid}>
-            {(Object.keys(CARD_STYLE_LABELS) as CardStyleKey[]).map(key => {
-              const active = prevCardStyle === key;
-              const icons: Record<CardStyleKey, string> = {
-                gradient: '🎨', minimal: '⬜', dark: '⬛', glass: '🔷',
-              };
-              return (
-                <TouchableOpacity
-                  key={key}
-                  style={[
-                    s.cardStyleItem,
-                    { backgroundColor: colors.cardSecondary },
-                    active && { borderColor: colors.primary, borderWidth: 2 },
-                  ]}
-                  onPress={() => applyCard(key)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={{ fontSize: 24, marginBottom: 6 }}>{icons[key]}</Text>
-                  <Text style={[s.cardStyleLabel, {
-                    color: active ? colors.primary : colors.textSecondary,
-                    fontSize: fs(11),
-                  }]}>
-                    {CARD_STYLE_LABELS[key]}
-                  </Text>
-                  {active && (
-                    <View style={[s.cardStyleBadge, { backgroundColor: colors.primary }]}>
-                      <Text style={s.cardStyleBadgeText}>✓</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* ──────────────────────────────────────────────────────
-            5. DISEÑO DE LA TARJETA DE INICIO
-        ────────────────────────────────────────────────────── */}
-        <SectionTitle
-          label="Diseño del panel de inicio"
-          sub="Elige cómo ver tu balance y estadísticas en inicio"
-        />
-
-        <View style={[s.card, { backgroundColor: colors.card }]}>
-          <View style={s.layoutGrid}>
-            {(Object.keys(BALANCE_LAYOUT_LABELS) as BalanceLayoutKey[]).map(key => {
-              const active = prevBalanceLayout === key;
-              const descs: Record<BalanceLayoutKey, string> = {
-                clasica:    'Balance completo con métricas y barra de progreso',
-                compacta:   'Vista condensada con barra única y 3 datos',
-                anillo:     'Anillo de progreso con estadísticas al lado',
-                horizontal: 'Dos columnas: balance e indicadores',
-              };
-              return (
-                <TouchableOpacity
-                  key={key}
-                  style={[
-                    s.layoutItem,
-                    { backgroundColor: colors.cardSecondary },
-                    active && { borderColor: colors.primary, borderWidth: 2 },
-                  ]}
-                  onPress={() => applyLayout(key)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[s.layoutIcon, { color: active ? colors.primary : colors.textSecondary }]}>
-                    {BALANCE_LAYOUT_ICONS[key]}
-                  </Text>
-                  <Text style={[s.layoutName, {
-                    color: active ? colors.primary : colors.textPrimary,
-                    fontSize: fs(12),
-                  }]}>
-                    {BALANCE_LAYOUT_LABELS[key]}
-                  </Text>
-                  <Text style={[s.layoutDesc, { color: colors.textTertiary, fontSize: fs(10) }]}>
-                    {descs[key]}
-                  </Text>
-                  {active && (
-                    <View style={[s.cardStyleBadge, { backgroundColor: colors.primary }]}>
-                      <Text style={s.cardStyleBadgeText}>✓</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
         {/* Reset */}
         <TouchableOpacity
           style={[s.resetBtn, { borderColor: colors.border }]}
-          onPress={() => {
-            applyAccent('indigo');
-            applyFont('normal');
-            applyFormat('cop');
-            applyCard('gradient');
-            applyLayout('clasica');
-          }}
+          onPress={() => applyFont('normal')}
           activeOpacity={0.7}
         >
           <Icon name="refresh-cw" size={14} color={colors.textTertiary} />
           <Text style={[s.resetText, { color: colors.textTertiary, fontSize: fs(13) }]}>
-            Restablecer valores por defecto
+            Restablecer tamaño de texto
           </Text>
         </TouchableOpacity>
 
@@ -623,12 +283,10 @@ const s = StyleSheet.create({
   sectionTitle: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#111827',
     letterSpacing: -0.2,
   },
   sectionSub: {
     fontSize: 12,
-    color: '#6B7280',
     marginTop: 2,
     fontWeight: '400',
   },
@@ -644,41 +302,7 @@ const s = StyleSheet.create({
     elevation: 2,
   },
 
-  // ── Accent grid ──
-  accentGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 12,
-    gap: 8,
-  },
-  accentItem: {
-    flex: 1,
-    minWidth: '28%',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-    gap: 8,
-  },
-  accentDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  accentCheck: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  accentLabel: {
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-
-  // ── Option rows (font / format) ──
+  // ── Option rows (font) ──
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -711,170 +335,6 @@ const s = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-  },
-
-  // ── Card style grid ──
-  cardStyleGrid: {
-    flexDirection: 'row',
-    padding: 12,
-    gap: 8,
-  },
-  cardStyleItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-    position: 'relative',
-  },
-  cardStyleLabel: {
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  cardStyleBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardStyleBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#fff',
-  },
-
-  // ── Balance layout grid ──
-  layoutGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 12,
-    gap: 8,
-  },
-  layoutItem: {
-    width: '47%',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-    position: 'relative',
-    gap: 6,
-  },
-  layoutIcon: {
-    fontSize: 28,
-    fontWeight: '700',
-  },
-  layoutName: {
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  layoutDesc: {
-    textAlign: 'center',
-    lineHeight: 14,
-    fontWeight: '400',
-  },
-
-  // ── Glass mode master banner ──
-  glassMasterBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    backgroundColor: 'rgba(97,86,232,0.12)',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(97,86,232,0.25)',
-  },
-  glassMasterIcon: {
-    fontSize: 28,
-    marginTop: 2,
-  },
-  glassMasterTitle: {
-    fontWeight: '800',
-    color: '#6156E8',
-    letterSpacing: -0.2,
-  },
-  glassMasterSub: {
-    color: '#6B7280',
-    marginTop: 3,
-    fontWeight: '400',
-    lineHeight: 17,
-  },
-  lockedSection: {
-    opacity: 0.35,
-  },
-
-  // ── Liquid Glass card ──
-  glassCard: {
-    borderRadius: 20,
-    padding: 20,
-    gap: 10,
-    overflow: 'hidden',
-    shadowColor: '#0B1220',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  glassCardActive: {
-    shadowOpacity: 0.35,
-    shadowRadius: 24,
-    elevation: 12,
-  },
-  glassShimmer: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0,
-    height: 50,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  glassRim: {
-    ...StyleSheet.absoluteFill,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  glassRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  glassLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    flex: 1,
-  },
-  glassEmoji: {
-    fontSize: 32,
-  },
-  glassTitle: {
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  glassSub: {
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  glassFeat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingLeft: 4,
-  },
-  glassFeatDot: {
-    fontSize: 7,
-  },
-  glassFeatText: {
-    fontWeight: '400',
   },
 
   // ── Reset ──

@@ -313,10 +313,10 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.personalizacionTitle, { color: colors.textPrimary }]}>
-                  Color, tipografía y formato
+                  Tamaño de texto
                 </Text>
                 <Text style={[styles.personalizacionSub, { color: colors.textTertiary }]}>
-                  Personaliza cada detalle visual de la app
+                  Ajusta la escala tipográfica de la app
                 </Text>
               </View>
               <Icon name="chevron-right" size={16} color={colors.textTertiary} />

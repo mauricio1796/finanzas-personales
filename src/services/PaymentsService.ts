@@ -47,15 +47,25 @@ export async function crearCheckout(plan: PlanPago, userId: string | undefined, 
   }
 }
 
-/** Consulta el estado real de una transacción por su referencia. */
-export async function consultarEstadoPago(reference: string): Promise<EstadoPago | 'PENDING'> {
-  if (!CONFIG.WORKER_URL) return 'ERROR';
+export interface RefPago {
+  /** id de transacción de Wompi (preferido — Wompi lo agrega solo al volver del checkout) */
+  id?: string;
+  /** referencia que generamos nosotros (respaldo si no se capturó el id) */
+  reference?: string;
+}
+
+/** Consulta el estado real de una transacción, por id (preferido) o por referencia. */
+export async function consultarEstadoPago(ref: RefPago): Promise<EstadoPago | 'PENDING'> {
+  if (!CONFIG.WORKER_URL || (!ref.id && !ref.reference)) return 'ERROR';
 
   const controller = new AbortController();
   const timeoutId  = setTimeout(() => controller.abort(), 10_000);
 
   try {
-    const response = await fetch(`${CONFIG.WORKER_URL}/payments/status?reference=${encodeURIComponent(reference)}`, {
+    const qs = ref.id
+      ? `id=${encodeURIComponent(ref.id)}`
+      : `reference=${encodeURIComponent(ref.reference!)}`;
+    const response = await fetch(`${CONFIG.WORKER_URL}/payments/status?${qs}`, {
       signal: controller.signal,
     });
     const data = await response.json().catch(() => ({})) as any;
@@ -74,14 +84,25 @@ export async function consultarEstadoPago(reference: string): Promise<EstadoPago
  * un resultado definitivo (aprobado, rechazado, anulado o error).
  */
 export async function esperarConfirmacionPago(
-  reference: string,
+  ref: RefPago,
   intentos = 6,
   intervaloMs = 2500,
 ): Promise<EstadoPago | 'PENDING'> {
   for (let i = 0; i < intentos; i++) {
-    const estado = await consultarEstadoPago(reference);
+    const estado = await consultarEstadoPago(ref);
     if (estado !== 'PENDING') return estado;
     await new Promise(res => setTimeout(res, intervaloMs));
   }
   return 'PENDING';
+}
+
+/** Extrae el "id" de transacción que Wompi agrega a la redirect-url al volver del checkout. */
+export function extraerIdDeRedirect(redirectedUrl: string | undefined | null): string | undefined {
+  if (!redirectedUrl) return undefined;
+  try {
+    const match = redirectedUrl.match(/[?&]id=([^&]+)/);
+    return match ? decodeURIComponent(match[1]) : undefined;
+  } catch {
+    return undefined;
+  }
 }

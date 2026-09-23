@@ -274,6 +274,7 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
   const [formDiaPago, setFormDiaPago] = useState('');
   const [formIcono, setFormIcono] = useState('tag');
   const [errores, setErrores] = useState<Record<string, string>>({});
+  const [sugerenciasVisibles, setSugerenciasVisibles] = useState(false);
 
 
   // Catalog modal
@@ -389,6 +390,20 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
     }),
   [filtroCatalogo]);
 
+  // Sugerencias del catálogo para el campo "Nombre" del formulario — evita que el
+  // usuario cree categorías sueltas sin ícono/color propios (quedan con el genérico
+  // "Otros" en getIconoCategoria/getBgIconoCategoria, que solo conocen nombres fijos).
+  const sugerenciasNombre = useMemo(() => {
+    const texto = formNombre.trim().toLowerCase();
+    if (!texto) return [];
+    return CATALOGO_CATEGORIAS.filter(item =>
+      item.tipo === formTipo &&
+      item.nombre.toLowerCase().includes(texto) &&
+      item.nombre.toLowerCase() !== texto &&
+      !categories.some((c: any) => c.name.toLowerCase() === item.nombre.toLowerCase()),
+    ).slice(0, 5);
+  }, [formNombre, formTipo, categories]);
+
   // ── Handlers ───────────────────────────────────────────────────────────────
   const toggleBusqueda = useCallback(() => {
     const toVal = mostrarBusqueda ? 0 : 1;
@@ -420,6 +435,7 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
     setFormDiaPago('');
     setFormIcono('tag');
     setErrores({});
+    setSugerenciasVisibles(false);
     setModalFormVisible(true);
   }, []);
 
@@ -431,7 +447,16 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
     setFormDiaPago(cat.diaPago ? String(cat.diaPago) : '');
     setFormIcono(cat.icon || 'tag');
     setErrores({});
+    setSugerenciasVisibles(false);
     setModalFormVisible(true);
+  }, []);
+
+  const elegirSugerencia = useCallback((item: typeof CATALOGO_CATEGORIAS[number]) => {
+    setFormNombre(item.nombre);
+    setFormIcono(item.icono);
+    setErrores(p => ({ ...p, nombre: '' }));
+    setSugerenciasVisibles(false);
+    Haptics.selectionAsync().catch(() => {});
   }, []);
 
 
@@ -586,7 +611,12 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
             <View style={[s.inputWrap, { backgroundColor: colors.inputBg, borderColor: errores.nombre ? colors.expense : colors.border }]}>
               <TextInput
                 value={formNombre}
-                onChangeText={t => { setFormNombre(t); if (errores.nombre) setErrores(p => ({...p, nombre: ''})); }}
+                onChangeText={t => {
+                  setFormNombre(t);
+                  if (errores.nombre) setErrores(p => ({...p, nombre: ''}));
+                  setSugerenciasVisibles(true);
+                }}
+                onFocus={() => setSugerenciasVisibles(true)}
                 placeholder="ej. Alimentación"
                 placeholderTextColor={colors.textTertiary}
                 style={[s.input, { color: colors.textPrimary }, Platform.OS === 'web' && ({ outline: 'none' } as any)]}
@@ -596,6 +626,31 @@ export const CategoriasScreen: React.FC<Props> = ({ onNavigate }) => {
               <Text style={[s.charCount, { color: colors.textTertiary }]}>{formNombre.length}/30</Text>
             </View>
             {errores.nombre ? <Text style={[s.errorText, { color: colors.expense }]}>{errores.nombre}</Text> : null}
+            {sugerenciasVisibles && sugerenciasNombre.length > 0 && !modalEditar && (
+              <View style={[s.sugerenciasBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {sugerenciasNombre.map(item => {
+                  const paleta = getPaletaItem(item.nombre, isDark);
+                  return (
+                    <TouchableOpacity
+                      key={item.nombre}
+                      style={s.sugerenciaRow}
+                      onPress={() => elegirSugerencia(item)}
+                    >
+                      <View style={[s.sugerenciaIcon, { backgroundColor: paleta.bg }]}>
+                        <Icon name={item.icono as any} size={14} color={paleta.color} />
+                      </View>
+                      <Text style={[s.sugerenciaText, { color: colors.textPrimary }]}>{item.nombre}</Text>
+                      <Text style={[s.sugerenciaHint, { color: colors.textTertiary }]}>Usar</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+            {sugerenciasVisibles && formNombre.trim().length > 1 && sugerenciasNombre.length === 0 && !modalEditar && (
+              <Text style={[s.sugerenciaLibre, { color: colors.textTertiary }]}>
+                Ninguna categoría del catálogo coincide — se creará "{formNombre.trim()}" como categoría personalizada.
+              </Text>
+            )}
           </View>
 
           {/* Tipo */}
@@ -1212,6 +1267,12 @@ const s = StyleSheet.create({
   inputPrefix:{ fontSize: 15 },
   charCount:  { fontSize: 11 },
   errorText:  { fontSize: 11, marginTop: 4 },
+  sugerenciasBox: { marginTop: 6, borderRadius: 12, borderWidth: 0.5, overflow: 'hidden' },
+  sugerenciaRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  sugerenciaIcon: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  sugerenciaText: { flex: 1, fontSize: 13, fontWeight: '500' },
+  sugerenciaHint: { fontSize: 11 },
+  sugerenciaLibre: { fontSize: 11, marginTop: 6, lineHeight: 16 },
   tipoRow:    { flexDirection: 'row', gap: 10 },
   tipoPill:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingVertical: 12 },
   tipoPillText: { fontSize: 14 },

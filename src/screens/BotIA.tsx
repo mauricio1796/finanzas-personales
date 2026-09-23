@@ -40,6 +40,8 @@ import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesSer
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
+// Fallbacks estáticos (solo para el StyleSheet, que no puede leer el tema) —
+// el color real en pantalla siempre viene de `colors.*` vía overrides inline.
 const PRIMARY      = '#6156E8';
 const PRIMARY_SOFT = '#EEF0FF';
 const BG           = '#F8F7FF';
@@ -87,15 +89,19 @@ const QUICK_SUGGESTIONS = [
 
 // ── FinnAvatar ────────────────────────────────────────────────────────────────
 
-const FinnAvatar: React.FC<{ size?: number }> = ({ size = 36 }) => (
-  <View style={[st.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
-    <Text style={[st.avatarText, { fontSize: size * 0.38 }]}>FI</Text>
-  </View>
-);
+const FinnAvatar: React.FC<{ size?: number }> = ({ size = 36 }) => {
+  const { colors } = useTheme();
+  return (
+    <View style={[st.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.primary }]}>
+      <Text style={[st.avatarText, { fontSize: size * 0.38 }]}>FI</Text>
+    </View>
+  );
+};
 
 // ── TypingIndicator ───────────────────────────────────────────────────────────
 
 const TypingIndicator: React.FC = () => {
+  const { colors } = useTheme();
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
@@ -118,11 +124,11 @@ const TypingIndicator: React.FC = () => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <View style={st.typingBubble}>
-      <Text style={st.typingLabel}>Finn está escribiendo</Text>
+    <View style={[st.typingBubble, { backgroundColor: colors.card }]}>
+      <Text style={[st.typingLabel, { color: colors.textTertiary }]}>Finn está escribiendo</Text>
       <View style={st.dotsRow}>
         {[dot1, dot2, dot3].map((dot, i) => (
-          <Animated.View key={i} style={[st.dot, { transform: [{ translateY: dot }] }]} />
+          <Animated.View key={i} style={[st.dot, { backgroundColor: colors.primary, transform: [{ translateY: dot }] }]} />
         ))}
       </View>
     </View>
@@ -160,15 +166,15 @@ const ConfirmacionCategorias: React.FC<ConfirmacionCategoriasProps> = ({
               style={{
                 width: '30%', aspectRatio: 1, borderRadius: 16,
                 borderWidth: activa ? 1.5 : 0.5,
-                borderColor: activa ? PRIMARY : colors.border,
-                backgroundColor: activa ? PRIMARY_SOFT : colors.card,
+                borderColor: activa ? colors.primary : colors.border,
+                backgroundColor: activa ? colors.primaryLight : colors.card,
                 alignItems: 'center', justifyContent: 'center', gap: 6, padding: 8,
               }}
             >
               <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: paleta.bg, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name={cat.icono as any} size={16} color={activa ? PRIMARY : paleta.color} />
+                <Icon name={cat.icono as any} size={16} color={activa ? colors.primary : paleta.color} />
               </View>
-              <Text style={{ fontSize: 10, fontWeight: '500', color: activa ? PRIMARY : colors.textSecondary, textAlign: 'center' }} numberOfLines={2}>
+              <Text style={{ fontSize: 10, fontWeight: '500', color: activa ? colors.primary : colors.textSecondary, textAlign: 'center' }} numberOfLines={2}>
                 {cat.nombre}
               </Text>
               {cat.presupuestoSugerido > 0 && (
@@ -190,7 +196,7 @@ const ConfirmacionCategorias: React.FC<ConfirmacionCategoriasProps> = ({
         <TouchableOpacity
           onPress={onConfirmar}
           disabled={seleccionadas.size === 0}
-          style={{ flex: 2, borderRadius: 12, backgroundColor: seleccionadas.size > 0 ? PRIMARY : colors.cardSecondary, padding: 10, alignItems: 'center' }}
+          style={{ flex: 2, borderRadius: 12, backgroundColor: seleccionadas.size > 0 ? colors.primary : colors.cardSecondary, padding: 10, alignItems: 'center' }}
         >
           <Text style={{ fontSize: 13, fontWeight: '500', color: seleccionadas.size > 0 ? '#fff' : colors.textTertiary }}>
             {seleccionadas.size > 0 ? `Agregar ${seleccionadas.size} categoría${seleccionadas.size > 1 ? 's' : ''}` : 'Selecciona categorías'}
@@ -374,14 +380,14 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
       return (
         <View style={[st.msgRow, st.msgBot]}>
           <FinnAvatar size={34} />
-          <View style={st.accionBubble}>
+          <View style={[st.accionBubble, { backgroundColor: colors.aiLight, borderColor: colors.ai }]}>
             <View style={st.accionHeader}>
-              <View style={st.accionBadge}>
+              <View style={[st.accionBadge, { backgroundColor: colors.ai }]}>
                 <Text style={st.accionBadgeText}>⚡ Finn actuó</Text>
               </View>
-              <Text style={st.accionTime}>{timeStr}</Text>
+              <Text style={[st.accionTime, { color: colors.textTertiary }]}>{timeStr}</Text>
             </View>
-            <Text style={[st.accionText, { color: item.accionFinn.exito ? PRIMARY : colors.expense }]}>
+            <Text style={[st.accionText, { color: item.accionFinn.exito ? colors.primary : colors.expense }]}>
               {item.accionFinn.exito ? '✓ ' : '✗ '}{item.accionFinn.descripcion}
             </Text>
           </View>
@@ -396,17 +402,17 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
         <View style={{ flex: isUser ? undefined : 1, maxWidth: '78%' }}>
           <View style={[
             st.bubble,
-            isUser ? st.bubbleUser : st.bubbleBot,
-            item.esError && !isUser && st.bubbleError,
+            isUser ? [st.bubbleUser, { backgroundColor: colors.primary }] : [st.bubbleBot, { backgroundColor: colors.card }],
+            item.esError && !isUser && [st.bubbleError, { backgroundColor: colors.expenseLight, borderColor: colors.expense }],
           ]}>
             {!isUser && (
-              <View style={st.bubbleAccent} />
+              <View style={[st.bubbleAccent, { backgroundColor: colors.primary }]} />
             )}
             <View style={isUser ? undefined : st.bubbleInner}>
-              <Text style={[st.bubbleText, isUser ? st.bubbleTextUser : st.bubbleTextBot]}>
+              <Text style={[st.bubbleText, isUser ? st.bubbleTextUser : { color: colors.textPrimary }]}>
                 {item.text}
               </Text>
-              <Text style={[st.bubbleTime, isUser ? st.bubbleTimeUser : st.bubbleTimeBot]}>
+              <Text style={[st.bubbleTime, isUser ? st.bubbleTimeUser : { color: colors.textTertiary }]}>
                 {timeStr}
               </Text>
             </View>
@@ -433,7 +439,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
   }, [confirmacionId, catsPendientes, catsSeleccionadas, confirmarCategorias]);
 
   // ── Status ────────────────────────────────────────────────────────────────
-  const statusColor = workerStatus === 'online' ? '#1D9E75' : workerStatus === 'offline' ? '#F55B5B' : '#9CA3AF';
+  const statusColor = workerStatus === 'online' ? colors.income : workerStatus === 'offline' ? colors.expense : colors.textTertiary;
   const statusLabel = workerStatus === 'online' ? 'En línea · IA activa' : workerStatus === 'offline' ? 'Modo básico' : 'Conectando…';
 
   // ── JSX ──────────────────────────────────────────────────────────────────
@@ -441,40 +447,40 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
     <KeyboardAvoidingView
       testID="finn-chat-screen"
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={[st.root, { paddingTop: Platform.OS === 'web' ? 0 : insets.top }]}
+      style={[st.root, { backgroundColor: colors.background, paddingTop: Platform.OS === 'web' ? 0 : insets.top }]}
     >
       {/* Decorative blobs */}
       <View style={st.blobTop} />
       <View style={st.blobRight} />
 
       {/* ── Header ── */}
-      <View style={st.header}>
+      <View style={[st.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         {onBack && Platform.OS !== 'web' && (
           <Pressable onPress={onBack} style={st.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Icon name="arrow-left" size={20} color="#111827" />
+            <Icon name="arrow-left" size={20} color={colors.textPrimary} />
           </Pressable>
         )}
 
         <View style={st.headerCenter}>
           <View style={st.headerAvatarWrap}>
-            <View style={st.headerAvatar}>
+            <View style={[st.headerAvatar, { backgroundColor: colors.primary }]}>
               <Text style={st.headerAvatarText}>FI</Text>
             </View>
-            <View style={[st.onlineDot, { backgroundColor: statusColor }]} />
+            <View style={[st.onlineDot, { backgroundColor: statusColor, borderColor: colors.card }]} />
           </View>
           <View>
-            <Text style={st.headerName}>Finn</Text>
-            <Text style={st.headerSub}>{statusLabel}</Text>
+            <Text style={[st.headerName, { color: colors.textPrimary }]}>Finn</Text>
+            <Text style={[st.headerSub, { color: colors.textTertiary }]}>{statusLabel}</Text>
           </View>
         </View>
 
         {/* Voice mode button */}
         <Pressable
           onPress={() => setVozModalVisible(true)}
-          style={st.vozBtn}
+          style={[st.vozBtn, { backgroundColor: colors.primaryLight }]}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Icon name="mic" size={19} color={PRIMARY} />
+          <Icon name="mic" size={19} color={colors.primary} />
         </Pressable>
       </View>
 
@@ -485,16 +491,16 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
         renderItem={renderMessage}
         keyExtractor={item => item.id}
         contentContainerStyle={st.list}
-        style={st.listBg}
+        style={[st.listBg, { backgroundColor: colors.background }]}
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         ListEmptyComponent={
           !isTyping ? (
             <View style={st.emptyState}>
-              <View style={st.emptyAvatar}>
+              <View style={[st.emptyAvatar, { backgroundColor: colors.primary }]}>
                 <Text style={st.emptyAvatarText}>FI</Text>
               </View>
-              <Text style={st.emptyTitle}>Hola, soy Finn</Text>
-              <Text style={st.emptySub}>Tu asistente financiero personal.{'\n'}Pregúntame cualquier cosa sobre tus finanzas.</Text>
+              <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>Hola, soy Finn</Text>
+              <Text style={[st.emptySub, { color: colors.textTertiary }]}>Tu asistente financiero personal.{'\n'}Pregúntame cualquier cosa sobre tus finanzas.</Text>
             </View>
           ) : null
         }
@@ -512,18 +518,18 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={st.suggestionsScroll}
+        style={[st.suggestionsScroll, { backgroundColor: colors.card, borderTopColor: colors.border }]}
         contentContainerStyle={st.suggestionsContent}
       >
         {QUICK_SUGGESTIONS.map(s => (
           <Pressable
             key={s.label}
-            style={({ pressed }) => [st.pill, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [st.pill, { backgroundColor: colors.primaryLight, borderColor: colors.border }, pressed && { opacity: 0.7 }]}
             onPress={() => handleSend(`${s.emoji} ${s.label}`)}
             disabled={isTyping}
           >
             <Text style={st.pillEmoji}>{s.emoji}</Text>
-            <Text style={st.pillText}>{s.label}</Text>
+            <Text style={[st.pillText, { color: colors.primary }]}>{s.label}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -535,19 +541,19 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
         visible={!!pendingAction}
         onRequestClose={() => setPendingAction(null)}
       >
-        <View style={st.modalOverlay}>
-          <View style={st.modalCard}>
-            <View style={st.modalIconWrap}>
+        <View style={[st.modalOverlay, { backgroundColor: colors.overlay }]}>
+          <View style={[st.modalCard, { backgroundColor: colors.card }]}>
+            <View style={[st.modalIconWrap, { backgroundColor: colors.expenseLight }]}>
               <Text style={{ fontSize: 26 }}>🗑️</Text>
             </View>
-            <Text style={st.modalTitle}>Confirmar eliminación</Text>
-            <Text style={st.modalBody}>{pendingAction?.preview}</Text>
+            <Text style={[st.modalTitle, { color: colors.textPrimary }]}>Confirmar eliminación</Text>
+            <Text style={[st.modalBody, { color: colors.textSecondary }]}>{pendingAction?.preview}</Text>
             <View style={st.modalBtns}>
-              <TouchableOpacity style={st.modalBtnCancel} onPress={() => setPendingAction(null)}>
-                <Text style={st.modalBtnCancelText}>Cancelar</Text>
+              <TouchableOpacity style={[st.modalBtnCancel, { borderColor: colors.border }]} onPress={() => setPendingAction(null)}>
+                <Text style={[st.modalBtnCancelText, { color: colors.textSecondary }]}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={st.modalBtnDelete}
+                style={[st.modalBtnDelete, { backgroundColor: colors.expense }]}
                 onPress={() => pendingAction && ejecutarAccionConfirmada(pendingAction)}
               >
                 <Text style={st.modalBtnDeleteText}>Eliminar</Text>
@@ -580,7 +586,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
       />
 
       {/* ── Input bar ── */}
-      <View style={[st.inputWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <View style={[st.inputWrap, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
         <VoiceButton
           size="small"
           categorias={categories.map(c => ({
@@ -599,12 +605,16 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
             setInputText(txt);
           }}
         />
-        <View style={[st.inputPill, inputFocused && st.inputPillFocused]}>
+        <View style={[
+          st.inputPill,
+          { backgroundColor: colors.inputBg },
+          inputFocused && [st.inputPillFocused, { borderColor: colors.primary, backgroundColor: colors.card }],
+        ]}>
           <TextInput
             testID="finn-message-input"
-            style={[st.input, Platform.OS === 'web' && ({ outline: 'none', resize: 'none' } as any)]}
+            style={[st.input, { color: colors.textPrimary }, Platform.OS === 'web' && ({ outline: 'none', resize: 'none' } as any)]}
             placeholder="Pregunta a Finn…"
-            placeholderTextColor="#BBBBC8"
+            placeholderTextColor={colors.textTertiary}
             value={inputText}
             onChangeText={setInputText}
             onFocus={() => setInputFocused(true)}
@@ -615,7 +625,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
           />
           <Pressable
             testID="finn-send-btn"
-            style={[st.sendBtn, (isTyping || !inputText.trim()) && st.sendBtnDisabled]}
+            style={[st.sendBtn, { backgroundColor: colors.primary }, (isTyping || !inputText.trim()) && st.sendBtnDisabled]}
             onPress={() => handleSend()}
             disabled={isTyping || !inputText.trim()}
           >

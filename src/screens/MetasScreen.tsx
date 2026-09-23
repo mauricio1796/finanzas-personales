@@ -1,45 +1,70 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, TextInput, KeyboardAvoidingView, Platform, Pressable,
+  Modal, TextInput, KeyboardAvoidingView, Platform, Pressable, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFinance } from '../state';
 import { useTheme } from '../state/ThemeContext';
 import { Icon } from '../components/ui/Icon';
 import { PremiumBadge } from '../components/ui/PremiumBadge';
+import { ConfettiBurst } from '../components/ui/ConfettiBurst';
 import type { Meta } from '../types';
 import { THEME } from '../constants/theme';
 
 const METAS_GRATIS = 1;
+const XP_POR_META = 150;
 
 const EMOJIS = ['🎯','🏠','✈️','🚗','💍','📚','💻','🏋️','🌴','💰','🎓','🎮'];
 const COLORS  = ['#6366F1','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#14B8A6','#F97316'];
 
 function fmt(n: number) { return '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.'); }
 
+/** Sugerencia de aporte semanal para llegar a tiempo a la fecha límite. */
+function sugerenciaSemanal(meta: Meta): { monto: number; semanas: number } | null {
+  if (!meta.fechaLimite) return null;
+  const hoy   = new Date();
+  const limite = new Date(meta.fechaLimite);
+  const msRestantes = limite.getTime() - hoy.getTime();
+  if (isNaN(msRestantes) || msRestantes <= 0) return null;
+  const semanas  = Math.max(1, Math.ceil(msRestantes / (7 * 24 * 60 * 60 * 1000)));
+  const faltante = Math.max(meta.montoObjetivo - meta.montoActual, 0);
+  if (faltante <= 0) return null;
+  return { monto: Math.ceil(faltante / semanas), semanas };
+}
+
 interface MetaFormProps {
   visible: boolean;
+  initial?: Meta | null;
   onClose: () => void;
   onSave: (meta: Omit<Meta, 'id' | 'creadaEn' | 'completada' | 'montoActual'>) => void;
 }
 
-const MetaForm: React.FC<MetaFormProps> = ({ visible, onClose, onSave }) => {
+const MetaForm: React.FC<MetaFormProps> = ({ visible, initial, onClose, onSave }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const [nombre, setNombre]         = useState('');
-  const [objetivo, setObjetivo]     = useState('');
-  const [emoji, setEmoji]           = useState('🎯');
-  const [color, setColor]           = useState('#6366F1');
-  const [fecha, setFecha]           = useState('');
+  const esEdicion = !!initial;
 
-  const reset = () => { setNombre(''); setObjetivo(''); setEmoji('🎯'); setColor('#6366F1'); setFecha(''); };
+  const [nombre, setNombre]     = useState(initial?.nombre ?? '');
+  const [objetivo, setObjetivo] = useState(initial ? initial.montoObjetivo.toLocaleString('es-CO').replace(/,/g, '.') : '');
+  const [emoji, setEmoji]       = useState(initial?.emoji ?? '🎯');
+  const [color, setColor]       = useState(initial?.color ?? '#6366F1');
+  const [fecha, setFecha]       = useState(initial?.fechaLimite ?? '');
+
+  // Reinicia el formulario cada vez que cambia qué meta se está editando (o se abre para crear)
+  React.useEffect(() => {
+    if (!visible) return;
+    setNombre(initial?.nombre ?? '');
+    setObjetivo(initial ? initial.montoObjetivo.toLocaleString('es-CO').replace(/,/g, '.') : '');
+    setEmoji(initial?.emoji ?? '🎯');
+    setColor(initial?.color ?? '#6366F1');
+    setFecha(initial?.fechaLimite ?? '');
+  }, [visible, initial]);
 
   const handleSave = () => {
     const monto = parseInt(objetivo.replace(/\./g, ''), 10);
     if (!nombre.trim() || !monto) return;
     onSave({ nombre: nombre.trim(), montoObjetivo: monto, emoji, color, fechaLimite: fecha || undefined });
-    reset();
     onClose();
   };
 
@@ -49,7 +74,7 @@ const MetaForm: React.FC<MetaFormProps> = ({ visible, onClose, onSave }) => {
         <Pressable style={st.overlay} onPress={onClose}>
           <Pressable style={[st.sheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + 24 }]} onPress={() => {}}>
             <View style={[st.handle, { backgroundColor: colors.border }]} />
-            <Text style={[st.sheetTitle, { color: colors.textPrimary }]}>Nueva Meta</Text>
+            <Text style={[st.sheetTitle, { color: colors.textPrimary }]}>{esEdicion ? 'Editar Meta' : 'Nueva Meta'}</Text>
 
             <Text style={[st.label, { color: colors.textTertiary }]}>EMOJI</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
@@ -83,7 +108,7 @@ const MetaForm: React.FC<MetaFormProps> = ({ visible, onClose, onSave }) => {
               value={fecha} onChangeText={setFecha} />
 
             <TouchableOpacity testID="meta-save-btn" style={[st.saveBtn, { backgroundColor: color }]} onPress={handleSave}>
-              <Text style={st.saveBtnText}>Crear Meta</Text>
+              <Text style={st.saveBtnText}>{esEdicion ? 'Guardar cambios' : 'Crear Meta'}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -103,6 +128,8 @@ const AbonoModal: React.FC<AbonoModalProps> = ({ meta, onClose, onAbono }) => {
   const [monto, setMonto] = useState('');
   if (!meta) return null;
 
+  const sugerido = sugerenciaSemanal(meta);
+
   const handleAbono = () => {
     const m = parseInt(monto.replace(/\./g,''), 10);
     if (!m || m <= 0) return;
@@ -121,6 +148,14 @@ const AbonoModal: React.FC<AbonoModalProps> = ({ meta, onClose, onAbono }) => {
             <Text style={[st.abonoSub, { color: colors.textTertiary }]}>
               {fmt(meta.montoActual)} de {fmt(meta.montoObjetivo)}
             </Text>
+            {sugerido && (
+              <TouchableOpacity onPress={() => setMonto(sugerido.monto.toLocaleString('es-CO').replace(/,/g, '.'))} style={[st.sugerenciaChip, { backgroundColor: meta.color + '18' }]}>
+                <Icon name="zap" size={11} color={meta.color} />
+                <Text style={[st.sugerenciaText, { color: meta.color }]}>
+                  Sugerido: {fmt(sugerido.monto)}/semana para llegar a tiempo
+                </Text>
+              </TouchableOpacity>
+            )}
             <TextInput style={[st.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary, marginTop: 16 }]}
               placeholder="Monto a abonar" placeholderTextColor={colors.textTertiary}
               keyboardType="numeric" value={monto}
@@ -140,26 +175,68 @@ interface MetasScreenProps { onBack: () => void; onPremiumPress?: () => void; }
 export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress }) => {
   const insets                                        = useSafeAreaInsets();
   const { colors }                                    = useTheme();
-  const { metas, addMeta, deleteMeta, abonarMeta, premium } = useFinance();
+  const { metas, addMeta, updateMeta, deleteMeta, abonarMeta, premium } = useFinance();
   const [showForm, setShowForm]                       = useState(false);
-  const [abonoTarget, setAbonoTarget]                 = useState<Meta | null>(null);
+  const [metaEnEdicion, setMetaEnEdicion]              = useState<Meta | null>(null);
+  const [abonoTarget, setAbonoTarget]                  = useState<Meta | null>(null);
+  const [celebrar, setCelebrar]                        = useState(false);
 
   const activasCount   = metas.filter(m => !m.completada).length;
   const alcanzoLimite  = !premium.isPremium && activasCount >= METAS_GRATIS;
 
   const handlePressAdd = () => {
     if (alcanzoLimite) { onPremiumPress?.(); return; }
+    setMetaEnEdicion(null);
+    setShowForm(true);
+  };
+
+  const handleEditar = (meta: Meta) => {
+    setMetaEnEdicion(meta);
     setShowForm(true);
   };
 
   const handleSave = (data: Omit<Meta, 'id' | 'creadaEn' | 'completada' | 'montoActual'>) => {
-    addMeta({
-      ...data,
-      id: Date.now().toString(),
-      montoActual: 0,
-      completada: false,
-      creadaEn: new Date().toISOString(),
-    });
+    if (metaEnEdicion) {
+      updateMeta(metaEnEdicion.id, data);
+      setMetaEnEdicion(null);
+    } else {
+      addMeta({
+        ...data,
+        id: Date.now().toString(),
+        montoActual: 0,
+        completada: false,
+        creadaEn: new Date().toISOString(),
+      });
+    }
+  };
+
+  const handleEliminar = (meta: Meta) => {
+    Alert.alert(
+      `¿Eliminar "${meta.nombre}"?`,
+      meta.montoActual > 0
+        ? `Llevas ${fmt(meta.montoActual)} ahorrados en esta meta. Esta acción no se puede deshacer.`
+        : 'Esta acción no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', style: 'destructive', onPress: () => deleteMeta(meta.id) },
+      ],
+    );
+  };
+
+  const handleAbono = (monto: number) => {
+    if (!abonoTarget) return;
+    const seCompleta = !abonoTarget.completada &&
+      Math.min(abonoTarget.montoActual + monto, abonoTarget.montoObjetivo) >= abonoTarget.montoObjetivo;
+
+    abonarMeta(abonoTarget.id, monto);
+
+    if (seCompleta) {
+      setCelebrar(true);
+      setTimeout(() => setCelebrar(false), 900);
+      setTimeout(() => {
+        Alert.alert('¡Meta alcanzada! 🎉', `Completaste "${abonoTarget.nombre}" y ganaste +${XP_POR_META} XP.`);
+      }, 300);
+    }
   };
 
   const activas    = metas.filter(m => !m.completada);
@@ -192,6 +269,8 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress
             <Text style={[st.sectionLabel, { color: colors.textTertiary }]}>EN PROGRESO</Text>
             {activas.map(meta => {
               const pct = Math.min(meta.montoActual / meta.montoObjetivo, 1);
+              const sugerido = sugerenciaSemanal(meta);
+              const numAportes = meta.aportes?.length ?? 0;
               return (
                 <View key={meta.id} style={[st.card, { backgroundColor: colors.card }]}>
                   <View style={st.cardTop}>
@@ -203,15 +282,19 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress
                       <Text style={[st.cardMonto, { color: colors.textSecondary }]}>
                         {fmt(meta.montoActual)} / {fmt(meta.montoObjetivo)}
                       </Text>
-                      {meta.fechaLimite && (
-                        <Text style={[st.cardFecha, { color: colors.textTertiary }]}>
-                          Límite: {meta.fechaLimite}
-                        </Text>
-                      )}
+                      <Text style={[st.cardFecha, { color: colors.textTertiary }]}>
+                        {meta.fechaLimite ? `Límite: ${meta.fechaLimite}` : 'Sin fecha límite'}
+                        {numAportes > 0 ? ` · ${numAportes} aporte${numAportes !== 1 ? 's' : ''}` : ''}
+                      </Text>
                     </View>
-                    <TouchableOpacity onPress={() => deleteMeta(meta.id)} style={st.deleteBtn}>
-                      <Icon name="trash-2" size={16} color={colors.textTertiary} />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 4 }}>
+                      <TouchableOpacity onPress={() => handleEditar(meta)} style={st.deleteBtn} hitSlop={6}>
+                        <Icon name="edit-2" size={15} color={colors.textTertiary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleEliminar(meta)} style={st.deleteBtn} hitSlop={6}>
+                        <Icon name="trash-2" size={16} color={colors.textTertiary} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   <View style={[st.barBg, { backgroundColor: colors.border }]}>
                     <View style={[st.barFill, { width: `${pct * 100}%` as any, backgroundColor: meta.color }]} />
@@ -222,6 +305,11 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress
                       <Text style={st.abonoBtnText}>+ Abonar</Text>
                     </TouchableOpacity>
                   </View>
+                  {sugerido && (
+                    <Text style={[st.sugerenciaInline, { color: colors.textTertiary }]}>
+                      💡 Aporta {fmt(sugerido.monto)}/semana para llegar a tiempo ({sugerido.semanas} semana{sugerido.semanas !== 1 ? 's' : ''} restantes)
+                    </Text>
+                  )}
                 </View>
               );
             })}
@@ -260,7 +348,7 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress
                     <Text style={[st.cardNombre, { color: colors.textPrimary }]}>{meta.nombre} ✓</Text>
                     <Text style={[st.cardMonto, { color: colors.income }]}>{fmt(meta.montoObjetivo)} alcanzado</Text>
                   </View>
-                  <TouchableOpacity onPress={() => deleteMeta(meta.id)} style={st.deleteBtn}>
+                  <TouchableOpacity onPress={() => handleEliminar(meta)} style={st.deleteBtn} hitSlop={6}>
                     <Icon name="trash-2" size={16} color={colors.textTertiary} />
                   </TouchableOpacity>
                 </View>
@@ -270,9 +358,15 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress
         )}
       </ScrollView>
 
-      <MetaForm visible={showForm} onClose={() => setShowForm(false)} onSave={handleSave} />
-      <AbonoModal meta={abonoTarget} onClose={() => setAbonoTarget(null)}
-        onAbono={m => abonoTarget && abonarMeta(abonoTarget.id, m)} />
+      <MetaForm
+        visible={showForm}
+        initial={metaEnEdicion}
+        onClose={() => { setShowForm(false); setMetaEnEdicion(null); }}
+        onSave={handleSave}
+      />
+      <AbonoModal meta={abonoTarget} onClose={() => setAbonoTarget(null)} onAbono={handleAbono} />
+
+      <ConfettiBurst active={celebrar} />
     </View>
   );
 };
@@ -307,6 +401,7 @@ const st = StyleSheet.create({
   pctText:      { fontSize: 13, fontWeight: '700' },
   abonoBtn:     { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20 },
   abonoBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  sugerenciaInline: { fontSize: 11, marginTop: 10 },
   // Sheet
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
@@ -323,4 +418,6 @@ const st = StyleSheet.create({
   abonoCard:    { margin: 24, borderRadius: 20, padding: 24 },
   abonoTitle:   { fontSize: 17, fontWeight: '700', textAlign: 'center', marginBottom: 4 },
   abonoSub:     { fontSize: 13, textAlign: 'center' },
+  sugerenciaChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'center', marginTop: 12 },
+  sugerenciaText: { fontSize: 11.5, fontWeight: '600' },
 });

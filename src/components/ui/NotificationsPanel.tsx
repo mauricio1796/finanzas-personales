@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NotificacionInApp } from '../../services/NotificacionesInAppService';
 import { NotifTipo } from '../../services/NotificacionesService';
 import { THEME } from '../../constants/theme';
+import { useTheme } from '../../state/ThemeContext';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -73,16 +74,17 @@ const NotifRow: React.FC<{
   onPress:    () => void;
   onEliminar: () => void;
 }> = ({ item, onPress, onEliminar }) => {
-  const meta  = TIPO_META[item.tipo] ?? { icono: '🔔', color: '#6156E8', etiqueta: 'Notificación' };
+  const { colors } = useTheme();
+  const meta  = TIPO_META[item.tipo] ?? { icono: '🔔', color: colors.primary, etiqueta: 'Notificación' };
 
   return (
     <TouchableOpacity
-      style={[s.row, !item.leida && s.rowUnread]}
+      style={[s.row, { borderBottomColor: colors.borderSubtle }, !item.leida && { backgroundColor: colors.primaryLight }]}
       onPress={onPress}
       activeOpacity={0.75}
     >
       {/* Unread indicator */}
-      {!item.leida && <View style={s.unreadDot} />}
+      {!item.leida && <View style={[s.unreadDot, { backgroundColor: colors.primary }]} />}
 
       {/* Icon bubble */}
       <View style={[s.iconBubble, { backgroundColor: meta.color + '18' }]}>
@@ -93,10 +95,10 @@ const NotifRow: React.FC<{
       <View style={s.rowContent}>
         <View style={s.rowTopRow}>
           <Text style={[s.tipoLabel, { color: meta.color }]}>{meta.etiqueta}</Text>
-          <Text style={s.tiempoText}>{tiempoRelativo(item.fecha)}</Text>
+          <Text style={[s.tiempoText, { color: colors.textTertiary }]}>{tiempoRelativo(item.fecha)}</Text>
         </View>
-        <Text style={s.tituloText} numberOfLines={1}>{item.titulo}</Text>
-        <Text style={s.cuerpoText}  numberOfLines={2}>{item.cuerpo}</Text>
+        <Text style={[s.tituloText, { color: colors.textPrimary }]} numberOfLines={1}>{item.titulo}</Text>
+        <Text style={[s.cuerpoText, { color: colors.textSecondary }]}  numberOfLines={2}>{item.cuerpo}</Text>
       </View>
 
       {/* Delete */}
@@ -105,7 +107,7 @@ const NotifRow: React.FC<{
         onPress={onEliminar}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 6 }}
       >
-        <Text style={s.deleteBtnText}>✕</Text>
+        <Text style={[s.deleteBtnText, { color: colors.textTertiary }]}>✕</Text>
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -123,6 +125,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
   onMarcarLeidas,
 }) => {
   const insets      = useSafeAreaInsets();
+  const { colors }  = useTheme();
   const translateY  = useRef(new Animated.Value(SCREEN_H)).current;
   const backdropOp  = useRef(new Animated.Value(0)).current;
 
@@ -163,20 +166,21 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
         style={[
           s.sheet,
           {
+            backgroundColor: colors.card,
             transform: [{ translateY }],
             paddingBottom: insets.bottom + 8,
           },
         ]}
       >
         {/* Handle */}
-        <View style={s.handle} />
+        <View style={[s.handle, { backgroundColor: colors.border }]} />
 
         {/* Header */}
-        <View style={s.header}>
+        <View style={[s.header, { borderBottomColor: colors.borderSubtle }]}>
           <View style={s.headerLeft}>
-            <Text style={s.headerTitle}>Notificaciones</Text>
+            <Text style={[s.headerTitle, { color: colors.textPrimary }]}>Notificaciones</Text>
             {noLeidas > 0 && (
-              <View style={s.badge}>
+              <View style={[s.badge, { backgroundColor: colors.expense }]}>
                 <Text style={s.badgeText}>{noLeidas}</Text>
               </View>
             )}
@@ -185,24 +189,24 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
           <View style={s.headerActions}>
             {items.length > 0 && (
               <TouchableOpacity
-                style={s.headerBtn}
+                style={[s.headerBtn, { backgroundColor: colors.cardSecondary }]}
                 onPress={onLimpiarTodo}
               >
-                <Text style={s.headerBtnText}>Limpiar</Text>
+                <Text style={[s.headerBtnText, { color: colors.textSecondary }]}>Limpiar</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={s.closeBtn} onPress={onClose}>
-              <Text style={s.closeBtnText}>✕</Text>
+            <TouchableOpacity style={[s.closeBtn, { backgroundColor: colors.cardSecondary }]} onPress={onClose}>
+              <Text style={[s.closeBtnText, { color: colors.textSecondary }]}>✕</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Finn sub-header */}
-        <View style={s.finnBar}>
-          <View style={s.finnAvatar}>
+        <View style={[s.finnBar, { backgroundColor: colors.primaryLight, borderBottomColor: colors.border }]}>
+          <View style={[s.finnAvatar, { backgroundColor: colors.primary }]}>
             <Text style={s.finnAvatarText}>FI</Text>
           </View>
-          <Text style={s.finnBarText}>
+          <Text style={[s.finnBarText, { color: colors.textSecondary }]}>
             {items.length === 0
               ? 'Sin alertas por ahora. Tu situación financiera está al día.'
               : `${items.length} alerta${items.length > 1 ? 's' : ''} de tu asesor financiero.`}
@@ -213,8 +217,8 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
         {items.length === 0 ? (
           <View style={s.emptyWrap}>
             <Text style={s.emptyIcon}>🔔</Text>
-            <Text style={s.emptyTitle}>Todo en orden</Text>
-            <Text style={s.emptyBody}>
+            <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>Todo en orden</Text>
+            <Text style={[s.emptyBody, { color: colors.textSecondary }]}>
               Aquí aparecerán alertas de presupuesto, pagos próximos, gastos inusuales y logros financieros.
             </Text>
           </View>
@@ -236,7 +240,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
               />
             ))}
 
-            <Text style={s.footerNote}>
+            <Text style={[s.footerNote, { color: colors.textTertiary }]}>
               Las notificaciones se eliminan automáticamente después de 30 días.
             </Text>
           </ScrollView>

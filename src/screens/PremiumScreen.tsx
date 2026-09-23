@@ -1,13 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { Icon } from '../components/ui/Icon';
 import { useFinance } from '../state/FinanceContext';
 import { useTheme } from '../state/ThemeContext';
 import { PLANES_PREMIUM, FEATURES_GRATIS, FEATURES_PREMIUM, activarPremium } from '../services/PremiumService';
-import { crearCheckout, esperarConfirmacionPago } from '../services/PaymentsService';
+import { crearCheckout, esperarConfirmacionPago, extraerIdDeRedirect, type RefPago } from '../services/PaymentsService';
 import { THEME } from '../constants/theme';
 import { AppColors } from '../constants/colors';
 
@@ -27,7 +26,7 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onBack }) => {
   const { user, premium, setPremium } = useFinance();
   const [planSel, setPlanSel] = useState<'mensual' | 'anual'>('anual');
   const [loading, setLoading] = useState(false);
-  const [pagoPendiente, setPagoPendiente] = useState<string | null>(null); // reference en curso
+  const [pagoPendiente, setPagoPendiente] = useState<RefPago | null>(null);
 
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -39,15 +38,15 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onBack }) => {
   };
 
   /** Abre el checkout de Wompi y confirma el pago antes de activar Premium. */
-  const pagarConWompi = async (reference?: string) => {
+  const pagarConWompi = async (refExistente?: RefPago) => {
     setLoading(true);
     try {
-      let ref = reference;
+      let ref = refExistente;
 
       if (!ref) {
         const redirectUrl = Linking.createURL('premium-success');
         const checkout = await crearCheckout(planSel, user?.id, redirectUrl);
-        ref = checkout.reference;
+        ref = { reference: checkout.reference };
         setPagoPendiente(ref);
 
         if (Platform.OS === 'web') {
@@ -55,7 +54,16 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onBack }) => {
           // vuelve a tocar "Ya pagué, verificar" cuando termine.
           window.open(checkout.url, '_blank');
         } else {
-          await WebBrowser.openAuthSessionAsync(checkout.url, redirectUrl);
+          // Import perezoso: expo-web-browser solo se necesita en native, así no pesa en el bundle web.
+          const WebBrowser = await import('expo-web-browser');
+          const result = await WebBrowser.openAuthSessionAsync(checkout.url, redirectUrl);
+          // Wompi agrega "?id=<transaction-id>" a la redirect-url — con eso
+          // consultamos sin depender de la llave privada.
+          const idWompi = result.type === 'success' ? extraerIdDeRedirect(result.url) : undefined;
+          if (idWompi) {
+            ref = { id: idWompi };
+            setPagoPendiente(ref);
+          }
         }
       }
 

@@ -1,5 +1,6 @@
 import React, { Component, ReactNode } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useTheme } from '../../state/ThemeContext';
 
 interface Props {
   children: ReactNode;
@@ -11,6 +12,21 @@ interface State {
   hasError: boolean;
   errorMessage: string;
 }
+
+// Componente funcional aparte porque una clase no puede usar el hook useTheme.
+const ErrorFallback: React.FC<{ fallbackLabel?: string; onReset: () => void }> = ({ fallbackLabel, onReset }) => {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={styles.icon}>⚠️</Text>
+      <Text style={[styles.title, { color: colors.textPrimary }]}>Algo salió mal</Text>
+      <Text style={[styles.msg, { color: colors.textSecondary }]}>{fallbackLabel ?? 'Ocurrió un error inesperado.'}</Text>
+      <Pressable style={[styles.btn, { backgroundColor: colors.primary }]} onPress={onReset}>
+        <Text style={styles.btnText}>Reintentar</Text>
+      </Pressable>
+    </View>
+  );
+};
 
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, errorMessage: '' };
@@ -28,16 +44,7 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (!this.state.hasError) return this.props.children;
 
-    return (
-      <View style={styles.container}>
-        <Text style={styles.icon}>⚠️</Text>
-        <Text style={styles.title}>Algo salió mal</Text>
-        <Text style={styles.msg}>{this.props.fallbackLabel ?? 'Ocurrió un error inesperado.'}</Text>
-        <Pressable style={styles.btn} onPress={this.handleReset}>
-          <Text style={styles.btnText}>Reintentar</Text>
-        </Pressable>
-      </View>
-    );
+    return <ErrorFallback fallbackLabel={this.props.fallbackLabel} onReset={this.handleReset} />;
   }
 }
 
@@ -47,13 +54,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-    backgroundColor: '#F8F7FF',
   },
   icon: { fontSize: 48, marginBottom: 16 },
-  title: { fontSize: 20, fontWeight: '700', color: '#1F2937', marginBottom: 8, textAlign: 'center' },
-  msg: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  title: { fontSize: 20, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
+  msg: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
   btn: {
-    backgroundColor: '#6156E8',
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 28,

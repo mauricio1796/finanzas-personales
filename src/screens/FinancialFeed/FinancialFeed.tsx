@@ -349,7 +349,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
               <Text style={[s.txName, { color: colors.textPrimary }]} numberOfLines={1}>
                 {tx.description || tx.category}
               </Text>
-              <Text style={s.txSub}>
+              <Text style={[s.txSub, { color: colors.textTertiary }]}>
                 {tx.category} · {hora}
               </Text>
             </View>
@@ -426,23 +426,23 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
         <View style={s.heroTopBar}>
           {/* Avatar - 40×40, light indigo */}
           <TouchableOpacity style={[s.avatar, { backgroundColor: colors.primaryLight }]} onPress={() => onNavigate('perfil')}>
-            <Text style={s.avatarLetter}>{(user?.name ?? 'U').charAt(0).toUpperCase()}</Text>
+            <Text style={[s.avatarLetter, { color: colors.primary }]}>{(user?.name ?? 'U').charAt(0).toUpperCase()}</Text>
           </TouchableOpacity>
 
           {/* Greeting + month subtitle */}
           <View style={s.greetingWrap}>
-            <Text style={s.greetingText} numberOfLines={1}>
+            <Text style={[s.greetingText, { color: colors.textPrimary }]} numberOfLines={1}>
               {getSaludo()}, {firstName}
             </Text>
-            <Text style={s.greetingMonth}>
+            <Text style={[s.greetingMonth, { color: colors.textTertiary }]}>
               {capitalize(getNombreMes(mesActual))} {añoActual}
             </Text>
           </View>
 
-          {/* Icon buttons — light-themed */}
+          {/* Icon buttons */}
           <View style={s.heroIconsRow}>
             <TouchableOpacity
-              style={s.heroIconBtn}
+              style={[s.heroIconBtn, { backgroundColor: colors.cardSecondary }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 setNotifPanelVisible(true);
@@ -450,16 +450,16 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
             >
               <Icon name="bell" size={16} color={noLeidas > 0 ? colors.primary : colors.textSecondary} />
               {noLeidas > 0 && (
-                <View style={s.bellBadge}>
+                <View style={[s.bellBadge, { borderColor: colors.cardSecondary }]}>
                   <Text style={s.bellBadgeText}>{noLeidas > 9 ? '9+' : noLeidas}</Text>
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity style={s.heroIconBtn} onPress={() => onNavigate('historial')}>
+            <TouchableOpacity style={[s.heroIconBtn, { backgroundColor: colors.cardSecondary }]} onPress={() => onNavigate('historial')}>
               <Icon name="search" size={16} color={colors.textSecondary} />
             </TouchableOpacity>
             <TouchableOpacity
-              style={s.heroIconBtn}
+              style={[s.heroIconBtn, { backgroundColor: colors.cardSecondary }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                 setDrawerVisible(true);

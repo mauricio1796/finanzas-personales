@@ -1,11 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { InteractionManager } from 'react-native';
 import { storageService } from '../services/storage/StorageService';
 import { supabaseService } from '../services/supabase/SupabaseService';
 import type { ServerData } from '../services/supabase/SupabaseService';
 import { syncQueue, type SyncStatus } from '../services/SyncQueueService';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
-import { computeGamification, reconcileXp, buildUserLevel } from '../services/GamificacionService';
+import { computeGamification, reconcileXp, buildUserLevel, LOGROS, RARITY_STYLE } from '../services/GamificacionService';
+import { emitRewardToast } from '../utils/rewardToastBus';
 import { getIngresoEfectivoMes } from '../utils/ingresoUtils';
 import { inyectarSubcategoriasDefecto } from '../models/Category';
 import {
@@ -300,6 +301,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Deriva el XP desde los datos reales (transacciones, pagos, retos, lecciones,
   // logros) y lo reconcilia de forma monótona con lo ya guardado: el progreso
   // nunca retrocede. Sustituye a los incrementos dispersos de `experience`.
+  //
+  // prevSnapRef guarda el último snapshot para poder avisar "en el momento" —
+  // toast + XP animado — cuando algo cambia de verdad (nuevo logro, subida de
+  // nivel), sin repetir el aviso en cada re-render ni al cargar la app.
+  const prevSnapRef = useRef<{ logros: Set<string>; nivel: number } | null>(null);
+
   useEffect(() => {
     if (isLoading) return;
     const snap = computeGamification({
@@ -309,6 +316,33 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       leccionesCompletadas,
       retosCompletados,
     });
+
+    const prevSnap = prevSnapRef.current;
+    if (prevSnap) {
+      for (const logro of LOGROS) {
+        if (snap.unlockedLogros.has(logro.id) && !prevSnap.logros.has(logro.id)) {
+          const paleta = RARITY_STYLE[logro.rarity];
+          emitRewardToast({
+            title: logro.titulo,
+            subtitle: `+${logro.xp} XP`,
+            icon: logro.icono,
+            iconColor: paleta.color,
+            iconBg: paleta.bg,
+          });
+        }
+      }
+      if (snap.nivel.level > prevSnap.nivel) {
+        emitRewardToast({
+          title: `Nivel ${snap.nivel.level} · ${snap.nivel.title}`,
+          subtitle: snap.nivel.unlock.nombre,
+          icon: snap.nivel.unlock.icono,
+          iconColor: snap.nivel.color,
+          iconBg: `${snap.nivel.color}22`,
+        });
+      }
+    }
+    prevSnapRef.current = { logros: snap.unlockedLogros, nivel: snap.nivel.level };
+
     setUserLevelState(prev => {
       const xp = reconcileXp(prev?.experience, snap.xpTotal);
       if (prev && prev.experience === xp && prev.level === snap.nivel.level) return prev;
@@ -624,14 +658,25 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setMetas(prev => prev.filter(m => m.id !== id));
     if (user) syncQueue.enqueue('eliminar meta', () => supabaseService.deleteMeta(id, user.id));
   };
-  const abonarMeta = (id: string, monto: number) =>
+  const abonarMeta = (id: string, monto: number) => {
+    // Snapshot previo (fuera del updater) para decidir la recompensa una sola vez,
+    // sin side-effects dentro del reducer de setMetas.
+    const actual = metas.find(m => m.id === id);
+    const seCompletaAhora = !!actual && !actual.completada &&
+      Math.min(actual.montoActual + monto, actual.montoObjetivo) >= actual.montoObjetivo;
+
     setMetas(prev => prev.map(m => {
       if (m.id !== id) return m;
       const nuevo = Math.min(m.montoActual + monto, m.montoObjetivo);
-      const updated = { ...m, montoActual: nuevo, completada: nuevo >= m.montoObjetivo };
+      const aportes = [...(m.aportes ?? []), { monto, fecha: new Date().toISOString() }];
+      const updated = { ...m, montoActual: nuevo, completada: nuevo >= m.montoObjetivo, aportes };
       if (user) syncQueue.enqueue('abonar meta', () => supabaseService.upsertMeta(user.id, updated));
       return updated;
     }));
+
+    // Recompensa por completar una meta (solo la primera vez que cruza el objetivo)
+    if (seCompletaAhora) awardXp(150);
+  };
 
   // ─── Deudas ───────────────────────────────────────────────────────────────
   const addDeuda = (deuda: Deuda) => {

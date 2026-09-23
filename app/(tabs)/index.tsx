@@ -29,6 +29,7 @@ import { authService } from '../../src/services/supabase/AuthService';
 import { supabaseService } from '../../src/services/supabase/SupabaseService';
 import { DashboardSkeleton } from '../../src/components/ui/SkeletonLoader';
 import { Toast, useToast } from '../../src/components/ui/Toast';
+import { RewardToastHost } from '../../src/components/ui/RewardToastHost';
 import { ResumenSemanalScreen } from '../../src/screens/ResumenSemanalScreen';
 import { ResumenMensualScreen } from '../../src/screens/ResumenMensualScreen';
 import { SimuladorDecisionesScreen } from '../../src/screens/SimuladorDecisionesScreen';
@@ -953,6 +954,7 @@ export default function HomeScreen() {
           tipo={toast.tipo}
           onHide={ocultarToast}
         />
+        <RewardToastHost />
         <Animated.View style={[styles.screenContent, { opacity: fadeAnim, transform: [{ translateX: slideAnim }] }]}>
           {currentScreen === 'dashboard' && (
             <FinancialFeed

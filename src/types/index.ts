@@ -52,6 +52,11 @@ export type ScreenName =
   | 'recurrentes';
 
 // ─── Meta (savings goal) ─────────────────────────────────────────────────────
+export interface AporteMeta {
+  monto: number;
+  fecha: string; // ISO
+}
+
 export interface Meta {
   id: string;
   nombre: string;
@@ -62,6 +67,8 @@ export interface Meta {
   fechaLimite?: string;
   completada: boolean;
   creadaEn: string;
+  /** Historial de abonos — opcional para no romper metas ya guardadas sin este campo. */
+  aportes?: AporteMeta[];
 }
 
 // ─── Deuda ────────────────────────────────────────────────────────────────────
