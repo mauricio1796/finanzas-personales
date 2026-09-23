@@ -90,8 +90,9 @@ class StorageService {
   async getRetoActivo(): Promise<RetoActivo | null> { return this.getData<RetoActivo>(this.KEYS.RETO_ACTIVO); }
   async saveRetosCompletados(ids: string[]): Promise<void> { return this.saveData(this.KEYS.RETOS_COMPLETADOS, ids); }
   async getRetosCompletados(): Promise<string[] | null> { return this.getData<string[]>(this.KEYS.RETOS_COMPLETADOS); }
-  async savePremium(state: PremiumState): Promise<void> { return this.saveData(this.KEYS.PREMIUM, state); }
-  async getPremium(): Promise<PremiumState | null> { return this.getData<PremiumState>(this.KEYS.PREMIUM); }
+  // BUG-07: el caché de Premium lo administra en exclusiva PremiumService, que
+  // añade la marca de "verificado con el servidor". Escribirlo desde aquí
+  // borraría esa marca y anularía el período de gracia sin conexión.
   async setTourDone(value: boolean): Promise<void> { return this.saveData(this.KEYS.TOUR_DONE, value); }
   async getTourDone(): Promise<boolean> { const v = await this.getData<boolean>(this.KEYS.TOUR_DONE); return v === true; }
   async setPermissionsShown(value: boolean): Promise<void> { return this.saveData(this.KEYS.PERMISSIONS_SHOWN, value); }

@@ -25,7 +25,8 @@ export function useWidgetSync() {
   };
 
   // Al cambiar transacciones o categorías
-  useEffect(() => { sync(); }, [transactions.length, categories.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  // BUG-13: el widget también debe resincronizarse al editar una transacción.
+  useEffect(() => { sync(); }, [transactions, categories]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Al volver a foreground
   useEffect(() => {

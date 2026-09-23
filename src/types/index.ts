@@ -28,7 +28,19 @@ export type CategoryUpdate = Partial<Omit<Category, 'id'>>;
 export interface Transaction {
   id: string;
   amount: number;
+  /**
+   * Nombre visible de la categoría. Se mantiene sincronizado con el nombre
+   * actual de la categoría (ver categoryResolver) para que la agregación por
+   * nombre siga siendo válida.
+   */
   category: string;
+  /**
+   * Identificador estable de la categoría (BUG-10). Sobrevive a los cambios de
+   * nombre, por lo que el histórico nunca se pierde al renombrar. Opcional
+   * porque las transacciones creadas antes de esta versión se migran al
+   * hidratar el estado.
+   */
+  categoryId?: string;
   date: string;
   type: 'income' | 'expense';
   description?: string;

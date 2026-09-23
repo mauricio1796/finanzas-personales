@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useFinance, Category } from '@/src/core/context/FinanceContext';
+import { useFinance } from '@/src/state';
+import type { Category } from '@/src/types';
 import { THEME } from '../constants/theme';
 
 interface SelectCategoriesMobileProps {

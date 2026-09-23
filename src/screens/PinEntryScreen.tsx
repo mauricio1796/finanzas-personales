@@ -19,12 +19,23 @@ import {
   getBiometricAvailability,
   isBiometricEnabled,
   authenticateBiometric,
+  getEstadoIntentos,
+  MAX_INTENTOS as MAX_ATTEMPTS,
   type BiometricKind,
+  type ResultadoVerificacion,
 } from '../services/PinService';
 
 const { width: W } = Dimensions.get('window');
 const KEY_SIZE = Math.min((W - 48 - 40) / 3, 78);
-const MAX_ATTEMPTS = 5;
+
+/** Mensaje legible para el bloqueo temporal por intentos fallidos. */
+function mensajeBloqueo(segundos: number): string {
+  if (segundos >= 60) {
+    const min = Math.ceil(segundos / 60);
+    return `Demasiados intentos. Espera ${min} minuto${min !== 1 ? 's' : ''}.`;
+  }
+  return `Demasiados intentos. Espera ${segundos} segundo${segundos !== 1 ? 's' : ''}.`;
+}
 
 // ── PinDots ───────────────────────────────────────────────────────────────────
 function PinDots({ pin, reveal, shake, hasError, primary, error, border, textPrimary }: {
@@ -117,7 +128,7 @@ export interface PinEntryScreenProps {
   onSuccess:    () => void;
   onForgotPin:  () => void;
   onSwitchUser: () => void;
-  verifyPin:    (pin: string) => Promise<boolean>;
+  verifyPin:    (pin: string) => Promise<ResultadoVerificacion>;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -164,6 +175,17 @@ export function PinEntryScreen({
     Animated.spring(enter, { toValue: 1, tension: 55, friction: 10, useNativeDriver: true }).start();
 
     (async () => {
+      // BUG-16: el bloqueo sobrevive al reinicio de la app, así que hay que
+      // reflejarlo al montar — antes, reabrir la app reiniciaba el contador.
+      const intentos = await getEstadoIntentos();
+      if (intentos.bloqueado) {
+        setHasError(true);
+        setErrorMsg(mensajeBloqueo(intentos.segundosRestantes));
+        setAttempts(MAX_ATTEMPTS);
+        return;
+      }
+      setAttempts(MAX_ATTEMPTS - intentos.intentosRestantes);
+
       const [{ available, kind }, enabled] = await Promise.all([
         getBiometricAvailability(),
         isBiometricEnabled(),
@@ -206,25 +228,31 @@ export function PinEntryScreen({
 
     if (next.length === 4) {
       setChecking(true);
-      const ok = await verifyPin(next);
+      const resultado = await verifyPin(next);
       setChecking(false);
 
-      if (ok) {
+      if (resultado.ok) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         onSuccess();
+        return;
+      }
+
+      // BUG-16: los intentos ya no viven en el estado de React (que se reiniciaba
+      // al matar la app); PinService los persiste y calcula la espera.
+      setAttempts(MAX_ATTEMPTS - resultado.intentosRestantes);
+      setHasError(true);
+      doShake();
+
+      if (resultado.bloqueado) {
+        setErrorMsg(mensajeBloqueo(resultado.segundosRestantes));
+        setPin('');
+      } else if (resultado.intentosRestantes <= 0) {
+        setErrorMsg('Demasiados intentos. Ingresa con tu correo.');
+        setTimeout(onForgotPin, 1500);
       } else {
-        const n = attempts + 1;
-        setAttempts(n);
-        setHasError(true);
-        doShake();
-        const remaining = MAX_ATTEMPTS - n;
-        if (remaining <= 0) {
-          setErrorMsg('Demasiados intentos. Ingresa con tu correo.');
-          setTimeout(onForgotPin, 1500);
-        } else {
-          setErrorMsg(`PIN incorrecto · ${remaining} intento${remaining !== 1 ? 's' : ''} restante${remaining !== 1 ? 's' : ''}`);
-          setTimeout(() => { setPin(''); setHasError(false); setErrorMsg(''); }, 900);
-        }
+        const r = resultado.intentosRestantes;
+        setErrorMsg(`PIN incorrecto · ${r} intento${r !== 1 ? 's' : ''} restante${r !== 1 ? 's' : ''}`);
+        setTimeout(() => { setPin(''); setHasError(false); setErrorMsg(''); }, 900);
       }
     }
   };

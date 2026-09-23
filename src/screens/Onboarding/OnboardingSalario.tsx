@@ -81,14 +81,25 @@ export const OnboardingSalario: React.FC<Props> = ({ onNext, onBack }) => {
     setHasDebt(val);
   };
 
-  const canContinue = income.length > 0 && getSalarioNum() > 0 && hasDebt !== null;
+  const getDeudaNum = () => parseInt(debtAmt.replace(/\./g, ''), 10) || 0;
+
+  /**
+   * BUG-26 — Antes se podía marcar "sí tengo deudas" y continuar con el monto
+   * vacío: el perfil quedaba con `hasDebts: true, debtAmount: 0`, un estado
+   * contradictorio que luego mostraba $0 en los reportes de deuda.
+   */
+  const canContinue =
+    income.length > 0 &&
+    getSalarioNum() > 0 &&
+    hasDebt !== null &&
+    (hasDebt === false || getDeudaNum() > 0);
 
   const handleNext = () => {
     if (!canContinue) return;
     Keyboard.dismiss();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const sal  = getSalarioNum();
-    const debt = parseInt(debtAmt.replace(/\./g, ''), 10) || 0;
+    const debt = getDeudaNum();
     setProfile({
       id: profile?.id ?? Date.now().toString(),
       userId: '1',

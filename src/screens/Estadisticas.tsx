@@ -114,7 +114,12 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
       .reduce((s, t) => s + t.amount, 0),
     [transactions, mes, año],
   );
-  const balance = totalIngresos - totalGastos;
+  /**
+   * BUG-12: esta pantalla mostraba DOS balances distintos a la vez — el "hero"
+   * calculado aquí a mano (solo transacciones, sin el salario del perfil) y el
+   * KpiCard que sí usa el motor central. Ahora ambos salen del mismo sitio.
+   */
+  const balance = metricasIngreso.balanceDisponible;
 
   // Donut slices
   const donutSlices = useMemo(() => {

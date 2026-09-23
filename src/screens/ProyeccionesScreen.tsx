@@ -49,7 +49,12 @@ function StepRow({ label, value, min, max, step, formato, onChange }: StepRowPro
   const display = formato === 'cop' ? fmtCOP(value) : formato === 'pct' ? value.toFixed(0) + '%' : value + ' meses';
   const dec = () => onChange(Math.max(min, value - step));
   const inc = () => onChange(Math.min(max, value + step));
-  const pct = Math.round(((value - min) / (max - min)) * 100);
+  // BUG-25: un `value` fuera de [min,max] producía un ancho negativo (o >100%).
+  // Se acota aquí también, para que ningún consumidor pueda romper la barra.
+  const rango = max - min;
+  const pct = rango > 0
+    ? Math.min(100, Math.max(0, Math.round(((value - min) / rango) * 100)))
+    : 0;
   return (
     <View style={styles.container}>
       <View style={styles.row}>
@@ -71,6 +76,15 @@ function StepRow({ label, value, min, max, step, formato, onChange }: StepRowPro
   );
 }
 
+/** Límites del slider "Gasto actual/mes" (BUG-25). */
+const GASTO_MIN = 500_000;
+const GASTO_MAX_DEFECTO = 5_000_000;
+
+/** Mantiene un valor dentro de [min, max]. */
+function acotar(valor: number, min: number, max: number): number {
+  return Math.min(Math.max(valor, min), max);
+}
+
 export const ProyeccionesScreen: React.FC<{ onBack?: () => void; onPremiumPress?: () => void }> = ({ onBack, onPremiumPress }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -86,7 +100,14 @@ export const ProyeccionesScreen: React.FC<{ onBack?: () => void; onPremiumPress?
   const [tasaMensual, setTasaMensual] = useState(2);
   const [plazo, setPlazo] = useState(24);
   const [reduccionPct, setReduccionPct] = useState(20);
-  const [gastoActual, setGastoActual] = useState(Math.round(salario * 0.7));
+  /**
+   * BUG-25 — El valor inicial debe caer dentro de los límites del StepRow
+   * (min 500.000). Con un salario bajo, `salario * 0.7` quedaba por debajo del
+   * mínimo y la barra de progreso se renderizaba con un ancho negativo.
+   */
+  const [gastoActual, setGastoActual] = useState(() =>
+    acotar(Math.round(salario * 0.7), GASTO_MIN, salario > GASTO_MIN ? salario : GASTO_MAX_DEFECTO),
+  );
   const [mesesReduccion, setMesesReduccion] = useState(12);
 
   const proyeccionReal = useMemo(() => proyectarMesProximo(transactions, salario), [transactions, salario]);
@@ -192,7 +213,7 @@ export const ProyeccionesScreen: React.FC<{ onBack?: () => void; onPremiumPress?
         )}
         {escenario === 'reduccion' && (
           <View style={styles.slidersCard}>
-            <StepRow label="Gasto actual/mes" value={gastoActual} min={500000} max={salario > 500000 ? salario : 5000000} step={100000} formato="cop" onChange={setGastoActual} />
+            <StepRow label="Gasto actual/mes" value={gastoActual} min={GASTO_MIN} max={salario > GASTO_MIN ? salario : GASTO_MAX_DEFECTO} step={100000} formato="cop" onChange={setGastoActual} />
             <StepRow label="Reduccion" value={reduccionPct} min={5} max={50} step={5} formato="pct" onChange={setReduccionPct} />
             <StepRow label="Proyectar a" value={mesesReduccion} min={3} max={24} step={3} formato="meses" onChange={setMesesReduccion} />
           </View>

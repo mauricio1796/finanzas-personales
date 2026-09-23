@@ -5,7 +5,7 @@ import * as Linking from 'expo-linking';
 import { Icon } from '../components/ui/Icon';
 import { useFinance } from '../state/FinanceContext';
 import { useTheme } from '../state/ThemeContext';
-import { PLANES_PREMIUM, FEATURES_GRATIS, FEATURES_PREMIUM, activarPremium } from '../services/PremiumService';
+import { PLANES_PREMIUM, FEATURES_GRATIS, FEATURES_PREMIUM, refrescarPremiumTrasPago } from '../services/PremiumService';
 import { crearCheckout, esperarConfirmacionPago, extraerIdDeRedirect, type RefPago } from '../services/PaymentsService';
 import { THEME } from '../constants/theme';
 import { AppColors } from '../constants/colors';
@@ -30,11 +30,25 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onBack }) => {
 
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const activarLocalmente = async (plan: 'mensual' | 'anual') => {
-    const newState = await activarPremium(plan);
-    setPremium(newState);
+  /**
+   * El Worker ya acreditó el entitlement en Supabase al verificar el pago con
+   * Wompi. Aquí solo le preguntamos al servidor cuál es el estado real: la app
+   * no se otorga Premium a sí misma (BUG-07).
+   */
+  const confirmarPremiumConServidor = async () => {
+    const estado = await refrescarPremiumTrasPago();
+    setPremium(estado);
     setPagoPendiente(null);
-    Alert.alert('¡Pago aprobado!', 'Bienvenido a FinancyAI Premium.', [{ text: 'Explorar', onPress: onBack }]);
+
+    if (estado.isPremium) {
+      Alert.alert('¡Pago aprobado!', 'Bienvenido a FinancyAI Premium.', [{ text: 'Explorar', onPress: onBack }]);
+    } else {
+      Alert.alert(
+        'Pago recibido',
+        'Tu pago fue aprobado, pero aún no pudimos confirmar la activación con el servidor. ' +
+        'Vuelve a tocar "Ya pagué, verificar" en unos segundos; si continúa, escríbenos y lo activamos.',
+      );
+    }
   };
 
   /** Abre el checkout de Wompi y confirma el pago antes de activar Premium. */
@@ -70,7 +84,7 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onBack }) => {
       const estado = await esperarConfirmacionPago(ref);
 
       if (estado === 'APPROVED') {
-        await activarLocalmente(planSel);
+        await confirmarPremiumConServidor();
       } else if (estado === 'PENDING') {
         Alert.alert(
           'Pago en proceso',

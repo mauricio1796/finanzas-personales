@@ -118,7 +118,9 @@ export const ResumenMensualScreen: React.FC<Props> = ({ onBack, onNavigate, mesO
 
   const resumen: ResumenMensual = useMemo(
     () => calcularResumenMensual(transactions, categories, monthlySalary, mes, año),
-    [transactions.length, categories.length, monthlySalary, mes, año],
+    // BUG-13: depender de `.length` no detectaba la EDICIÓN de una transacción
+    // (mismo número de elementos), así que el resumen mostraba datos obsoletos.
+    [transactions, categories, monthlySalary, mes, año],
   );
 
   const calColor = calificacionColor(resumen.calificacion);

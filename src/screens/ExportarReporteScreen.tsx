@@ -21,6 +21,7 @@ import {
   type ReporteGuardado,
 } from '../services/PDFService';
 import type { ConfigReporte, DatosReporte } from '../utils/pdfUtils';
+import { calcularMetricasFinancieras } from '../utils/ingresoUtils';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -130,9 +131,22 @@ export const ExportarReporteScreen: React.FC<Props> = ({ onBack, onNavigate, mes
     const d = new Date(t.date);
     return d.getMonth() === mesSelec.mes && d.getFullYear() === mesSelec.año;
   });
-  const ingresos  = txsMes.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const gastos    = txsMes.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-  const ahorro    = ingresos - gastos;
+  /**
+   * BUG-22 — Estas mini-stats se calculaban a mano (solo transacciones, sin el
+   * salario del perfil), así que el usuario veía aquí un "ahorro" distinto al
+   * del Dashboard y al del widget para el mismo mes. Ahora salen del motor
+   * central, que es la única fuente de verdad financiera.
+   */
+  const metricasMes = calcularMetricasFinancieras(
+    transactions,
+    categories as any,
+    profile?.monthlySalary ?? 0,
+    mesSelec.mes,
+    mesSelec.año,
+  );
+  const ingresos  = metricasMes.ingresoEfectivo;
+  const gastos    = metricasMes.totalGastado;
+  const ahorro    = metricasMes.balanceDisponible;
   const fmt       = (n: number) => '$' + Math.round(Math.abs(n)).toLocaleString('es-CO').replace(/,/g, '.');
 
   // ── Build DatosReporte ────────────────────────────────────────────────────

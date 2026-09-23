@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../state/ThemeContext';
+import { validarFortalezaPin } from '../services/PinService';
 
 const { width: W } = Dimensions.get('window');
 const DIGIT_SIZE = (W - 48 - 48) / 4;
@@ -135,6 +136,16 @@ export function PinSetupScreen({ userName, onDone }: PinSetupScreenProps) {
 
     if (next.length === 4) {
       if (phase === 'enter') {
+        // BUG-24: un PIN trivial (0000, 1234...) es lo primero que probaría
+        // cualquiera con el teléfono en la mano. Se rechaza antes de confirmarlo.
+        const fortaleza = validarFortalezaPin(next);
+        if (!fortaleza.valido) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+          doShake();
+          setErrorMsg(fortaleza.motivo ?? 'Elige un PIN más seguro.');
+          setTimeout(() => { setCurrent(''); setErrorMsg(''); }, 1600);
+          return;
+        }
         setFirst(next);
         transitionPhase('confirm');
       } else {

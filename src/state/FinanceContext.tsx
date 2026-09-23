@@ -8,7 +8,15 @@ import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesSer
 import { computeGamification, reconcileXp, buildUserLevel, LOGROS, RARITY_STYLE } from '../services/GamificacionService';
 import { emitRewardToast } from '../utils/rewardToastBus';
 import { getIngresoEfectivoMes } from '../utils/ingresoUtils';
+import { sincronizarPremium } from '../services/PremiumService';
+import { RETOS_DISPONIBLES } from '../services/RetosService';
+import { LECCIONES } from '../services/AcademiaService';
 import { inyectarSubcategoriasDefecto } from '../models/Category';
+import {
+  migrarTransaccionesACategoryId,
+  renombrarCategoriaEnTransacciones,
+  encontrarCategoriaDeTx,
+} from '../utils/categoryResolver';
 import {
   User,
   Category,
@@ -59,10 +67,17 @@ interface FinanceContextType {
   retoActivo: RetoActivo | null;
   retosCompletados: string[];
   premium: PremiumState;
+  /**
+   * Snapshot del motor de gamificación (BUG-23). Fuente ÚNICA de XP/nivel:
+   * las pantallas lo consumen en vez de recalcular su propia versión.
+   */
+  gamificacion: ReturnType<typeof computeGamification>;
 
   // Core methods
   setUser: (user: User | null) => void;
   setIsOnboarded: (value: boolean) => Promise<void>;
+  /** Cierra el onboarding solo si los datos se guardaron (BUG-11). */
+  finalizarOnboarding: () => Promise<{ ok: boolean; error?: string }>;
   updateOnboardingStep: (step: number) => void;
   setCategories: (cats: Category[]) => void;
   setProfile: (profile: FinancialProfile) => void;
@@ -193,7 +208,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         storedLecciones,
         storedRetoActivo,
         storedRetosComp,
-        storedPremium,
         storedMetas,
         storedDeudas,
         storedRecurrentes,
@@ -209,7 +223,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         storageService.getLeccionesCompletadas(),
         storageService.getRetoActivo(),
         storageService.getRetosCompletados(),
-        storageService.getPremium(),
         storageService.getMetas(),
         storageService.getDeudas(),
         storageService.getRecurrentes(),
@@ -217,7 +230,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (storedOnboarded) setIsOnboardedState(true);
       if (storedUser) setUserState(storedUser);
-      if (storedTxs) setTransactions(storedTxs);
+
+      let catsHidratadas: Category[] = [];
       if (storedCats) {
         const migrated = storedCats.map((c: any) => {
           const { presupuesto, gastado, ...rest } = c;
@@ -227,7 +241,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           return rest as Category;
         });
         // Inyectar subcategorías por defecto para categorías que no las tengan
-        setCategoriesState(inyectarSubcategoriasDefecto(migrated));
+        catsHidratadas = inyectarSubcategoriasDefecto(migrated);
+        setCategoriesState(catsHidratadas);
+      }
+
+      // BUG-10: dota de `categoryId` estable a las transacciones antiguas, que
+      // solo guardaban el nombre de la categoría. Se hace después de tener las
+      // categorías para poder resolver la correspondencia. Las transacciones
+      // cuya categoría ya no existe se dejan intactas: su nombre histórico es
+      // la única información que queda de ese gasto.
+      if (storedTxs) {
+        const migradas = migrarTransaccionesACategoryId(storedTxs, catsHidratadas);
+        setTransactions(migradas ?? storedTxs);
+        if (migradas) {
+          storageService.saveTransactions(migradas).catch(() => {
+            // Si la escritura falla, la migración se reintenta en el próximo arranque.
+          });
+        }
       }
       if (storedProfile) setProfileState(storedProfile);
       if (storedGoal) setGoalState(storedGoal);
@@ -235,7 +265,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (storedLecciones) setLeccionesCompletadas(storedLecciones);
       if (storedRetoActivo) setRetoActivo(storedRetoActivo);
       if (storedRetosComp) setRetosCompletados(storedRetosComp);
-      if (storedPremium) setPremiumState(storedPremium);
+      // BUG-07: el estado Premium NO se hidrata desde el almacenamiento local.
+      // `sincronizarPremium()` consulta el entitlement real en Supabase y solo
+      // acepta el caché local si el servidor ya lo confirmó antes y sigue
+      // dentro del período de gracia sin conexión. El caché lo administra en
+      // exclusiva PremiumService (incluye la marca de verificación).
+      sincronizarPremium()
+        .then(setPremiumState)
+        .catch(() => setPremiumState(DEFAULT_PREMIUM));
       if (storedMetas) setMetas(storedMetas);
       if (storedDeudas) setDeudas(storedDeudas);
       if (storedRecurrentes) setRecurrentes(storedRecurrentes);
@@ -292,7 +329,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => { storageService.saveLeccionesCompletadas(leccionesCompletadas); }, [leccionesCompletadas]);
   useEffect(() => { storageService.saveRetosCompletados(retosCompletados); }, [retosCompletados]);
   useEffect(() => { storageService.saveRetoActivo(retoActivo); }, [retoActivo]);
-  useEffect(() => { storageService.savePremium(premium); }, [premium]);
+  // El caché de Premium lo administra PremiumService (incluye la marca de
+  // "verificado con el servidor"); escribirlo aquí borraría esa marca.
   useEffect(() => { storageService.saveMetas(metas); }, [metas]);
   useEffect(() => { storageService.saveDeudas(deudas); }, [deudas]);
   useEffect(() => { storageService.saveRecurrentes(recurrentes); }, [recurrentes]);
@@ -307,15 +345,26 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // nivel), sin repetir el aviso en cada re-render ni al cargar la app.
   const prevSnapRef = useRef<{ logros: Set<string>; nivel: number } | null>(null);
 
-  useEffect(() => {
-    if (isLoading) return;
-    const snap = computeGamification({
+  /**
+   * BUG-23 — Un único cálculo de gamificación para toda la app. Antes esto
+   * vivía dentro del efecto y GamificacionScreen hacía su propio
+   * `calcularXPTotal` en paralelo, con un `Math.max` de parche: el número
+   * grande y el desglose podían no cuadrar, y el widget mostraba otro nivel.
+   */
+  const gamificacion = useMemo(
+    () => computeGamification({
       transactions,
       categories,
       goal,
       leccionesCompletadas,
       retosCompletados,
-    });
+    }),
+    [transactions, categories, goal, leccionesCompletadas, retosCompletados],
+  );
+
+  useEffect(() => {
+    if (isLoading) return;
+    const snap = gamificacion;
 
     const prevSnap = prevSnapRef.current;
     if (prevSnap) {
@@ -353,7 +402,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       return next;
     });
-  }, [isLoading, transactions, categories, goal, leccionesCompletadas, retosCompletados, user]);
+  }, [isLoading, gamificacion, user]);
 
   // ─── importServerData: carga datos del servidor en el contexto local ───────
   // Llamado desde index.tsx después de un login o registro exitoso.
@@ -366,7 +415,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (data.leccionesCompletadas !== undefined) setLeccionesCompletadas(data.leccionesCompletadas);
     if (data.retosCompletados !== undefined) setRetosCompletados(data.retosCompletados);
     if (data.retoActivo !== undefined) setRetoActivo(data.retoActivo);
-    if (data.premium !== undefined) setPremiumState(data.premium);
+    // BUG-07: `data.premium` viene de profiles.premium, que históricamente el
+    // cliente podía escribir. El entitlement real se resuelve solo contra
+    // `premium_entitlements` vía sincronizarPremium().
+    void data.premium;
     if (data.isOnboarded !== undefined) setIsOnboardedState(data.isOnboarded);
     if (data.paidTxIds !== undefined) await storageService.savePaidTxIds(data.paidTxIds);
     if (data.metas !== undefined) setMetas(data.metas);
@@ -385,6 +437,41 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } else if (user) {
       const uid = user.id;
       syncQueue.enqueue('marcar onboarded', () => supabaseService.upsertUserData(uid, { isOnboarded: value }));
+    }
+  };
+
+  /**
+   * BUG-11 — Cierra el onboarding solo si los datos quedaron realmente guardados.
+   *
+   * Antes: `setIsOnboarded(true)` se invocaba sin `await` y la navegación seguía
+   * de inmediato, mientras perfil, categorías y meta se guardaban en efectos
+   * aparte y sin manejo de error. Si una de esas escrituras fallaba (disco
+   * lleno, error de almacenamiento), el usuario quedaba marcado como
+   * "onboarded" pero con datos incompletos y sin aviso.
+   *
+   * Ahora la marca de completado es lo ÚLTIMO que se escribe: si algo falla
+   * antes, el onboarding no se cierra y el usuario puede reintentar.
+   */
+  const finalizarOnboarding = async (): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      await Promise.all([
+        profile ? storageService.saveProfile(profile) : Promise.resolve(),
+        storageService.saveCategories(categories),
+        goal ? storageService.saveGoal(goal) : Promise.resolve(),
+      ]);
+
+      // Solo tras confirmar la persistencia de los datos se marca completado.
+      await storageService.setOnboarded(true);
+      setIsOnboardedState(true);
+
+      if (user) {
+        const uid = user.id;
+        syncQueue.enqueue('marcar onboarded', () => supabaseService.upsertUserData(uid, { isOnboarded: true }));
+      }
+      return { ok: true };
+    } catch (e: any) {
+      console.warn('[Onboarding] No se pudo finalizar:', e?.message);
+      return { ok: false, error: e?.message ?? 'No se pudieron guardar tus datos.' };
     }
   };
 
@@ -438,10 +525,18 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const addTransaction = (tx: Transaction) => {
-    setTransactions(prev => [tx, ...prev]);
+    // BUG-10: toda transacción nace con identidad estable de categoría. Quien
+    // llama puede pasar el nombre (o un id) en `category`; aquí se resuelve una
+    // sola vez y se normaliza el nombre visible al canónico de la categoría.
+    const cat = tx.categoryId ? undefined : encontrarCategoriaDeTx(tx, categories);
+    const conId: Transaction = cat
+      ? { ...tx, categoryId: cat.id, category: cat.name }
+      : tx;
+
+    setTransactions(prev => [conId, ...prev]);
     if (user) {
       const uid = user.id;
-      syncQueue.enqueue('agregar transacción', () => supabaseService.upsertTransaction(uid, tx));
+      syncQueue.enqueue('agregar transacción', () => supabaseService.upsertTransaction(uid, conId));
     }
   };
 
@@ -503,7 +598,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // ─── Phase 3 methods ──────────────────────────────────────────────────────
+
+  /**
+   * BUG-15 — defensa en profundidad para contenido Premium.
+   * Antes, el único control era un `if` en el render de la pantalla: cualquier
+   * ruta alternativa a estos mutadores (deep link, consola de depuración, un
+   * refactor futuro) otorgaba el contenido igual. Ahora la propia capa de
+   * estado rechaza el contenido Premium si el entitlement no está activo.
+   */
+  const puedeAccederAContenidoPremium = (esPremium: boolean): boolean =>
+    !esPremium || premium.isPremium;
+
   const completarLeccion = (leccionId: string, xp: number) => {
+    const leccion = LECCIONES.find(l => l.id === leccionId);
+    if (leccion && !puedeAccederAContenidoPremium(leccion.isPremium)) {
+      console.warn('[Premium] Lección premium bloqueada sin entitlement activo:', leccionId);
+      return;
+    }
     setLeccionesCompletadas(prev => {
       if (prev.includes(leccionId)) return prev;
       const next = [...prev, leccionId];
@@ -518,6 +629,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const iniciarReto = (retoId: string) => {
+    const reto = RETOS_DISPONIBLES.find(r => r.id === retoId);
+    if (reto && !puedeAccederAContenidoPremium(reto.isPremium)) {
+      console.warn('[Premium] Reto premium bloqueado sin entitlement activo:', retoId);
+      return;
+    }
     const nuevo: RetoActivo = { retoId, fechaInicio: new Date().toISOString() };
     setRetoActivo(nuevo);
     if (user) {
@@ -527,6 +643,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const completarReto = (retoId: string, xp?: number) => {
+    const retoDef = RETOS_DISPONIBLES.find(r => r.id === retoId);
+    if (retoDef && !puedeAccederAContenidoPremium(retoDef.isPremium)) {
+      console.warn('[Premium] Reto premium bloqueado sin entitlement activo:', retoId);
+      return;
+    }
     setRetosCompletados(prev => {
       if (prev.includes(retoId)) return prev;
       const next = [...prev, retoId];
@@ -553,12 +674,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  /**
+   * Refleja en la UI el entitlement que el SERVIDOR ya resolvió. No lo sube a
+   * Supabase: `premium_entitlements` solo la escribe el Worker tras verificar
+   * el pago con Wompi, y `profiles.premium` quedó protegida por trigger.
+   */
   const setPremium = (state: PremiumState) => {
     setPremiumState(state);
-    if (user) {
-      const uid = user.id;
-      syncQueue.enqueue('actualizar premium', () => supabaseService.upsertUserData(uid, { premium: state }));
-    }
   };
 
   // ─── Category management ──────────────────────────────────────────────────
@@ -571,15 +693,40 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateCategory = (id: string, update: CategoryUpdate) => {
+    let renombrado: { antes: string; despues: string } | null = null;
+
     setCategoriesState(prev => prev.map(c => {
       if (c.id !== id) return c;
       const updated = { ...c, ...update };
+      if (typeof update.name === 'string' && update.name !== c.name) {
+        renombrado = { antes: c.name, despues: update.name };
+      }
       if (user) {
         const uid = user.id;
         syncQueue.enqueue('actualizar categoría', () => supabaseService.upsertCategory(uid, updated));
       }
       return updated;
     }));
+
+    // BUG-10: al renombrar, el histórico debe seguir la categoría. Como las
+    // transacciones llevan `categoryId`, el gasto ya registrado no desaparece
+    // del presupuesto: solo se actualiza su nombre visible.
+    if (renombrado) {
+      const { antes, despues } = renombrado;
+      setTransactions(prev => {
+        const actualizadas = renombrarCategoriaEnTransacciones(prev, id, antes, despues);
+        if (!actualizadas) return prev;
+        if (user) {
+          const uid = user.id;
+          const cambiadas = actualizadas.filter((tx, i) => tx !== prev[i]);
+          cambiadas.forEach(tx => {
+            syncQueue.enqueue('renombrar categoría en transacción',
+              () => supabaseService.upsertTransaction(uid, tx));
+          });
+        }
+        return actualizadas;
+      });
+    }
   };
 
   const deleteCategory = (id: string) => {
@@ -805,8 +952,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     retoActivo,
     retosCompletados,
     premium,
+    gamificacion,
     setUser,
     setIsOnboarded,
+    finalizarOnboarding,
     updateOnboardingStep,
     setCategories,
     setProfile,

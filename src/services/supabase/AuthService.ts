@@ -6,14 +6,42 @@ export interface AuthResult {
   error: string | null;
 }
 
+/**
+ * BUG-18 — El SDK de Supabase solo devuelve `{ data, error }` cuando la
+ * petición LLEGA al servidor. Si no hay red, `fetch` lanza una excepción y,
+ * como estos métodos no la capturaban (y los handlers de la pantalla usan
+ * `try/finally` sin `catch`), quedaba como promesa rechazada sin manejar: el
+ * botón dejaba de cargar y el usuario no veía ninguna explicación.
+ *
+ * Este envoltorio traduce cualquier excepción a un mensaje accionable.
+ */
+function mensajeDeExcepcion(e: unknown): string {
+  const texto = String((e as any)?.message ?? e ?? '');
+  if (/network|fetch|failed to fetch|econn|timeout|abort/i.test(texto)) {
+    return 'Sin conexión. Revisa tu internet e intenta de nuevo.';
+  }
+  return 'No pudimos completar la operación. Intenta de nuevo.';
+}
+
+/** Ejecuta una llamada de red devolviendo `respaldo` si lanza excepción. */
+async function conRed<T>(fn: () => Promise<T>, respaldo: (msg: string) => T): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    return respaldo(mensajeDeExcepcion(e));
+  }
+}
+
 class AuthService {
   readonly isReady = isSupabaseReady;
 
   // ─── Sign In ──────────────────────────────────────────────────────────────
   async signIn(email: string, password: string): Promise<AuthResult> {
-    if (!supabase) return { user: null, error: 'Supabase no configurado' };
+    const db = supabase;
+    if (!db) return { user: null, error: 'Supabase no configurado' };
+    return conRed(async () => {
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
 
     if (error || !data.user) {
       const msg = error?.message ?? 'Error al iniciar sesión';
@@ -24,7 +52,7 @@ class AuthService {
     }
 
     // Obtener nombre desde la tabla profiles
-    const { data: profile } = await supabase
+    const { data: profile } = await db
       .from('profiles')
       .select('name, monthly_salary')
       .eq('id', data.user.id)
@@ -40,13 +68,16 @@ class AuthService {
       },
       error: null,
     };
+    }, msg => ({ user: null, error: msg }));
   }
 
   // ─── Sign Up ──────────────────────────────────────────────────────────────
   async signUp(email: string, password: string, name: string): Promise<AuthResult> {
-    if (!supabase) return { user: null, error: 'Supabase no configurado' };
+    const db = supabase;
+    if (!db) return { user: null, error: 'Supabase no configurado' };
+    return conRed(async () => {
 
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await db.auth.signUp({
       email,
       password,
       options: {
@@ -65,7 +96,7 @@ class AuthService {
     // actualizar el nombre en profiles como refuerzo (el trigger ya lo hace)
     if (data.session) {
       await new Promise(r => setTimeout(r, 400));
-      await supabase
+      await db
         .from('profiles')
         .update({ name })
         .eq('id', data.user.id);
@@ -82,12 +113,15 @@ class AuthService {
       },
       error: null,
     };
+    }, msg => ({ user: null, error: msg }));
   }
 
   // ─── OTP: enviar código (solo usuarios existentes) ───────────────────────
   async sendOtp(email: string): Promise<{ error: string | null; userNotFound?: boolean }> {
-    if (!supabase) return { error: 'Supabase no configurado' };
-    const { error } = await supabase.auth.signInWithOtp({
+    const db = supabase;
+    if (!db) return { error: 'Supabase no configurado' };
+    return conRed(async () => {
+    const { error } = await db.auth.signInWithOtp({
       email,
       options: { shouldCreateUser: false },
     });
@@ -102,12 +136,15 @@ class AuthService {
       return { error: 'No se pudo enviar el código. Verifica el correo.' };
     }
     return { error: null };
+    }, msg => ({ error: msg }));
   }
 
   // ─── OTP: registrar nuevo usuario y enviar código ────────────────────────
   async sendOtpNewUser(email: string, name: string, password: string): Promise<{ error: string | null }> {
-    if (!supabase) return { error: 'Supabase no configurado' };
-    const { error: signUpError } = await supabase.auth.signUp({
+    const db = supabase;
+    if (!db) return { error: 'Supabase no configurado' };
+    return conRed(async () => {
+    const { error: signUpError } = await db.auth.signUp({
       email,
       password,
       options: { data: { name } },
@@ -115,7 +152,7 @@ class AuthService {
     if (signUpError && !signUpError.message.includes('already registered')) {
       return { error: signUpError.message };
     }
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await db.auth.signInWithOtp({
       email,
       options: { shouldCreateUser: false },
     });
@@ -124,12 +161,15 @@ class AuthService {
       return { error: 'No se pudo enviar el código.' };
     }
     return { error: null };
+    }, msg => ({ error: msg }));
   }
 
   // ─── OTP: verificar código ────────────────────────────────────────────────
   async verifyOtp(email: string, token: string): Promise<AuthResult> {
-    if (!supabase) return { user: null, error: 'Supabase no configurado' };
-    const { data, error } = await supabase.auth.verifyOtp({
+    const db = supabase;
+    if (!db) return { user: null, error: 'Supabase no configurado' };
+    return conRed(async () => {
+    const { data, error } = await db.auth.verifyOtp({
       email,
       token,
       type: 'email',
@@ -140,7 +180,7 @@ class AuthService {
     }
     // Esperar trigger si es usuario nuevo
     await new Promise(r => setTimeout(r, 400));
-    const { data: profile } = await supabase
+    const { data: profile } = await db
       .from('profiles')
       .select('name, monthly_salary')
       .eq('id', data.user.id)
@@ -155,6 +195,7 @@ class AuthService {
       },
       error: null,
     };
+    }, msg => ({ user: null, error: msg }));
   }
 
   // ─── Sign Out ─────────────────────────────────────────────────────────────

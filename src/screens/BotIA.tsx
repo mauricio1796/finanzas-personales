@@ -30,7 +30,7 @@ import {
   verificarConexionWorker,
   type MensajeChat,
 } from '../services/RealAIService';
-import { ejecutarHerramienta, previewEliminar, type FinnToolCall, type FinnToolResult } from '../services/AgentService';
+import { ejecutarHerramienta, previewAccion, type FinnToolCall, type FinnToolResult } from '../services/AgentService';
 import { VoiceButton }    from '../components/ui/VoiceButton';
 import { FinnVozModal }   from '../components/ui/FinnVozModal';
 import { catalogoItemToCategory, CATALOGO_CATEGORIAS, getPaletaItem } from '../constants/catalogoCategorias';
@@ -325,9 +325,21 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
         tool: resp.tool, input: resp.input,
         toolUseId: resp.toolUseId, assistantMessage: resp.assistantMessage,
       };
-      if (resp.tool === 'eliminar_transaccion') {
-        const preview = previewEliminar(resp.input.id, transactions as any);
-        setPendingAction({ toolCall, preview: `¿Eliminar ${preview}?` });
+      /**
+       * BUG-03 — Toda operación que DESTRUYE o ALTERA un dato financiero ya
+       * registrado pasa por confirmación del usuario. Antes solo la eliminación
+       * confirmaba, y `actualizar_transaccion` se ejecutaba sola: una
+       * resolución equivocada del modelo cambiaba montos sin que nadie lo viera.
+       * Crear (registrar, crear categoría) no destruye nada y sigue siendo directo.
+       */
+      const TOOLS_QUE_REQUIEREN_CONFIRMACION = [
+        'eliminar_transaccion',
+        'actualizar_transaccion',
+        'eliminar_subcategoria',
+      ];
+
+      if (TOOLS_QUE_REQUIEREN_CONFIRMACION.includes(resp.tool)) {
+        setPendingAction({ toolCall, preview: previewAccion(resp.tool, resp.input, transactions as any) });
       } else {
         ejecutarAccionConfirmada({ toolCall, preview: '' });
       }

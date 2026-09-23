@@ -91,11 +91,29 @@ export function OnboardingWelcome({ onNext }: { onNext: () => void }) {
   const opacity  = useRef(new Animated.Value(0)).current;
   const progress = useRef(new Animated.Value(0)).current;
 
+  /**
+   * BUG-30 — La secuencia se encadenaba con `setTimeout` sin limpieza: al
+   * desmontar la pantalla a mitad de la animación, los temporizadores seguían
+   * vivos y podían llamar `setState` sobre un componente desmontado o disparar
+   * `onNext()` en un momento inesperado (doble avance del onboarding).
+   */
+  const montado = useRef(true);
+  const timers  = useRef<ReturnType<typeof setTimeout>[]>([]);
+
   useEffect(() => {
+    montado.current = true;
     playScene(0);
+    return () => {
+      montado.current = false;
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+      opacity.stopAnimation();
+      progress.stopAnimation();
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const playScene = (idx: number) => {
+    if (!montado.current) return;
     if (idx >= SCENES.length) {
       updateOnboardingStep(1);
       onNext();
@@ -110,22 +128,26 @@ export function OnboardingWelcome({ onNext }: { onNext: () => void }) {
       duration: FADE_IN,
       useNativeDriver: true,
     }).start(() => {
+      if (!montado.current) return;
       Animated.timing(progress, {
         toValue: 1,
         duration: scene.hold,
         useNativeDriver: false,
       }).start();
 
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        if (!montado.current) return;
         Animated.timing(opacity, {
           toValue: 0,
           duration: FADE_OUT,
           useNativeDriver: true,
         }).start(() => {
+          if (!montado.current) return;
           setSceneIdx(idx + 1);
           playScene(idx + 1);
         });
       }, scene.hold);
+      timers.current.push(timer);
     });
   };
 

@@ -14,6 +14,7 @@ import { ModalCategoria } from '../components/finanzas/ModalCategoria';
 import { ConfirmarPagoModal } from '../components/ui/ConfirmarPagoModal';
 import { THEME } from '../constants/theme';
 import { AppColors } from '../constants/colors';
+import { encontrarCategoriaDeTx } from '../utils/categoryResolver';
 
 type SubTab = 'historial' | 'presupuesto';
 type PeriodoFilter = 'mes' | 'anterior' | '3m' | 'todo';
@@ -171,7 +172,14 @@ function PresupuestoTab() {
   const [editingCat, setEditingCat] = useState<any>(undefined);
   const [pagoModal, setPagoModal] = useState<{ visible: boolean; compromiso: any | null }>({ visible: false, compromiso: null });
 
-  const budgetCats = useMemo(() => categories.filter((c: any) => c.tipo || (c.budget ?? 0) > 0), [categories]);
+  // BUG-20: las subcategorías heredan `tipo` de su padre, así que entraban en
+  // esta lista y aparecían como tarjetas de presupuesto independientes, además
+  // de sumar su budget al total. Solo las categorías raíz tienen presupuesto
+  // propio (mismo criterio que ya aplicaba CategoriasScreen).
+  const budgetCats = useMemo(
+    () => categories.filter((c: any) => !c.parentCategoryId && (c.tipo || (c.budget ?? 0) > 0)),
+    [categories],
+  );
   const totalPresupuesto = useMemo(() => budgetCats.reduce((s: number, c: any) => s + (c.budget ?? 0), 0), [budgetCats]);
 
   const getMesActual = () => { const n = new Date(); return n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0"); };
@@ -180,11 +188,18 @@ function PresupuestoTab() {
     const mes = getMesActual();
     const map: Record<string, number> = {};
     transactions.filter((t: any) => t.type === "expense" && t.date.startsWith(mes)).forEach((t: any) => {
-      const cat = budgetCats.find((c: any) => c.name === t.category);
-      if (cat) map[cat.id] = (map[cat.id] ?? 0) + t.amount;
+      // BUG-21: resolver por id estable y con nombres normalizados; antes un
+      // `c.name === t.category` exacto descartaba el gasto en silencio si
+      // difería una tilde o una mayúscula, y no contaba para ningún presupuesto.
+      const cat = encontrarCategoriaDeTx(t, categories);
+      // El gasto de una subcategoría suma al presupuesto de su categoría raíz.
+      const raizId = cat?.parentCategoryId ?? cat?.id;
+      if (raizId && budgetCats.some((b: any) => b.id === raizId)) {
+        map[raizId] = (map[raizId] ?? 0) + t.amount;
+      }
     });
     return map;
-  }, [transactions, budgetCats]);
+  }, [transactions, categories, budgetCats]);
 
   const sorted = useMemo(() => {
     const today = new Date().getDate();

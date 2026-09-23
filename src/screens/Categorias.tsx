@@ -7,10 +7,12 @@ import {
   ScrollView,
   FlatList,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useFinance, Category } from '@/src/core/context/FinanceContext';
+import { useFinance } from '@/src/state';
+import type { Category } from '@/src/types';
 import { THEME } from '@/src/constants/theme';
 
 interface CategoriasProps {
@@ -74,9 +76,28 @@ export function Categorias({ onCategoryUpdate }: CategoriasProps) {
     onCategoryUpdate?.();
   };
 
+  /**
+   * BUG-19 — Antes un toque accidental borraba la categoría al instante, sin
+   * confirmación ni aviso de que las transacciones ya registradas bajo ella
+   * quedan huérfanas. Mismo patrón de confirmación que CategoriasScreen.
+   */
   const handleDeleteCategory = (id: string) => {
-    setCategories(categories.filter(c => c.id !== id));
-    onCategoryUpdate?.();
+    const cat = categories.find(c => c.id === id);
+    Alert.alert(
+      `¿Eliminar "${cat?.name ?? 'esta categoría'}"?`,
+      'Las transacciones ya registradas no se eliminan, pero dejarán de tener una categoría activa. Esta acción no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => {
+            setCategories(categories.filter(c => c.id !== id));
+            onCategoryUpdate?.();
+          },
+        },
+      ],
+    );
   };
 
   const handleEditCategory = (category: Category) => {

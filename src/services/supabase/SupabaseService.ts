@@ -75,6 +75,7 @@ function rowToTransaction(r: Record<string, any>): Transaction {
     type: r.type as 'income' | 'expense',
     ...(r.description ? { description: r.description as string } : {}),
     ...(r.subcategory ? { subcategory: r.subcategory as string } : {}),
+    ...(r.category_id ? { categoryId: r.category_id as string } : {}),
   };
 }
 
@@ -169,6 +170,7 @@ class SupabaseService {
       p_description:  tx.description?.substring(0, 500) ?? null,
       p_updated_at:   new Date().toISOString(),
       p_subcategory:  tx.subcategory?.substring(0, 200) ?? null,
+      p_category_id:  tx.categoryId?.substring(0, 200) ?? null,
     });
     if (error) throw error;
   }
@@ -191,7 +193,7 @@ class SupabaseService {
 
     let query = db
       .from('transactions')
-      .select('id, amount, category, date, type, description, subcategory, updated_at')
+      .select('id, amount, category, category_id, date, type, description, subcategory, updated_at')
       .eq('user_id', userId)
       .is('deleted_at', null)   // excluye soft-deleted
       .order('date', { ascending: false })
@@ -220,7 +222,7 @@ class SupabaseService {
     if (!db) return null;
     const { data, error } = await db
       .from('transactions')
-      .select('id, amount, category, date, type, description, subcategory')
+      .select('id, amount, category, category_id, date, type, description, subcategory')
       .eq('user_id', userId)
       .is('deleted_at', null)
       .order('date', { ascending: false });

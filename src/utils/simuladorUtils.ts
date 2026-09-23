@@ -95,7 +95,11 @@ export function simularDecision(
   const info = INFO_VEREDICTO[veredicto];
 
   // ── Balance después ───────────────────────────────────────────────────────────
-  const balanceDespues = Math.max(0, metricas.balanceDisponible - monto);
+  // BUG-01 (misma clase): truncar a 0 hacía que una compra que deja al usuario
+  // en números rojos se viera igual que una que lo deja exactamente en cero.
+  // El valor real con signo es justo la advertencia que el simulador existe
+  // para dar.
+  const balanceDespues = metricas.balanceDisponible - monto;
   const nuevoPctGastado = metricas.ingresoEfectivo > 0
     ? Math.round(((metricas.totalGastado + monto) / metricas.ingresoEfectivo) * 100)
     : 0;

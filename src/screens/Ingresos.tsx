@@ -5,7 +5,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { useFinance, Transaction } from '@/src/core/context/FinanceContext';
+import { useFinance } from '@/src/state';
+import type { Transaction } from '@/src/types';
 import { SwipeableRow } from '@/src/components/ui/SwipeableRow';
 import { Icon } from '@/src/components/ui/Icon';
 import { useTheme } from '@/src/state/ThemeContext';

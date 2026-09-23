@@ -1,4 +1,4 @@
-import { Transaction } from '../types';
+import type { Transaction } from '../types';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -94,12 +94,27 @@ export interface MetricasFinancieras {
   esIngresoReal: boolean;
   totalGastado: number;
   totalPendiente: number;
+  /**
+   * Ingreso del mes menos lo ya gastado. Valor REAL con signo: si es negativo,
+   * el usuario gastó más de lo que ingresó (BUG-01). Antes se truncaba a 0 con
+   * `Math.max`, lo que ocultaba precisamente la situación más crítica que la
+   * app debería advertir.
+   */
   balanceDisponible: number;
+  /** Disponible menos los compromisos pendientes. También con signo real. */
   balanceFinal: number;
   porcentajeGastado: number;
   porcentajePendiente: number;
   porcentajeLibre: number;
+  /**
+   * Ahorro proyectado: `balanceFinal` acotado a 0, porque un ahorro negativo no
+   * existe — eso es un déficit, y se consulta en `balanceFinal` / `enDeficit`.
+   */
   ahorroProyectado: number;
+  /** true si los gastos del mes ya superan el ingreso disponible. */
+  enDeficit: boolean;
+  /** Magnitud del déficit (positiva). 0 si no hay déficit. */
+  montoDeficit: number;
   diasRestantesMes: number;
   gastoPromedioRecomendadoDia: number;
 }
@@ -143,8 +158,10 @@ export function calcularMetricasFinancieras(
 
   const totalPendiente = compromisosDiaPago + presupuestosSinDia;
 
-  const balanceDisponible = Math.max(0, ingresoEfectivo - totalGastado);
-  const balanceFinal = Math.max(0, ingresoEfectivo - totalGastado - totalPendiente);
+  // BUG-01: valores reales con signo. Truncarlos a 0 ocultaba el déficit, que
+  // es justamente la señal que el semáforo financiero y Finn deben ver.
+  const balanceDisponible = ingresoEfectivo - totalGastado;
+  const balanceFinal = ingresoEfectivo - totalGastado - totalPendiente;
 
   const pctGastado   = ingresoEfectivo > 0 ? Math.min(100, Math.round((totalGastado   / ingresoEfectivo) * 100)) : 0;
   const pctPendiente = ingresoEfectivo > 0 ? Math.min(100 - pctGastado, Math.round((totalPendiente / ingresoEfectivo) * 100)) : 0;
@@ -167,9 +184,14 @@ export function calcularMetricasFinancieras(
     porcentajeGastado:    pctGastado,
     porcentajePendiente:  pctPendiente,
     porcentajeLibre:      pctLibre,
-    ahorroProyectado:     balanceFinal,
+    // El ahorro no puede ser negativo: si balanceFinal lo es, no hay ahorro.
+    ahorroProyectado:     Math.max(0, balanceFinal),
+    enDeficit:            balanceDisponible < 0,
+    montoDeficit:         balanceDisponible < 0 ? Math.abs(balanceDisponible) : 0,
     diasRestantesMes:     diasRestantes,
-    gastoPromedioRecomendadoDia: diasRestantes > 0 ? Math.round(balanceFinal / diasRestantes) : 0,
+    // Sin saldo proyectado no hay presupuesto diario que recomendar.
+    gastoPromedioRecomendadoDia:
+      diasRestantes > 0 ? Math.round(Math.max(0, balanceFinal) / diasRestantes) : 0,
   };
 }
 

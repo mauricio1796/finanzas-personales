@@ -84,7 +84,9 @@ export const SimuladorDecisionesScreen: React.FC<Props> = ({ onBack, onNavigate 
       transactions, categories, profile?.monthlySalary ?? 0,
       now.getMonth(), now.getFullYear(),
     ),
-    [transactions.length, categories.length, profile?.monthlySalary],
+    // BUG-13: ver nota en ResumenMensualScreen — editar un monto debe
+    // recalcular el veredicto del simulador.
+    [transactions, categories, profile?.monthlySalary],
   );
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
@@ -376,8 +378,12 @@ export const SimuladorDecisionesScreen: React.FC<Props> = ({ onBack, onNavigate 
                           inputRange:  [0, 1],
                           outputRange: [
                             '0%',
+                            // El dato conserva su signo real (puede ser
+                            // negativo si la compra deja al usuario en rojo);
+                            // el ancho de la barra se acota solo aquí, en la
+                            // presentación.
                             resultado.balanceAntes > 0
-                              ? `${Math.min(100, Math.round((resultado.balanceDespues / resultado.balanceAntes) * 100))}%`
+                              ? `${Math.min(100, Math.max(0, Math.round((resultado.balanceDespues / resultado.balanceAntes) * 100)))}%`
                               : '0%',
                           ],
                         }),

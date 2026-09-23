@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, ScrollView, TextInput, Pressable,
   StyleSheet, KeyboardAvoidingView, Platform, Modal,
@@ -31,11 +31,20 @@ export function PlanificarMesScreen({ visible, onClose }: PlanificarMesScreenPro
   );
 
   // Local draft budgets: categoryId → string value
-  const [drafts, setDrafts] = useState<Record<string, string>>(() => {
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+
+  /**
+   * BUG-29 — El inicializador de `useState` solo corre en el primer render. Si
+   * el modal seguía montado y las categorías cambiaban (o el usuario lo volvía
+   * a abrir), los campos quedaban desincronizados con los presupuestos reales.
+   * Se resincroniza cada vez que se abre y cuando cambian las categorías.
+   */
+  useEffect(() => {
+    if (!visible) return;
     const init: Record<string, string> = {};
     cats.forEach(c => { init[c.id] = c.budget ? String(c.budget) : ''; });
-    return init;
-  });
+    setDrafts(init);
+  }, [visible, cats]);
 
   const totalPlanificado = useMemo(() => {
     return cats.reduce((sum, c) => {

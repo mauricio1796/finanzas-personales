@@ -47,15 +47,32 @@ export async function crearEspacio(nombre: string): Promise<SharedSpace> {
   return mapSpace(space);
 }
 
+/**
+ * BUG-02 — Antes esto era `select('*').limit(1)` SIN filtro de usuario: dependía
+ * al 100% de que la RLS estuviera bien configurada. Si la RLS faltaba, devolvía
+ * el primer espacio de CUALQUIER usuario de la base de datos.
+ *
+ * Ahora se filtra explícitamente por membresía activa del usuario autenticado.
+ * La RLS sigue siendo la barrera de seguridad real (ver la migración
+ * 20260923_shared_finances_rls.sql), pero el cliente ya no confía ciegamente
+ * en ella: defensa en profundidad.
+ */
 export async function obtenerMiEspacio(): Promise<SharedSpace | null> {
   const db = assertSupabase();
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) return null;
+
   const { data, error } = await db
-    .from('shared_spaces')
-    .select('*')
+    .from('space_members')
+    .select('shared_spaces!inner(id, name, type, created_by, created_at)')
+    .eq('user_id', user.id)
+    .eq('status', 'activo')
     .limit(1)
     .maybeSingle();
   if (error) throw error;
-  return data ? mapSpace(data) : null;
+
+  const space = (data as any)?.shared_spaces;
+  return space ? mapSpace(space) : null;
 }
 
 // ─── Invitaciones ─────────────────────────────────────────────────────────────

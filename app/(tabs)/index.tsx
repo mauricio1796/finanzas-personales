@@ -488,6 +488,10 @@ export default function HomeScreen() {
       setOtpCode(['', '', '', '', '', '', '', '']);
       startResendTimer();
       setTimeout(() => otpRefs.current[0]?.focus(), 300);
+    } catch {
+      // BUG-18: red de seguridad — ninguna excepción de red debe dejar al
+      // usuario sin explicación (antes solo había `finally`).
+      setAuthError('Sin conexión. Revisa tu internet e intenta de nuevo.');
     } finally {
       setAuthLoading(false);
     }
@@ -508,6 +512,10 @@ export default function HomeScreen() {
       setOtpCode(['', '', '', '', '', '', '', '']);
       startResendTimer();
       setTimeout(() => otpRefs.current[0]?.focus(), 300);
+    } catch {
+      // BUG-18: red de seguridad — ninguna excepción de red debe dejar al
+      // usuario sin explicación (antes solo había `finally`).
+      setAuthError('Sin conexión. Revisa tu internet e intenta de nuevo.');
     } finally {
       setAuthLoading(false);
     }
@@ -635,6 +643,10 @@ export default function HomeScreen() {
         setUser(newUser);
       }
       setLoginEmail(''); setLoginPassword('');
+    } catch {
+      // BUG-18: red de seguridad — ninguna excepción de red debe dejar al
+      // usuario sin explicación (antes solo había `finally`).
+      setAuthError('Sin conexión. Revisa tu internet e intenta de nuevo.');
     } finally {
       setAuthLoading(false);
     }
@@ -692,6 +704,10 @@ export default function HomeScreen() {
       setRegisterEmail('');
       setRegisterPassword('');
       setRegisterConfirmPassword('');
+    } catch {
+      // BUG-18: red de seguridad — ninguna excepción de red debe dejar al
+      // usuario sin explicación (antes solo había `finally`).
+      setAuthError('Sin conexión. Revisa tu internet e intenta de nuevo.');
     } finally {
       setAuthLoading(false);
     }

@@ -646,7 +646,9 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
           { label: 'Ingresos',    value: formatCOP(estadisticas.totalIngresos),   color: colors.income     },
           { label: 'Gastos',      value: formatCOP(estadisticas.totalGastos),     color: colors.expense    },
           {
-            label: 'Balance',
+            // BUG-05: "Neto", no "Balance" — es la suma de los movimientos
+            // filtrados, no el balance disponible que muestra el Dashboard.
+            label: 'Neto',
             value: formatCOP(estadisticas.balance),
             color: estadisticas.balance >= 0 ? colors.income : colors.expense,
           },
@@ -696,7 +698,11 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
           lastScrollY.current = y;
         }}
         scrollEventThrottle={16}
-        getItemLayout={(_, index) => ({ length: 65, offset: 65 * index, index })}
+        // BUG-06: `getItemLayout` asumía 65px para TODOS los ítems, pero la
+        // lista es heterogénea (cabecera de grupo ≈33px, fila ≈65px,
+        // separador 8px). Esos offsets falsos desalineaban el scroll y las
+        // cabeceras sticky. Nada aquí usa scrollToIndex, así que se elimina y
+        // se deja que FlatList mida de verdad.
         removeClippedSubviews
         maxToRenderPerBatch={20}
         windowSize={10}

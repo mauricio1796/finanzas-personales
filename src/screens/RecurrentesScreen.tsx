@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, TextInput, KeyboardAvoidingView, Platform, Pressable, Switch,
+  Modal, TextInput, KeyboardAvoidingView, Platform, Pressable, Switch, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFinance } from '../state';
@@ -122,6 +122,21 @@ export const RecurrentesScreen: React.FC<RecurrentesScreenProps> = ({ onBack }) 
   const insets                                               = useSafeAreaInsets();
   const { colors }                                           = useTheme();
   const { recurrentes, addRecurrente, deleteRecurrente, toggleRecurrente } = useFinance();
+
+  /**
+   * BUG-19 — Un gasto recurrente eliminado deja de programarse y no se puede
+   * recuperar; se confirma antes de borrarlo.
+   */
+  const confirmarEliminarRecurrente = (r: any) => {
+    Alert.alert(
+      `¿Eliminar "${r?.nombre ?? 'este gasto recurrente'}"?`,
+      'Dejará de programarse cada mes. Esta acción no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', style: 'destructive', onPress: () => deleteRecurrente(r.id) },
+      ],
+    );
+  };
   const [showForm, setShowForm]                              = useState(false);
 
   const handleSave = (data: Omit<GastoRecurrente, 'id' | 'creadoEn' | 'proximoPago'>) => {
@@ -186,7 +201,7 @@ export const RecurrentesScreen: React.FC<RecurrentesScreenProps> = ({ onBack }) 
                 <Switch value={r.activo} onValueChange={() => toggleRecurrente(r.id)}
                   trackColor={{ false: colors.border, true: colors.primary + '80' }}
                   thumbColor={r.activo ? colors.primary : colors.textTertiary} />
-                <TouchableOpacity onPress={() => deleteRecurrente(r.id)}>
+                <TouchableOpacity onPress={() => confirmarEliminarRecurrente(r)}>
                   <Icon name="trash-2" size={15} color={colors.textTertiary} />
                 </TouchableOpacity>
               </View>
@@ -211,7 +226,7 @@ export const RecurrentesScreen: React.FC<RecurrentesScreenProps> = ({ onBack }) 
                     <Switch value={r.activo} onValueChange={() => toggleRecurrente(r.id)}
                       trackColor={{ false: colors.border, true: colors.primary + '80' }}
                       thumbColor={colors.textTertiary} />
-                    <TouchableOpacity onPress={() => deleteRecurrente(r.id)}>
+                    <TouchableOpacity onPress={() => confirmarEliminarRecurrente(r)}>
                       <Icon name="trash-2" size={15} color={colors.textTertiary} />
                     </TouchableOpacity>
                   </View>

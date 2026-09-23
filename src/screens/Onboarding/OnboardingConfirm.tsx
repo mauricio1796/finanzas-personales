@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  Animated, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, Alert, Animated, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +16,8 @@ const CONFETTI_COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 const N = 18;
 
 export const OnboardingConfirm: React.FC<Props> = ({ onDone }) => {
-  const { setIsOnboarded, categories, profile } = useFinance();
+  const { finalizarOnboarding, categories, profile } = useFinance();
+  const [guardando, setGuardando] = useState(false);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -178,15 +179,33 @@ export const OnboardingConfirm: React.FC<Props> = ({ onDone }) => {
         <Animated.View style={slideUp(btnAnim)}>
           <TouchableOpacity
             testID="onboarding-finish-btn"
-            style={[s.btn, { backgroundColor: colors.primary }]}
-            onPress={() => {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              setIsOnboarded(true);
-              onDone();
+            style={[s.btn, { backgroundColor: colors.primary, opacity: guardando ? 0.7 : 1 }]}
+            disabled={guardando}
+            onPress={async () => {
+              if (guardando) return;
+              setGuardando(true);
+              try {
+                // BUG-11: solo se navega si los datos quedaron guardados.
+                const resultado = await finalizarOnboarding();
+                if (resultado.ok) {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  onDone();
+                } else {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                  Alert.alert(
+                    'No pudimos guardar tus datos',
+                    `${resultado.error ?? 'Ocurrió un problema al guardar.'}\n\nToca "Ir al Dashboard" para reintentar.`,
+                  );
+                }
+              } finally {
+                setGuardando(false);
+              }
             }}
             activeOpacity={0.85}
           >
-            <Text style={s.btnText}>Ir al Dashboard</Text>
+            {guardando
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={s.btnText}>Ir al Dashboard</Text>}
           </TouchableOpacity>
         </Animated.View>
       </View>

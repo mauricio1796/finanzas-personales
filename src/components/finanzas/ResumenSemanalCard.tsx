@@ -16,7 +16,8 @@ export function ResumenSemanalCard({ onPress }: ResumenSemanalCardProps) {
 
   const metrics = useMemo(
     () => computeWeeklyMetrics(transactions, categories, userLevel ?? null, 0),
-    [transactions.length, categories.length, userLevel],
+    // BUG-13: el resumen debe reflejar ediciones, no solo altas y bajas.
+    [transactions, categories, userLevel],
   );
 
   // Entrance animation

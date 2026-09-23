@@ -1,4 +1,5 @@
 import { type Transaction, type Category } from '../types';
+import { calcularMetricasFinancieras, type MetricasFinancieras } from './ingresoUtils';
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -220,11 +221,16 @@ const PDF_STYLES = `
 
 // ── Section builders ──────────────────────────────────────────────────────────
 
-function seccionResumen(txsMes: Transaction[], salary: number): string {
-  const ingresos  = totalTipo(txsMes, 'income');
-  const gastos    = totalTipo(txsMes, 'expense');
-  const ahorro    = ingresos - gastos;
-  const tasaAhorro = porcentaje(ahorro, ingresos);
+/**
+ * BUG-22 — El PDF calculaba su propio resumen (solo transacciones, ignorando el
+ * salario base del perfil), así que el reporte exportado no cuadraba con lo que
+ * el usuario veía en la app. Ahora recibe las métricas del motor central.
+ */
+function seccionResumen(txsMes: Transaction[], salary: number, metricas: MetricasFinancieras): string {
+  const ingresos  = metricas.ingresoEfectivo;
+  const gastos    = metricas.totalGastado;
+  const ahorro    = metricas.balanceDisponible;
+  const tasaAhorro = porcentaje(Math.max(0, ahorro), ingresos);
 
   return `
     <div class="metrics-grid">
@@ -484,7 +490,9 @@ export function generarHTMLReporte(datos: DatosReporte): string {
   const hoy     = new Date();
   const fechaGen = `${hoy.getDate()}/${hoy.getMonth() + 1}/${hoy.getFullYear()}`;
 
-  const resumen        = seccionResumen(txsMes, salary);
+  // Misma fuente de verdad que el Dashboard, el widget y Finn (BUG-22).
+  const metricasMes    = calcularMetricasFinancieras(transactions, categories as any, salary, mes, año);
+  const resumen        = seccionResumen(txsMes, salary, metricasMes);
   const graficos       = incluirGraficos       ? seccionGraficoCategorias(txsMes)              : '';
   const transacciones  = incluirTransacciones  ? seccionTransacciones(txsMes, filtroTipo)      : '';
   const categorias     = incluirCategorias     ? seccionCategorias(txsMes, categories)         : '';

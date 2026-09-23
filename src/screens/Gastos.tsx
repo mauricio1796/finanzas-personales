@@ -6,13 +6,14 @@ import {
 import { ReceiptScanScreen } from '@/src/features/receipt-scan/screens/ReceiptScanScreen';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { Transaction } from '@/src/core/financeEngine';
-import { useFinance } from '@/src/core/context/FinanceContext';
+import type { Transaction } from '@/src/types';
+import { useFinance } from '@/src/state';
 import { SwipeableRow } from '@/src/components/ui/SwipeableRow';
 import { Icon } from '@/src/components/ui/Icon';
 import { useTheme } from '@/src/state/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getBgIconoCategoria, getIconoCategoria } from '@/src/utils/categoryUtils';
+import { encontrarCategoriaDeTx } from '@/src/utils/categoryResolver';
 
 const parseCOP  = (s: string) => parseInt(s.replace(/\./g, '').replace(/[^0-9]/g, ''), 10);
 const fmtCOP    = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
@@ -74,6 +75,27 @@ export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack
       .filter(t => { const d = new Date(t.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); })
       .reduce((s, t) => s + t.amount, 0);
   }, [expList]);
+
+  /**
+   * BUG-14 — Gasto del mes SOLO de la categoría seleccionada.
+   *
+   * Antes la barra de presupuesto comparaba `totalThisMonth` (todos los gastos
+   * del mes, de todas las categorías) contra el presupuesto de la categoría
+   * elegida: la barra aparecía llena y en rojo aunque esa categoría no tuviera
+   * ni un gasto, justo en el momento de registrar uno nuevo.
+   */
+  const gastoMesCategoriaSel = useMemo(() => {
+    if (!selCatId) return 0;
+    const now = new Date();
+    return expList
+      .filter(t => {
+        const d = new Date(t.date);
+        if (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear()) return false;
+        const cat = encontrarCategoriaDeTx(t, categories);
+        return cat?.id === selCatId;
+      })
+      .reduce((s, t) => s + t.amount, 0);
+  }, [expList, categories, selCatId]);
 
   const subcats = useMemo(
     () => selCatId ? categories.filter(c => c.parentCategoryId === selCatId) : [],
@@ -312,8 +334,8 @@ export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack
               </View>
               <View style={[s.budgetTrack, { backgroundColor: colors.border }]}>
                 <View style={[s.budgetFill, {
-                  flex: Math.min(totalThisMonth / selCat.budget, 1),
-                  backgroundColor: totalThisMonth >= selCat.budget ? '#EF4444' : '#F87171',
+                  flex: Math.min(Math.max(gastoMesCategoriaSel / selCat.budget, 0), 1),
+                  backgroundColor: gastoMesCategoriaSel >= selCat.budget ? '#EF4444' : '#F87171',
                 }]} />
               </View>
             </View>

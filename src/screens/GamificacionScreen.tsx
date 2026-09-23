@@ -40,7 +40,7 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
   const { colors } = useTheme();
   const {
     transactions, categories, userLevel, leccionesCompletadas,
-    retosCompletados, user, goal,
+    retosCompletados, user, goal, gamificacion,
   } = useFinance();
 
   type Tab = 'progreso' | 'logros' | 'desbloqueos' | 'ranking';
@@ -73,18 +73,14 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
 
   const unlockedIds = useMemo(() => evaluarLogros(logroData), [logroData]);
 
-  const xpActual = useMemo(() => {
-    const derivado = calcularXPTotal(
-      transactions,
-      categoriasPagadas,
-      retosCompletados ?? [],
-      leccionesCompletadas ?? [],
-      unlockedIds,
-    );
-    // Coincide con el resto de la app (motor de gamificación) y es monótono.
-    return Math.max(userLevel?.experience ?? 0, derivado);
-  },
-  [transactions, categoriasPagadas, retosCompletados, leccionesCompletadas, unlockedIds, userLevel?.experience]);
+  /**
+   * BUG-23 — Fuente ÚNICA de XP: `userLevel.experience`, que el contexto ya
+   * reconcilia de forma monótona a partir del motor de gamificación. Antes esta
+   * pantalla recalculaba su propio total y lo combinaba con un `Math.max`, así
+   * que el número grande podía no cuadrar con el desglose de abajo ni con el
+   * nivel que mostraba el widget.
+   */
+  const xpActual = userLevel?.experience ?? gamificacion.xpTotal;
 
   const nivelActual   = useMemo(() => getNivelActual(xpActual),   [xpActual]);
   const nivelSiguiente = useMemo(() => getNivelSiguiente(xpActual), [xpActual]);
@@ -154,12 +150,19 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
     .split(' ').slice(0, 2).map(w => (w[0] ?? '').toUpperCase()).join('') || 'U';
 
   // XP breakdown for progress tab
+  // El desglose debe SUMAR exactamente el XP mostrado arriba. La fila "Bonus"
+  // recoge el XP otorgado directamente (awardXp), que no proviene de ninguna
+  // de las fuentes calculadas; sin ella, el desglose no cuadraría (BUG-23).
+  const xpDeFuentes = gamificacion.xpTotal;
+  const xpBonus     = Math.max(0, xpActual - xpDeFuentes);
+
   const xpBreakdown = [
     { label: 'Transacciones',    xp: transactions.length * XP_POR_ACCION.transaccion,                   icon: 'trending-down', color: '#6366F1' },
     { label: 'Pagos cumplidos',  xp: categoriasPagadas * XP_POR_ACCION.pago,                            icon: 'check-circle',  color: '#10B981' },
     { label: 'Retos completados',xp: xpDeRetos(retosCompletados ?? []),                                 icon: 'zap',           color: '#F59E0B' },
     { label: 'Lecciones',        xp: xpDeLecciones(leccionesCompletadas ?? []),                         icon: 'book-open',     color: '#8B5CF6' },
-    { label: 'Logros',           xp: LOGROS.filter(l => unlockedIds.has(l.id)).reduce((s,l) => s+l.xp,0), icon: 'award', color: '#EF4444' },
+    { label: 'Logros',           xp: gamificacion.xpLogros,                                             icon: 'award',         color: '#EF4444' },
+    { label: 'Bonus',            xp: xpBonus,                                                           icon: 'gift',          color: '#EC4899' },
   ].filter(b => b.xp > 0);
 
   const xpInLevel  = nivelSiguiente ? xpActual - nivelActual.xpRequired : 0;

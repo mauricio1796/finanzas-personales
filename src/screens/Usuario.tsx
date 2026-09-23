@@ -5,7 +5,7 @@ import {
   Alert, Platform, Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFinance } from '@/src/core/context/FinanceContext';
+import { useFinance } from '@/src/state';
 import { useTheme } from '../state/ThemeContext';
 import { Icon } from '../components/ui/Icon';
 import { PremiumBadge } from '../components/ui/PremiumBadge';

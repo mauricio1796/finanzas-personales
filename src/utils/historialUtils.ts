@@ -28,6 +28,19 @@ export interface EstadisticasHistorial {
   totalTransacciones: number;
   totalGastos:        number;
   totalIngresos:      number;
+  /**
+   * BUG-05 — NETO DE LOS MOVIMIENTOS FILTRADOS, no el "balance disponible".
+   *
+   * Es deliberadamente distinto del balance del Dashboard: aquí el usuario
+   * puede filtrar por "hoy", "esta semana" o "3 meses", periodos para los que
+   * un balance mensual (salario base − gastos del mes) no significa nada. Lo
+   * que esta cifra resume es exactamente la suma de lo que se ve en la lista.
+   *
+   * El bug original no era la fórmula sino la ETIQUETA: se mostraba como
+   * "Balance", así que contradecía al Dashboard a ojos del usuario. La pantalla
+   * ahora lo rotula "Neto". Para el balance disponible real, la única fuente de
+   * verdad es `calcularMetricasFinancieras` en ingresoUtils.ts.
+   */
   balance:            number;
   promedioGasto:      number;
   categoriaMasGasto:  string;

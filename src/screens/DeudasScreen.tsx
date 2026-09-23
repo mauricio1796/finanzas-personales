@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, TextInput, KeyboardAvoidingView, Platform, Pressable,
+  Modal, TextInput, KeyboardAvoidingView, Platform, Pressable, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFinance } from '../state';
@@ -121,6 +121,25 @@ export const DeudasScreen: React.FC<DeudasScreenProps> = ({ onBack }) => {
   const insets                                  = useSafeAreaInsets();
   const { colors }                              = useTheme();
   const { deudas, addDeuda, deleteDeuda, pagarDeuda } = useFinance();
+
+  /**
+   * BUG-19 — Eliminar una deuda borra también su historial de pagos y su
+   * amortización, y no se puede deshacer. Antes bastaba un toque accidental en
+   * la papelera. Se confirma igual que ya hacía MetasScreen.
+   */
+  const confirmarEliminarDeuda = (deuda: any) => {
+    const pagos = Array.isArray(deuda?.pagos) ? deuda.pagos.length : 0;
+    Alert.alert(
+      `¿Eliminar "${deuda?.nombre ?? 'esta deuda'}"?`,
+      pagos > 0
+        ? `Se perderá su historial de ${pagos} pago${pagos !== 1 ? 's' : ''}. Esta acción no se puede deshacer.`
+        : 'Esta acción no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', style: 'destructive', onPress: () => deleteDeuda(deuda.id) },
+      ],
+    );
+  };
   const [showForm, setShowForm]                 = useState(false);
   const [pagoTarget, setPagoTarget]             = useState<Deuda | null>(null);
   const [expandedId, setExpandedId]             = useState<string | null>(null);
@@ -208,7 +227,7 @@ export const DeudasScreen: React.FC<DeudasScreenProps> = ({ onBack }) => {
                   <TouchableOpacity onPress={() => setExpandedId(expanded ? null : deuda.id)} style={st.iconBtn}>
                     <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => deleteDeuda(deuda.id)} style={st.iconBtn}>
+                  <TouchableOpacity onPress={() => confirmarEliminarDeuda(deuda)} style={st.iconBtn}>
                     <Icon name="trash-2" size={16} color={colors.textTertiary} />
                   </TouchableOpacity>
                 </View>
@@ -258,7 +277,7 @@ export const DeudasScreen: React.FC<DeudasScreenProps> = ({ onBack }) => {
                     <Text style={[st.cardNombre, { color: colors.textPrimary }]}>{d.nombre} ✓</Text>
                     <Text style={[st.cardSub, { color: colors.income }]}>Pagado {fmt(d.montoOriginal)}</Text>
                   </View>
-                  <TouchableOpacity onPress={() => deleteDeuda(d.id)} style={st.iconBtn}>
+                  <TouchableOpacity onPress={() => confirmarEliminarDeuda(d)} style={st.iconBtn}>
                     <Icon name="trash-2" size={16} color={colors.textTertiary} />
                   </TouchableOpacity>
                 </View>

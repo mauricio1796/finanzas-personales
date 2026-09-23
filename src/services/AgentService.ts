@@ -1,4 +1,7 @@
-import { type Transaction, type Category, type FinancialGoal } from '../types';
+import type { Transaction, Category, FinancialGoal } from '../types';
+import { resolverTransaccionesCandidatas } from '../utils/categoryResolver';
+
+export { resolverTransaccionesCandidatas };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -61,41 +64,55 @@ export function ejecutarHerramienta(toolCall: FinnToolCall, ctx: AgentContext): 
     }
 
     case 'eliminar_transaccion': {
-      // Buscar por ID, o por categoría+monto (la más reciente) si no hay ID
-      let tx = ctx.transactions.find(t => t.id === input.id);
-      if (!tx && input.categoria) {
-        const cat = input.categoria.toLowerCase();
-        tx = [...ctx.transactions]
-          .filter(t => t.category.toLowerCase() === cat || t.category.toLowerCase().includes(cat))
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+      // BUG-03: mismo criterio inequívoco que actualizar_transaccion. Borrar es
+      // aún más grave que editar, así que tampoco aquí se adivina.
+      const candidatos = resolverTransaccionesCandidatas(input, ctx.transactions);
+      if (candidatos.length === 0) {
+        return { exito: false, descripcion: 'No encontré esa transacción. Dime el monto y la categoría exactos.' };
       }
-      if (!tx) return { exito: false, descripcion: `No encontré la transacción` };
+      if (candidatos.length > 1) {
+        const opciones = candidatos.slice(0, 3)
+          .map(t => `${fmt(t.amount)} en ${t.category} (${new Date(t.date).toLocaleDateString('es-CO')})`)
+          .join('; ');
+        return { exito: false, descripcion: `Hay varias que coinciden: ${opciones}. ¿Cuál elimino?` };
+      }
+      const tx = candidatos[0];
       ctx.deleteTransaction(tx.id);
       return { exito: true, descripcion: `Eliminé el ${tx.type === 'income' ? 'ingreso' : 'gasto'} de ${fmt(tx.amount)} en ${tx.category}` };
     }
 
     case 'actualizar_transaccion': {
-      // Buscar por ID; si no, por la transacción más reciente de esa categoría/tipo
-      let tx = input.id ? ctx.transactions.find(t => t.id === input.id) : undefined;
-      if (!tx) {
-        // Fallback: buscar la más reciente que coincida con categoría, tipo o monto original
-        const sorted = [...ctx.transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        if (input.categoria) {
-          const cat = input.categoria.toLowerCase();
-          tx = sorted.find(t =>
-            t.category.toLowerCase() === cat ||
-            t.category.toLowerCase().includes(cat),
-          );
-        }
-        if (!tx && input.monto_original !== undefined) {
-          tx = sorted.find(t => t.amount === input.monto_original);
-        }
-        if (!tx && input.tipo) {
-          tx = sorted.find(t => t.type === input.tipo);
-        }
-        if (!tx) tx = sorted[0]; // última transacción como último recurso
+      /**
+       * BUG-03 — Resolución INEQUÍVOCA de la transacción.
+       *
+       * Antes, si el modelo no lograba resolver el id, esta función recorría una
+       * cascada de heurísticas y terminaba en `sorted[0]`: modificaba la última
+       * transacción del usuario, sin relación con lo pedido y sin confirmación,
+       * informando "Corregí el gasto..." como si hubiera acertado.
+       *
+       * Ahora solo se acepta una coincidencia única. Ante cualquier ambigüedad
+       * se devuelve un error pidiendo precisión: la autoridad sobre los datos
+       * financieros es de la app, no de lo que el modelo haya inferido.
+       */
+      const candidatos = resolverTransaccionesCandidatas(input, ctx.transactions);
+
+      if (candidatos.length === 0) {
+        return {
+          exito: false,
+          descripcion: 'No encontré esa transacción. ¿Puedes decirme el monto y la categoría exactos?',
+        };
       }
-      if (!tx) return { exito: false, descripcion: `No encontré la transacción a actualizar` };
+      if (candidatos.length > 1) {
+        const opciones = candidatos.slice(0, 3)
+          .map(t => `${fmt(t.amount)} en ${t.category} (${new Date(t.date).toLocaleDateString('es-CO')})`)
+          .join('; ');
+        return {
+          exito: false,
+          descripcion: `Encontré varias que coinciden: ${opciones}. ¿Cuál de ellas quieres corregir?`,
+        };
+      }
+
+      const tx = candidatos[0];
 
       const update: Partial<Transaction> = {};
       if (input.monto       !== undefined) update.amount      = Number(input.monto);
@@ -207,4 +224,44 @@ export function previewEliminar(id: string, transactions: Transaction[]): string
   const fmt = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
   const fecha = new Date(tx.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
   return `${tx.type === 'income' ? 'ingreso' : 'gasto'} de ${fmt(tx.amount)} en ${tx.category} del ${fecha}`;
+}
+
+/**
+ * Texto de confirmación para las acciones sensibles de Finn (BUG-03).
+ * Describe exactamente QUÉ transacción se va a tocar, para que el usuario pueda
+ * detectar una resolución equivocada antes de que se aplique.
+ */
+export function previewAccion(
+  tool: string,
+  input: Record<string, any>,
+  transactions: Transaction[],
+): string {
+  const fmt = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
+  const candidatos = resolverTransaccionesCandidatas(input, transactions);
+  const tx = candidatos.length === 1 ? candidatos[0] : undefined;
+
+  switch (tool) {
+    case 'eliminar_transaccion':
+      return tx
+        ? `¿Eliminar ${previewEliminar(tx.id, transactions)}?`
+        : '¿Eliminar esa transacción? No pude identificarla con certeza.';
+
+    case 'actualizar_transaccion': {
+      if (!tx) return '¿Modificar esa transacción? No pude identificarla con certeza.';
+      const antes = fmt(tx.amount);
+      const despues = input.monto !== undefined ? fmt(Number(input.monto)) : antes;
+      const cambioCat = input.categoria && input.categoria !== tx.category
+        ? ` y moverlo a ${input.categoria}`
+        : '';
+      return antes === despues && !cambioCat
+        ? `¿Actualizar el ${tx.type === 'income' ? 'ingreso' : 'gasto'} de ${antes} en ${tx.category}?`
+        : `¿Cambiar el ${tx.type === 'income' ? 'ingreso' : 'gasto'} de ${tx.category}: ${antes} → ${despues}${cambioCat}?`;
+    }
+
+    case 'eliminar_subcategoria':
+      return `¿Eliminar la subcategoría "${input.nombre ?? input.id}"?`;
+
+    default:
+      return '¿Confirmas esta acción?';
+  }
 }

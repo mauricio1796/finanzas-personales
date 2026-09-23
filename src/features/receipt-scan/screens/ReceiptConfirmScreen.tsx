@@ -6,7 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/src/state/ThemeContext';
 import { Icon } from '@/src/components/ui/Icon';
-import { useFinance } from '@/src/core/context/FinanceContext';
+import { useFinance } from '@/src/state';
 import type { ReceiptScanResult, ReceiptConfirmData } from '../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
