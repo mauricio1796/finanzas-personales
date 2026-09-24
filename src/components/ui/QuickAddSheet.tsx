@@ -88,11 +88,20 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
       } else {
         setDescription('');
       }
-      // Find category by name (from voice parse) or default to first
-      const matchedCat = initialData?.category
-        ? cats.find(c => c.label.toLowerCase() === initialData.category!.toLowerCase())?.id
+      /**
+       * Si venía una categoría prellenada (voz) y NO existe, se deja la
+       * selección vacía para que el usuario elija.
+       *
+       * Antes se caía a `cats[0]` en silencio: un "pago membresía Netflix"
+       * podía terminar archivado en Alimentación sin que nadie lo notara. Sin
+       * categoría el botón de confirmar queda deshabilitado, así que el gasto
+       * no se puede guardar en el sitio equivocado por accidente.
+       */
+      const pidioCategoria = !!initialData?.category;
+      const matchedCat = pidioCategoria
+        ? cats.find(c => c.label.toLowerCase() === initialData.category!.toLowerCase())?.id ?? null
         : null;
-      setSelectedCat(matchedCat ?? cats[0]?.id ?? null);
+      setSelectedCat(pidioCategoria ? matchedCat : (cats[0]?.id ?? null));
       Animated.parallel([
         Animated.spring(slideAnim, { toValue: 0, friction: 8, tension: 65, useNativeDriver: true }),
         Animated.timing(backdropOp, { toValue: 1, duration: 200, useNativeDriver: true }),

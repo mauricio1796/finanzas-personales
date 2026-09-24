@@ -1,4 +1,4 @@
-import { Transaction, Category } from '../types';
+import type { Transaction, Category } from '../types';
 
 // ── Gasto de una categoría en el mes especificado ──────────────────────────────
 export function getGastoCategoria(

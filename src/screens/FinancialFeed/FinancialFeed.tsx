@@ -19,6 +19,12 @@ import { generarInsightDiario } from '../../services/RealAIService';
 import { calcularMetricasFinancieras } from '../../utils/ingresoUtils';
 import { THEME } from '../../constants/theme';
 import { QuickAddSheet, type QuickAddInitialData } from '../../components/ui/QuickAddSheet';
+import { PropuestaGastoSheet } from '../../components/ui/PropuestaGastoSheet';
+import {
+  construirPropuesta,
+  categoriaDesdePropuesta,
+  type PropuestaGasto,
+} from '../../utils/propuestaGasto';
 import { TransactionDetailSheet } from '../../components/ui/TransactionDetailSheet';
 import { VoiceButton } from '../../components/ui/VoiceButton';
 import { type ParsedTransaction } from '../../services/VoiceService';
@@ -61,7 +67,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   const { colors, isDark, accentColor, formatAmount, cardStyle, fontScale, balanceLayout } = useTheme();
   const {
     user, transactions, categories, profile, goal, userLevel,
-    addTransaction: ctxAdd, deleteTransaction: ctxDelete,
+    addTransaction: ctxAdd, deleteTransaction: ctxDelete, addCategory,
     metas, deudas, premium,
   } = useFinance();
 
@@ -205,6 +211,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   const [selectedTx,      setSelectedTx]      = useState<Transaction | null>(null);
   const [quickAddType,    setQuickAddType]    = useState<'income' | 'expense'>('expense');
   const [quickAddInitial, setQuickAddInitial] = useState<QuickAddInitialData | undefined>(undefined);
+  const [propuesta,       setPropuesta]       = useState<PropuestaGasto | null>(null);
   const [aiInsight,       setAiInsight]       = useState<string | null>(null);
 
   // ── Animated values ────────────────────────────────────────────────────────
@@ -298,12 +305,61 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
     setQuickAddVisible(true);
   };
 
+  /**
+   * Lo dictado ya no cae directo al formulario: Finn resuelve monto y categoría
+   * y propone UNA acción. Antes, si la categoría no existía, QuickAddSheet
+   * elegía en silencio la primera de la lista.
+   */
   const handleVoiceParsed = (tx: ParsedTransaction) => {
-    abrirQuickAdd(tx.tipo, {
-      amount:      tx.monto,
-      category:    tx.categoria,
-      description: tx.descripcion,
-      type:        tx.tipo,
+    const p = construirPropuesta(tx, {
+      categories,
+      transactions,
+      salario: profile?.monthlySalary ?? 0,
+    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setPropuesta(p);
+  };
+
+  /** Guarda la propuesta tal cual, creando la categoría si hace falta. */
+  const confirmarPropuesta = (p: PropuestaGasto) => {
+    let categoryId: string | undefined;
+    let categoryName = p.descripcion;
+
+    if (p.categoria.estado === 'existente') {
+      categoryId   = p.categoria.categoria.id;
+      categoryName = p.categoria.categoria.name;
+    } else if (p.categoria.estado === 'nueva') {
+      const nueva = categoriaDesdePropuesta(p.categoria.nombre, p.categoria.budgetSugerido);
+      if (nueva) {
+        addCategory(nueva);
+        categoryId   = nueva.id;
+        categoryName = nueva.name;
+      }
+    }
+
+    ctxAdd({
+      id:       Date.now().toString(),
+      amount:   p.monto,
+      category: categoryName,
+      ...(categoryId ? { categoryId } : {}),
+      type:     p.tipo,
+      date:     new Date().toISOString(),
+      ...(p.descripcion ? { description: p.descripcion } : {}),
+      ...(p.subcategoriaId ? { subcategory: p.subcategoriaId } : {}),
+    });
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setPropuesta(null);
+  };
+
+  /** Abre el formulario completo con lo que Finn sí pudo resolver. */
+  const ajustarPropuesta = (p: PropuestaGasto) => {
+    setPropuesta(null);
+    abrirQuickAdd(p.tipo, {
+      amount:      p.monto,
+      category:    p.categoria.estado === 'existente' ? p.categoria.categoria.name : undefined,
+      description: p.descripcion,
+      type:        p.tipo,
     });
   };
 
@@ -1238,6 +1294,15 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
         onEliminar={eliminarNotif}
         onLimpiarTodo={limpiarNotifs}
         onMarcarLeidas={marcarLeidas}
+      />
+
+      {/* ── Propuesta de voz ──────────────────────────────────────────── */}
+      <PropuestaGastoSheet
+        visible={propuesta !== null}
+        propuesta={propuesta}
+        onConfirmar={confirmarPropuesta}
+        onAjustar={ajustarPropuesta}
+        onCerrar={() => setPropuesta(null)}
       />
 
       {/* ── QuickAddSheet ─────────────────────────────────────────────── */}

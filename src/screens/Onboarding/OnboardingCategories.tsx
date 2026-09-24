@@ -8,18 +8,13 @@ import { useFinance } from '../../state';
 import { useTheme } from '../../state/ThemeContext';
 import { Icon, FeatherName } from '../../components/ui/Icon';
 import { OnboardingShell } from '../../components/onboarding/OnboardingShell';
-import { CATALOGO_CATEGORIAS } from '../../constants/catalogoCategorias';
+import { CATALOGO_CATEGORIAS, calcularPresupuestoSugerido } from '../../constants/catalogoCategorias';
 import { THEME } from '../../constants/theme';
 import { inyectarSubcategoriasDefecto } from '../../models/Category';
 
 interface Props { onNext: () => void; onBack: () => void; }
 
 // Mapa id → nombre canónico en CATALOGO_CATEGORIAS
-/** `pctSugerido` del catálogo viene como "% × 100" (2500 = 25%). */
-const ESCALA_PCT = 10_000;
-/** Los presupuestos sugeridos se redondean a decenas de miles de pesos. */
-const STEP_COP = 10_000;
-
 const ID_CATALOG: Record<string, string> = {
   alimentacion:    'Alimentación',
   transporte:      'Transporte',
@@ -154,14 +149,10 @@ export const OnboardingCategories: React.FC<Props> = ({ onNext, onBack }) => {
       .map(c => {
         const catalogNombre = ID_CATALOG[c.id];
         const catalogItem = CATALOGO_CATEGORIAS.find(ci => ci.nombre === catalogNombre);
-        // Presupuesto sugerido basado en el salario del perfil.
-        // Las dos divisiones tienen propósitos distintos y ambas son necesarias:
-        // `pctSugerido` viene en escala "% × 100" (2500 = 25%), así que ESCALA_PCT
-        // lo convierte a monto; STEP_COP redondea ese monto a decenas de miles.
-        const budget =
-          catalogItem && salary > 0
-            ? Math.round((salary * catalogItem.pctSugerido) / ESCALA_PCT / STEP_COP) * STEP_COP
-            : 0;
+        // Misma fórmula que usa la propuesta de gasto por voz.
+        const budget = catalogItem
+          ? calcularPresupuestoSugerido(catalogItem.pctSugerido, salary)
+          : 0;
         return {
           id: c.id,
           name: catalogNombre ?? c.name,        // nombre canónico (con tildes)

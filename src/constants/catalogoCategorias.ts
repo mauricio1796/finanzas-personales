@@ -1,4 +1,4 @@
-import { Category } from '../types';
+import type { Category } from '../types';
 import { generarIdCategoria } from '../utils/categoryUtils';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
@@ -53,6 +53,13 @@ export const CATALOGO_CATEGORIAS: CatalogoItem[] = [
 ];
 
 // ── Conversión a Category ──────────────────────────────────────────────────────
+
+/**
+ * Presupuesto sugerido a partir del salario. Implementación única en
+ * `utils/categoryResolver`; se reexporta aquí porque es donde vive
+ * `pctSugerido` y es donde la busca quien lee el catálogo.
+ */
+export { calcularPresupuestoSugerido } from '../utils/categoryResolver';
 
 export function catalogoItemToCategory(
   item: CatalogoItem,

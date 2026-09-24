@@ -1,5 +1,5 @@
 import type { Transaction, Category, FinancialGoal } from '../types';
-import { resolverTransaccionesCandidatas } from '../utils/categoryResolver';
+import { resolverTransaccionesCandidatas, encontrarCategoriaDeTx } from '../utils/categoryResolver';
 
 export { resolverTransaccionesCandidatas };
 
@@ -60,7 +60,19 @@ export function ejecutarHerramienta(toolCall: FinnToolCall, ctx: AgentContext): 
       const subLabel = subcategoryId
         ? ` (${ctx.categories.find(c => c.id === subcategoryId)?.name ?? subcategoryId})`
         : '';
-      return { exito: true, descripcion: `Registré un ${label} de ${fmt(input.monto)} en ${input.categoria}${subLabel}` };
+
+      // Si la categoría dictada no existe, la transacción queda sin categoría
+      // real y por tanto no cuenta para ningún presupuesto. Se dice
+      // explícitamente en vez de dejar creer que quedó bien archivada.
+      const categoriaReal = encontrarCategoriaDeTx(tx, ctx.categories);
+      const aviso = categoriaReal
+        ? ''
+        : ` Ojo: no tienes una categoría "${input.categoria}", así que este ${label} aún no cuenta para ningún presupuesto. Dime si quieres que la cree.`;
+
+      return {
+        exito: true,
+        descripcion: `Registré un ${label} de ${fmt(input.monto)} en ${input.categoria}${subLabel}.${aviso}`,
+      };
     }
 
     case 'eliminar_transaccion': {
