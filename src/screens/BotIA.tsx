@@ -4,7 +4,6 @@ import {
   TextInput,
   Pressable,
   TouchableOpacity,
-  Modal,
   View,
   Text,
   FlatList,
@@ -39,6 +38,7 @@ import { THEME }  from '../constants/theme';
 import { CONFIG } from '../constants/config';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
 import { consentService } from '../services/ConsentService';
+import { ConfirmSheet } from '../components/ui/ConfirmSheet';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -598,34 +598,17 @@ export function BotIA({ transactions, monthlySalary, onBack, onNavigate }: BotIA
         ))}
       </ScrollView>
 
-      {/* ── Delete confirmation modal ── */}
-      <Modal
-        transparent
-        animationType="fade"
+      {/* ── Confirmación de acciones que modifican o eliminan registros ── */}
+      <ConfirmSheet
         visible={!!pendingAction}
-        onRequestClose={() => setPendingAction(null)}
-      >
-        <View style={[st.modalOverlay, { backgroundColor: colors.overlay }]}>
-          <View style={[st.modalCard, { backgroundColor: colors.card }]}>
-            <View style={[st.modalIconWrap, { backgroundColor: colors.expenseLight }]}>
-              <Text style={{ fontSize: 26 }}>🗑️</Text>
-            </View>
-            <Text style={[st.modalTitle, { color: colors.textPrimary }]}>Confirmar eliminación</Text>
-            <Text style={[st.modalBody, { color: colors.textSecondary }]}>{pendingAction?.preview}</Text>
-            <View style={st.modalBtns}>
-              <TouchableOpacity style={[st.modalBtnCancel, { borderColor: colors.border }]} onPress={() => setPendingAction(null)}>
-                <Text style={[st.modalBtnCancelText, { color: colors.textSecondary }]}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[st.modalBtnDelete, { backgroundColor: colors.expense }]}
-                onPress={() => pendingAction && ejecutarAccionConfirmada(pendingAction)}
-              >
-                <Text style={st.modalBtnDeleteText}>Eliminar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        title={pendingAction?.toolCall.tool === 'actualizar_transaccion' ? '¿Aplicar este cambio?' : '¿Eliminar este registro?'}
+        message={pendingAction?.preview}
+        confirmLabel={pendingAction?.toolCall.tool === 'actualizar_transaccion' ? 'Aplicar' : 'Eliminar'}
+        destructive={pendingAction?.toolCall.tool !== 'actualizar_transaccion'}
+        icon={pendingAction?.toolCall.tool === 'actualizar_transaccion' ? 'edit-2' : 'trash-2'}
+        onConfirm={() => pendingAction && ejecutarAccionConfirmada(pendingAction)}
+        onCancel={() => setPendingAction(null)}
+      />
 
       {/* ── Finn Voice Modal ── */}
       <FinnVozModal
@@ -1018,14 +1001,4 @@ const st = StyleSheet.create({
   accionText:      { fontSize: 14, fontWeight: '600', lineHeight: 20 },
 
   // ── Modal ───────────────────────────────────────────────────────────────
-  modalOverlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  modalCard:      { width: '100%', borderRadius: 28, padding: 28, alignItems: 'center', gap: 10, backgroundColor: '#FFFFFF' },
-  modalIconWrap:  { width: 60, height: 60, borderRadius: 30, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  modalTitle:     { fontSize: 18, fontWeight: '700', color: '#111827' },
-  modalBody:      { fontSize: 14, textAlign: 'center', lineHeight: 20, color: '#6B7280' },
-  modalBtns:      { flexDirection: 'row', gap: 12, marginTop: 8, width: '100%' },
-  modalBtnCancel: { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' },
-  modalBtnCancelText: { fontSize: 15, fontWeight: '600', color: '#6B7280' },
-  modalBtnDelete: { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: 'center', backgroundColor: '#F55B5B' },
-  modalBtnDeleteText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });

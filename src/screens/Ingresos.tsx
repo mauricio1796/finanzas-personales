@@ -2,12 +2,15 @@ import React, { useState, useMemo } from 'react';
 import {
   StyleSheet, TextInput, Pressable, View, Text,
   ScrollView, Platform, Animated,
+  LayoutAnimation,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useFinance } from '@/src/state';
 import type { Transaction } from '@/src/types';
-import { SwipeableRow } from '@/src/components/ui/SwipeableRow';
+import { TransactionCard } from '@/src/components/finanzas/TransactionCard';
+import { ConfirmSheet } from '@/src/components/ui/ConfirmSheet';
+import { TransactionDetailSheet } from '@/src/components/ui/TransactionDetailSheet';
 import { Icon } from '@/src/components/ui/Icon';
 import { useTheme } from '@/src/state/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -68,6 +71,23 @@ export function Ingresos({ transactions, onAddIncome, onDeleteTransaction, onBac
   const [tipIdx]                        = useState(() => Math.floor(Math.random() * TIPS.length));
 
   // ── Derived ───────────────────────────────────────────────────────────────
+  // ── Historial: tarjetas desplegables + confirmación tranquila ────────────
+  const [txExpandida, setTxExpandida] = useState<string | null>(null);
+  const [txAEliminar, setTxAEliminar] = useState<Transaction | null>(null);
+  const [txDetalle,   setTxDetalle]   = useState<Transaction | null>(null);
+  const alternarTx = (id: string) => {
+    Haptics.selectionAsync().catch(() => {});
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setTxExpandida(prev => (prev === id ? null : id));
+  };
+  const eliminarConfirmado = () => {
+    if (!txAEliminar) return;
+    onDeleteTransaction(txAEliminar.id);
+    setTxAEliminar(null);
+    setTxExpandida(null);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  };
+
   const incomeList = useMemo(
     () => transactions.filter(t => t.type === 'income').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
     [transactions],
@@ -299,28 +319,43 @@ export function Ingresos({ transactions, onAddIncome, onDeleteTransaction, onBac
               <Text style={[s.emptyDesc, { color: colors.textTertiary }]}>Registra tu primer ingreso arriba</Text>
             </View>
           ) : (
-            incomeList.map((item, idx) => {
+            incomeList.map(item => {
               const cat = INCOME_CATS.find(c => c.label === item.category);
+              const fecha = new Date(item.date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' });
               return (
-                <SwipeableRow key={item.id} onDelete={() => onDeleteTransaction(item.id)}>
-                  <View style={[s.txItem, idx < incomeList.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
-                    <View style={[s.txIcon, { backgroundColor: cat?.bg ?? '#D1FAE5' }]}>
-                      <Icon name={(cat?.icon ?? 'dollar-sign') as any} size={16} color={cat?.color ?? '#10B981'} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.txCat, { color: colors.textPrimary }]}>{item.category}</Text>
-                      {item.description ? <Text style={[s.txDesc, { color: colors.textSecondary }]} numberOfLines={1}>{item.description}</Text> : null}
-                      <Text style={[s.txDate, { color: colors.textTertiary }]}>
-                        {new Date(item.date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </Text>
-                    </View>
-                    <Text style={[s.txAmount, { color: '#10B981' }]}>+{fmtCOP(item.amount)}</Text>
-                  </View>
-                </SwipeableRow>
+                <TransactionCard
+                  key={item.id}
+                  title={item.description || item.category}
+                  meta={[item.category, fecha]}
+                  amountLabel={`+${fmtCOP(item.amount)}`}
+                  amountColor={colors.income}
+                  iconName={(cat?.icon ?? 'dollar-sign') as any}
+                  iconBg={cat?.bg ?? colors.incomeLight}
+                  iconColor={cat?.color ?? colors.income}
+                  expanded={txExpandida === item.id}
+                  onToggle={() => alternarTx(item.id)}
+                  onLongPress={() => setTxDetalle(item)}
+                  onViewDetail={() => setTxDetalle(item)}
+                  onDelete={() => setTxAEliminar(item)}
+                  style={s.txCard}
+                  testID={`ingreso-tx-${item.id}`}
+                />
               );
             })
           )}
         </View>
+
+        <ConfirmSheet
+          visible={!!txAEliminar}
+          title="¿Eliminar este ingreso?"
+          message={txAEliminar
+            ? `${txAEliminar.description || txAEliminar.category} · ${fmtCOP(txAEliminar.amount)}. Esta acción no se puede deshacer.`
+            : undefined}
+          confirmLabel="Eliminar"
+          onConfirm={eliminarConfirmado}
+          onCancel={() => setTxAEliminar(null)}
+        />
+        <TransactionDetailSheet transaction={txDetalle} onClose={() => setTxDetalle(null)} />
 
       </View>
     </ScrollView>
@@ -448,12 +483,7 @@ const s = StyleSheet.create({
 
   txCount: { fontSize: 12, fontWeight: '600' },
 
-  txItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-  txIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  txCat: { fontSize: 14, fontWeight: '700' },
-  txDesc: { fontSize: 12, marginTop: 1 },
-  txDate: { fontSize: 11, marginTop: 2 },
-  txAmount: { fontSize: 16, fontWeight: '800', flexShrink: 0 },
+  txCard: { marginTop: 8 },
 
   emptyBox: { alignItems: 'center', paddingVertical: 32, gap: 8 },
   emptyIcon: { fontSize: 40 },

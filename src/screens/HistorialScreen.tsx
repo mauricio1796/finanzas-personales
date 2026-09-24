@@ -4,9 +4,9 @@ import {
   Text,
   TouchableOpacity,
   FlatList,
+  LayoutAnimation,
   TextInput,
   Modal,
-  Alert,
   ScrollView,
   Animated,
   StyleSheet,
@@ -15,7 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFinance } from '../state';
 import { useTheme } from '../state/ThemeContext';
 import { Icon } from '../components/ui/Icon';
-import { SwipeableRow } from '../components/ui/SwipeableRow';
+import { ConfirmSheet } from '../components/ui/ConfirmSheet';
+import { TransactionCard } from '../components/finanzas/TransactionCard';
 import { useHaptics } from '../hooks/useHaptics';
 import { Toast, useToast } from '../components/ui/Toast';
 import { useBottomPadding } from '../hooks/useBottomPadding';
@@ -203,28 +204,27 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
     }).start();
   }, [mostrarFiltrosPanel, filtrosPanelAnim, haptics]);
 
-  const confirmarEliminar = useCallback(
-    (tx: Transaction, onSuccess?: () => void) => {
-      Alert.alert(
-        'Eliminar transaccion',
-        `Eliminar ${tx.type === 'income' ? 'ingreso' : 'gasto'} de ${formatCOP(tx.amount)}?`,
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Eliminar',
-            style: 'destructive',
-            onPress: () => {
-              deleteTransaction(tx.id);
-              haptics.success();
-              mostrarToast('Transaccion eliminada', 'success');
-              onSuccess?.();
-            },
-          },
-        ],
-      );
-    },
-    [deleteTransaction, haptics, mostrarToast],
-  );
+  // Confirmación tranquila (hoja inferior) en lugar del Alert del sistema.
+  const [txAEliminar, setTxAEliminar] = useState<Transaction | null>(null);
+
+  // Tarjeta desplegada (una a la vez), igual que en Categorías.
+  const [txExpandida, setTxExpandida] = useState<string | null>(null);
+  const alternarTx = useCallback((id: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setTxExpandida(prev => (prev === id ? null : id));
+  }, []);
+
+  const confirmarEliminar = useCallback((tx: Transaction) => {
+    setTxAEliminar(tx);
+  }, []);
+
+  const ejecutarEliminar = useCallback(() => {
+    if (!txAEliminar) return;
+    deleteTransaction(txAEliminar.id);
+    setTxAEliminar(null);
+    haptics.success();
+    mostrarToast('Movimiento eliminado', 'success');
+  }, [txAEliminar, deleteTransaction, haptics, mostrarToast]);
 
   // ── Render: grupo header (sticky) ─────────────────────────────────────────────
   const renderGrupoHeader = useCallback(
@@ -279,69 +279,26 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
         minute: '2-digit',
       });
       return (
-        <SwipeableRow
+        <TransactionCard
           key={tx.id}
-          onDelete={() => {
-            haptics.heavy();
-            confirmarEliminar(tx);
-          }}
-        >
-          <TouchableOpacity
-            onPress={() => { haptics.light(); setTxSeleccionada(tx); }}
-            onLongPress={() => { haptics.medium(); setTxSeleccionada(tx); }}
-            style={[
-              s.txRow,
-              { backgroundColor: colors.card, borderBottomColor: colors.borderSubtle },
-            ]}
-            activeOpacity={0.7}
-          >
-            {/* Ícono */}
-            <View
-              style={[
-                s.txIcon,
-                { backgroundColor: isIncome ? colors.incomeLight : paleta.bg },
-              ]}
-            >
-              <Icon
-                name={icono as any}
-                size={18}
-                color={isIncome ? colors.income : paleta.color}
-              />
-            </View>
-
-            {/* Info */}
-            <View style={s.txInfo}>
-              <Text
-                style={[s.txTitle, { color: colors.textPrimary }]}
-                numberOfLines={1}
-              >
-                {tx.description || tx.category}
-              </Text>
-              <View style={s.txMeta}>
-                <Text style={[s.txMetaTxt, { color: colors.textTertiary }]}>
-                  {tx.category}
-                </Text>
-                <View style={[s.txMetaDot, { backgroundColor: colors.textTertiary }]} />
-                <Text style={[s.txMetaTxt, { color: colors.textTertiary }]}>
-                  {hora}
-                </Text>
-              </View>
-            </View>
-
-            {/* Monto */}
-            <Text
-              style={[
-                s.txAmount,
-                { color: isIncome ? colors.income : colors.expense },
-              ]}
-            >
-              {isIncome ? '+' : '-'}{formatCOP(tx.amount)}
-            </Text>
-          </TouchableOpacity>
-        </SwipeableRow>
+          title={tx.description || tx.category}
+          meta={[tx.category, hora]}
+          amountLabel={`${isIncome ? '+' : '-'}${formatCOP(tx.amount)}`}
+          amountColor={isIncome ? colors.income : colors.expense}
+          iconName={icono as any}
+          iconBg={isIncome ? colors.incomeLight : paleta.bg}
+          iconColor={isIncome ? colors.income : paleta.color}
+          expanded={txExpandida === tx.id}
+          onToggle={() => { haptics.light(); alternarTx(tx.id); }}
+          onLongPress={() => { haptics.medium(); setTxSeleccionada(tx); }}
+          onViewDetail={() => { haptics.light(); setTxSeleccionada(tx); }}
+          onDelete={() => { haptics.light(); confirmarEliminar(tx); }}
+          style={s.txCard}
+          testID={`historial-tx-${tx.id}`}
+        />
       );
     },
-    [colors, isDark, haptics, confirmarEliminar],
+    [colors, isDark, haptics, confirmarEliminar, txExpandida, alternarTx],
   );
 
   // ── Render: item del FlatList ─────────────────────────────────────────────────
@@ -679,6 +636,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         stickyHeaderIndices={stickyIndices}
+        extraData={txExpandida}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[s.listContent, { paddingBottom: bottomPadding }]}
         ListEmptyComponent={
@@ -813,20 +771,35 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
               {/* Botón eliminar */}
               <TouchableOpacity
                 onPress={() => {
-                  haptics.heavy();
-                  confirmarEliminar(txSeleccionada, () => setTxSeleccionada(null));
+                  haptics.light();
+                  const tx = txSeleccionada;
+                  // iOS no presenta un modal sobre otro: primero se cierra el detalle.
+                  setTxSeleccionada(null);
+                  setTimeout(() => confirmarEliminar(tx), 350);
                 }}
-                style={[s.modalDeleteBtn, { borderColor: colors.expense }]}
+                style={s.modalDeleteBtn}
+                accessibilityRole="button"
               >
-                <Icon name="trash-2" size={16} color={colors.expense} />
-                <Text style={[s.modalDeleteTxt, { color: colors.expense }]}>
-                  Eliminar transaccion
+                <Icon name="trash-2" size={14} color={colors.danger} />
+                <Text style={[s.modalDeleteTxt, { color: colors.danger }]}>
+                  Eliminar movimiento
                 </Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
         </Modal>
       )}
+
+      <ConfirmSheet
+        visible={!!txAEliminar}
+        title="¿Eliminar este movimiento?"
+        message={txAEliminar
+          ? `${txAEliminar.type === 'income' ? 'Ingreso' : 'Gasto'} de ${formatCOP(txAEliminar.amount)} en ${txAEliminar.description || txAEliminar.category}. Esta acción no se puede deshacer.`
+          : undefined}
+        confirmLabel="Eliminar"
+        onConfirm={ejecutarEliminar}
+        onCancel={() => setTxAEliminar(null)}
+      />
 
       {/* ── TOAST ───────────────────────────────────────────────────────────── */}
       <Toast
@@ -966,22 +939,8 @@ const s = StyleSheet.create({
   grupoTotal:   { fontSize: 11, fontWeight: '500' },
   grupoSpacer:  { height: 8 },
 
-  // Transaction row
-  txRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
-    borderBottomWidth: 0.5,
-  },
-  txIcon:    { width: 40, height: 40, borderRadius: THEME.radius.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  txInfo:    { flex: 1, gap: 2 },
-  txTitle:   { fontSize: 14, fontWeight: '500' },
-  txMeta:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  txMetaTxt: { fontSize: 11 },
-  txMetaDot: { width: 3, height: 3, borderRadius: 1.5 },
-  txAmount:  { fontSize: 15, fontWeight: '500' },
+  // Margen de cada tarjeta (el diseño vive en components/finanzas/TransactionCard)
+  txCard: { marginHorizontal: 16, marginTop: 8 },
 
   // Modal
   modalRoot: { flex: 1 },
@@ -1014,10 +973,9 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    borderRadius: 14,
-    borderWidth: 0.5,
-    padding: 14,
-    marginTop: 8,
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginTop: 4,
   },
   modalDeleteTxt: { fontSize: 14, fontWeight: '500' },
 });

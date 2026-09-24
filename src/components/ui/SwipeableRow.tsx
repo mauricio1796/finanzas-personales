@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,32 +8,37 @@ import {
   Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { THEME } from '../../constants/theme';
+import { useTheme } from '../../state/ThemeContext';
 
-const SWIPE_THRESHOLD = -55;
-const DELETE_WIDTH    = 68;
+const SWIPE_THRESHOLD = -40;
+const ACTION_WIDTH    = 60;
 
 interface SwipeableRowProps {
   children: React.ReactNode;
   onDelete: () => void;
 }
 
+/**
+ * Fila deslizable con una acción de eliminar discreta: un botón circular
+ * pequeño en rojo suave (no un bloque rojo sólido). Al tocarlo la fila vuelve
+ * a su sitio y se pide confirmación; si el usuario cancela, nada se mueve.
+ */
 export const SwipeableRow: React.FC<SwipeableRowProps> = ({ children, onDelete }) => {
-  const translateX  = useRef(new Animated.Value(0)).current;
-  const rowOpen     = useRef(false);
-  const deleteScale = useRef(new Animated.Value(1)).current;
+  const { colors } = useTheme();
+  const translateX = useRef(new Animated.Value(0)).current;
+  const rowOpen    = useRef(false);
 
   const close = () => {
-    Animated.spring(translateX, { toValue: 0, useNativeDriver: true, friction: 8 }).start(() => {
+    Animated.spring(translateX, { toValue: 0, useNativeDriver: true, friction: 9 }).start(() => {
       rowOpen.current = false;
     });
   };
 
   const open = () => {
     Animated.spring(translateX, {
-      toValue: -DELETE_WIDTH,
+      toValue: -ACTION_WIDTH,
       useNativeDriver: true,
-      friction: 8,
+      friction: 9,
     }).start(() => {
       rowOpen.current = true;
     });
@@ -48,7 +53,7 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({ children, onDelete }
         translateX.setValue(0);
       },
       onPanResponderMove: (_, g) => {
-        const val = Math.min(0, Math.max(-DELETE_WIDTH, g.dx));
+        const val = Math.min(0, Math.max(-ACTION_WIDTH, g.dx));
         translateX.setValue(val);
       },
       onPanResponderRelease: (_, g) => {
@@ -63,24 +68,22 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({ children, onDelete }
   ).current;
 
   const handleDelete = () => {
-    Animated.sequence([
-      Animated.timing(deleteScale, { toValue: 1.3, duration: 100, useNativeDriver: true }),
-      Animated.timing(deleteScale, { toValue: 1,   duration: 80,  useNativeDriver: true }),
-    ]).start(() => {
-      Animated.timing(translateX, {
-        toValue: -400,
-        duration: 200,
-        useNativeDriver: true,
-      }).start(() => onDelete());
-    });
+    close();
+    onDelete();
   };
 
   if (Platform.OS === 'web') {
     return (
       <View style={styles.webRow}>
         {children}
-        <TouchableOpacity onPress={onDelete} style={styles.webDelete} activeOpacity={0.6}>
-          <Feather name="trash-2" size={16} color="#EF4444" />
+        <TouchableOpacity
+          onPress={onDelete}
+          style={styles.webDelete}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          accessibilityLabel="Eliminar registro"
+        >
+          <Feather name="trash-2" size={14} color={colors.textTertiary} />
         </TouchableOpacity>
       </View>
     );
@@ -88,16 +91,21 @@ export const SwipeableRow: React.FC<SwipeableRowProps> = ({ children, onDelete }
 
   return (
     <View style={styles.container}>
-      {/* Delete zone */}
-      <View style={styles.deleteAction}>
-        <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn} activeOpacity={0.7}>
-          <Animated.View style={{ transform: [{ scale: deleteScale }] }}>
-            <Feather name="trash-2" size={18} color="#fff" />
-          </Animated.View>
+      {/* Acción de eliminar */}
+      <View style={styles.actionZone}>
+        <TouchableOpacity
+          onPress={handleDelete}
+          style={[styles.actionBtn, { backgroundColor: colors.dangerLight }]}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Eliminar registro"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Feather name="trash-2" size={16} color={colors.danger} />
         </TouchableOpacity>
       </View>
 
-      {/* Swipeable content */}
+      {/* Contenido deslizable */}
       <Animated.View
         style={{ transform: [{ translateX }] }}
         {...panResponder.panHandlers}
@@ -115,20 +123,19 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
-  deleteAction: {
+  actionZone: {
     position: 'absolute',
     right: 0,
     top: 0,
     bottom: 0,
-    width: DELETE_WIDTH,
-    backgroundColor: '#EF4444',
+    width: ACTION_WIDTH,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
   },
-  deleteBtn: {
-    width: '100%',
-    height: '100%',
+  actionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
