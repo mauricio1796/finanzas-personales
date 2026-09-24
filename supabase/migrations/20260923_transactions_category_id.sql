@@ -49,8 +49,14 @@ create or replace function public.upsert_transaction_safe(
 returns void
 language plpgsql
 security definer
+set search_path = public
 as $$
 begin
+  -- Conserva la validación de identidad de la versión anterior.
+  if p_user_id is null or p_user_id <> (select auth.uid()) then
+    raise exception 'No autorizado';
+  end if;
+
   insert into public.transactions (
     id, user_id, amount, category, date, type, description, subcategory, category_id, updated_at
   )
@@ -68,10 +74,14 @@ begin
         -- migró esa transacción, se conserva el identificador que ya existía.
         category_id = coalesce(excluded.category_id, transactions.category_id),
         updated_at  = excluded.updated_at
-    where transactions.updated_at is null
-       or excluded.updated_at > transactions.updated_at;
+    where transactions.user_id = (select auth.uid())
+      and (transactions.updated_at is null or excluded.updated_at > transactions.updated_at);
 end;
 $$;
+
+revoke all on function public.upsert_transaction_safe(
+  text, uuid, numeric, text, text, text, text, timestamptz, text, text
+) from public, anon;
 
 grant execute on function public.upsert_transaction_safe(
   text, uuid, numeric, text, text, text, text, timestamptz, text, text

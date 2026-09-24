@@ -102,15 +102,41 @@ export async function crearInvitacion(spaceId: string): Promise<SpaceInvitation>
   return mapInvitation(data);
 }
 
-export async function obtenerInvitacionPorCodigo(codigo: string): Promise<SpaceInvitation | null> {
+/** Fila que devuelve la RPC `buscar_invitacion_por_codigo`. */
+interface InvitacionConEspacio {
+  id: string;
+  space_id: string;
+  code: string;
+  status: string;
+  expires_at: string;
+  created_at: string;
+  space_name: string;
+  space_type: SharedSpace['type'];
+  created_by: string;
+  space_created_at: string;
+}
+
+/**
+ * Busca una invitación por su código EXACTO.
+ *
+ * Usa una RPC `security definer` en vez de leer la tabla: la política de lectura
+ * directa ahora exige ser miembro del espacio, y quien llega con un código
+ * todavía no lo es. Antes la política era `auth.uid() IS NOT NULL`, lo que
+ * permitía a cualquier usuario autenticado enumerar TODAS las invitaciones.
+ */
+async function buscarInvitacionConEspacio(codigo: string): Promise<InvitacionConEspacio | null> {
   const db = assertSupabase();
-  const { data, error } = await db
-    .from('space_invitations')
-    .select('*')
-    .eq('code', codigo.toUpperCase())
-    .maybeSingle();
+  const { data, error } = await db.rpc('buscar_invitacion_por_codigo', {
+    p_code: codigo.trim().toUpperCase(),
+  });
   if (error) throw error;
-  return data ? mapInvitation(data) : null;
+  const fila = Array.isArray(data) ? data[0] : data;
+  return (fila as InvitacionConEspacio) ?? null;
+}
+
+export async function obtenerInvitacionPorCodigo(codigo: string): Promise<SpaceInvitation | null> {
+  const fila = await buscarInvitacionConEspacio(codigo);
+  return fila ? mapInvitation(fila) : null;
 }
 
 export async function aceptarInvitacion(codigo: string): Promise<SharedSpace> {
@@ -118,41 +144,34 @@ export async function aceptarInvitacion(codigo: string): Promise<SharedSpace> {
   const { data: { user } } = await db.auth.getUser();
   if (!user) throw new Error('Usuario no autenticado');
 
-  const invitacion = await obtenerInvitacionPorCodigo(codigo);
-  if (!invitacion) throw new Error('Código de invitación no encontrado');
-  if (invitacion.status !== 'pendiente') throw new Error('Esta invitación ya fue usada o expiró');
-  if (new Date(invitacion.expiresAt) < new Date()) throw new Error('Esta invitación ha expirado');
-
-  // Verificar que no sea el mismo creador
-  const { data: space } = await db
-    .from('shared_spaces')
-    .select('created_by, name, type, created_at')
-    .eq('id', invitacion.spaceId)
-    .single();
-  if (!space) throw new Error('Espacio no encontrado');
-  if (space.created_by === user.id) throw new Error('Ya eres el creador de este espacio');
+  // La RPC ya filtra por código exacto, estado pendiente y vigencia, y trae los
+  // datos del espacio — que el invitado aún no puede leer directamente porque
+  // todavía no es miembro (ese paso rompía la unión antes de esta corrección).
+  const fila = await buscarInvitacionConEspacio(codigo);
+  if (!fila) throw new Error('Código de invitación no válido, ya usado o expirado');
+  if (fila.created_by === user.id) throw new Error('Ya eres el creador de este espacio');
 
   // Agregar como miembro activo
   const { error: memberErr } = await db
     .from('space_members')
     .upsert(
-      { space_id: invitacion.spaceId, user_id: user.id, role: 'miembro', status: 'activo' },
+      { space_id: fila.space_id, user_id: user.id, role: 'miembro', status: 'activo' },
       { onConflict: 'space_id,user_id' }
     );
   if (memberErr) throw memberErr;
 
-  // Marcar invitación como aceptada
+  // Marcar invitación como aceptada (ya se es miembro, así que la RLS lo permite)
   await db
     .from('space_invitations')
     .update({ status: 'aceptada' })
-    .eq('id', invitacion.id);
+    .eq('id', fila.id);
 
   return {
-    id: invitacion.spaceId,
-    name: space.name,
-    type: space.type,
-    createdBy: space.created_by,
-    createdAt: space.created_at,
+    id: fila.space_id,
+    name: fila.space_name,
+    type: fila.space_type,
+    createdBy: fila.created_by,
+    createdAt: fila.space_created_at,
   };
 }
 

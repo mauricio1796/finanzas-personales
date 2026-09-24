@@ -32,7 +32,7 @@ alter table public.premium_entitlements enable row level security;
 drop policy if exists "premium_entitlements: lectura propia" on public.premium_entitlements;
 create policy "premium_entitlements: lectura propia"
   on public.premium_entitlements for select
-  using (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id);
 
 drop trigger if exists premium_entitlements_updated_at on public.premium_entitlements;
 create trigger premium_entitlements_updated_at
@@ -45,14 +45,21 @@ create trigger premium_entitlements_updated_at
 -- aún no se ha sincronizado), pero deja de ser escribible por el cliente:
 -- cualquier UPDATE que no venga de service_role conserva el valor anterior.
 create or replace function public.protect_premium_column()
-returns trigger as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
 begin
   if current_user <> 'service_role' then
     new.premium := old.premium;
   end if;
   return new;
 end;
-$$ language plpgsql security definer;
+$$;
+
+-- Es una función de TRIGGER: no debe quedar expuesta como RPC.
+revoke all on function public.protect_premium_column() from public, anon, authenticated;
 
 drop trigger if exists profiles_protect_premium on public.profiles;
 create trigger profiles_protect_premium
