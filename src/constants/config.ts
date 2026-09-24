@@ -20,6 +20,13 @@ export const CONFIG = {
 
   APP_VERSION: '1.1.0',
 
+  // Cobro de Premium con pasarela externa (Wompi) dentro de la app.
+  // App Store (Guideline 3.1.1) y Google Play (política de Pagos) exigen su
+  // sistema de compras integrado para desbloquear funciones digitales. Mientras
+  // no exista integración IAP, los builds de tienda deben usar
+  // EXPO_PUBLIC_EXTERNAL_PAYMENTS=false (ver eas.json › production).
+  EXTERNAL_PAYMENTS_ENABLED: (process.env.EXPO_PUBLIC_EXTERNAL_PAYMENTS ?? 'true') !== 'false',
+
   // Timeouts (ms)
   AI_TIMEOUT_MS:   15_000,
   PING_TIMEOUT_MS:  5_000,

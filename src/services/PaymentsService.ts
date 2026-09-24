@@ -7,7 +7,8 @@
  * nunca ve ni maneja datos de tarjeta.
  */
 
-import { CONFIG, WORKER_HEADERS } from '../constants/config';
+import { CONFIG } from '../constants/config';
+import { getWorkerHeaders } from './workerAuth';
 
 export type PlanPago = 'mensual' | 'anual';
 
@@ -32,7 +33,8 @@ export async function crearCheckout(plan: PlanPago, userId: string | undefined, 
   try {
     const response = await fetch(`${CONFIG.WORKER_URL}/payments/checkout`, {
       method:  'POST',
-      headers: WORKER_HEADERS,
+      headers: await getWorkerHeaders(),
+      // userId se envía solo por compatibilidad: el Worker usa el del JWT.
       body:    JSON.stringify({ plan, userId, redirectUrl }),
       signal:  controller.signal,
     });
@@ -66,6 +68,7 @@ export async function consultarEstadoPago(ref: RefPago): Promise<EstadoPago | 'P
       ? `id=${encodeURIComponent(ref.id)}`
       : `reference=${encodeURIComponent(ref.reference!)}`;
     const response = await fetch(`${CONFIG.WORKER_URL}/payments/status?${qs}`, {
+      headers: await getWorkerHeaders(),
       signal: controller.signal,
     });
     const data = await response.json().catch(() => ({})) as any;

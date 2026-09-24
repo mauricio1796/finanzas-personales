@@ -83,6 +83,17 @@ import { savePin, hasPin, verifyPin, clearPin, saveRememberedUser, clearRemember
 import { calcularRachaActual } from '../../src/services/GamificacionService';
 import { SharedFinancesEntryScreen } from '../../src/features/shared-finances/screens/SharedFinancesEntryScreen';
 import { ReceiptScanScreen } from '../../src/features/receipt-scan/screens/ReceiptScanScreen';
+import { LegalScreen } from '../../src/screens/legal/LegalScreen';
+import { PrivacyCenterScreen } from '../../src/screens/legal/PrivacyCenterScreen';
+import { DeleteAccountScreen } from '../../src/screens/legal/DeleteAccountScreen';
+import { ConsentGate } from '../../src/components/legal/ConsentGate';
+import { consentService, cumpleObligatorios } from '../../src/services/ConsentService';
+import { LEGAL_SCREEN, type LegalDocId } from '../../src/legal';
+
+// Pantalla interna → documento legal que muestra
+const LEGAL_DOC_BY_SCREEN: Record<string, LegalDocId> = Object.fromEntries(
+  (Object.entries(LEGAL_SCREEN) as [LegalDocId, string][]).map(([doc, screen]) => [screen, doc]),
+);
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -171,6 +182,31 @@ export default function HomeScreen() {
       if (!shown) setShowPermissions(true);
     });
   }, []);
+
+  // ==================== CONSENTIMIENTOS (Ley 1581) ====================
+  // Resultado de la verificación, atado al usuario verificado (evita que el
+  // resultado de una cuenta se aplique a otra al cambiar de sesión).
+  const [consentCheck, setConsentCheck] = useState<{ uid: string; ok: boolean; isUpdate: boolean } | null>(null);
+  const consentsOk = consentCheck && consentCheck.uid === user?.id ? consentCheck.ok : null;
+  const consentIsUpdate = consentCheck?.isUpdate ?? false;
+
+  useEffect(() => {
+    const uid = user?.id;
+    if (!uid) return;
+    let cancelled = false;
+    (async () => {
+      await consentService.bindUser(uid);
+      await consentService.flushPending(uid);   // autorizaciones del registro por OTP
+      const state = await consentService.syncFromServer();
+      if (cancelled) return;
+      setConsentCheck({
+        uid,
+        ok: cumpleObligatorios(state),
+        isUpdate: !!state.privacy?.granted || !!state.terms?.granted,
+      });
+    })().catch(() => { if (!cancelled) setConsentCheck({ uid, ok: false, isUpdate: false }); });
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   // ==================== AUTH STATE ====================
   const [loginEmail, setLoginEmail] = useState('');
@@ -743,6 +779,20 @@ export default function HomeScreen() {
     setShowSplash(true);
   };
 
+  // Cerrar sesión SIN borrar datos (p. ej. si el usuario no acepta los documentos).
+  // `handleReset` además borra los datos, por eso no se usa aquí.
+  const handleSignOutKeepData = async () => {
+    if (authService.isReady) {
+      try { await authService.signOut(); } catch {}
+    }
+    await clearPin();
+    setPinExists(false);
+    setIsUnlocked(false);
+    setShowPinSetup(false);
+    setCurrentScreen('dashboard');
+    setUser(null);
+  };
+
   // ==================== FINANCE HANDLERS ====================
   const addTransaction = (amount: number, category: string, type: 'income' | 'expense', date: Date, description?: string) => {
     // Si es un gasto y la categoría no existe en la lista del usuario, crearla
@@ -1005,7 +1055,7 @@ export default function HomeScreen() {
             />
           )}
           {currentScreen === 'bot' && (
-            <BotIA transactions={transactions} monthlySalary={saldoDisponible} onBack={volver} />
+            <BotIA transactions={transactions} monthlySalary={saldoDisponible} onBack={volver} onNavigate={navegarA} />
           )}
           {currentScreen === 'perfil' && (
             <Usuario
@@ -1085,6 +1135,19 @@ export default function HomeScreen() {
           {currentScreen === 'compartido' && (
             <SharedFinancesEntryScreen onVolver={volver} />
           )}
+          {currentScreen === 'privacidad' && (
+            <PrivacyCenterScreen onBack={volver} onNavigate={navegarA} />
+          )}
+          {currentScreen === 'eliminar-cuenta' && (
+            <DeleteAccountScreen
+              onBack={volver}
+              onExportFirst={() => navegarA('privacidad')}
+              onDeleted={handleReset}
+            />
+          )}
+          {LEGAL_DOC_BY_SCREEN[currentScreen] && (
+            <LegalScreen docId={LEGAL_DOC_BY_SCREEN[currentScreen]} onBack={volver} />
+          )}
           {currentScreen === 'escanear' && (
             <ReceiptScanScreen
               onGastoRegistrado={() => navegarA('gastos')}
@@ -1101,6 +1164,17 @@ export default function HomeScreen() {
           />
         )}
       </View>
+
+      {/* Autorizaciones obligatorias pendientes (cuentas previas o documentos actualizados) */}
+      {user?.id && (
+        <ConsentGate
+          visible={consentsOk === false}
+          userId={user.id}
+          isUpdate={consentIsUpdate}
+          onAccepted={() => setConsentCheck({ uid: user.id, ok: true, isUpdate: false })}
+          onSignOut={handleSignOutKeepData}
+        />
+      )}
 
       {/* Finn Tour */}
       <FinnTour

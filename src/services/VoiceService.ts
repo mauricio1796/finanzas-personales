@@ -1,7 +1,9 @@
 import { AudioModule, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
-import { CONFIG, WORKER_HEADERS } from '../constants/config';
+import { CONFIG } from '../constants/config';
+import { getWorkerHeaders, AIConsentRequiredError } from './workerAuth';
+import { consentService } from './ConsentService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -86,6 +88,11 @@ export async function detenerGrabacion(): Promise<string | null> {
 }
 
 export async function transcribirAudio(uri: string): Promise<string> {
+  // El audio se procesa en un proveedor externo: requiere autorización de IA.
+  if (!(await consentService.hasAIConsent())) {
+    FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+    throw new AIConsentRequiredError();
+  }
   const base64 = await FileSystem.readAsStringAsync(uri, {
     encoding: 'base64',
   });
@@ -99,14 +106,14 @@ export async function transcribirAudio(uri: string): Promise<string> {
   try {
     const response = await fetch(`${CONFIG.WORKER_URL}/transcribe`, {
       method:  'POST',
-      headers: WORKER_HEADERS,
+      headers: await getWorkerHeaders(),
       body:    JSON.stringify({ audio: base64 }),
       signal:  controller.signal,
     });
     if (!response.ok) {
-      const detalle = await response.text().catch(() => '');
-      console.warn('[VoiceService] /transcribe fallo:', response.status, detalle);
-      throw new Error(`HTTP ${response.status} ${detalle}`.trim());
+      // Solo el código de estado: el cuerpo podría contener datos del usuario.
+      console.warn('[VoiceService] /transcribe fallo:', response.status);
+      throw new Error(`HTTP ${response.status}`);
     }
     const data = await response.json() as any;
     return typeof data.transcript === 'string' ? data.transcript : '';
@@ -121,6 +128,7 @@ export async function parsearTextoATransaccion(
   texto:      string,
   categorias?: CategoriaVoz[],
 ): Promise<ParsedTransaction> {
+  if (!(await consentService.hasAIConsent())) throw new AIConsentRequiredError();
   const controller = new AbortController();
   const timeoutId  = setTimeout(() => controller.abort(), 10_000);
 
@@ -130,7 +138,7 @@ export async function parsearTextoATransaccion(
 
     const response = await fetch(`${CONFIG.WORKER_URL}/voice`, {
       method:  'POST',
-      headers: WORKER_HEADERS,
+      headers: await getWorkerHeaders(),
       body:    JSON.stringify(body),
       signal:  controller.signal,
     });

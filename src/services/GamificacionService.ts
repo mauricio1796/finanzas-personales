@@ -122,7 +122,7 @@ export const NIVELES: NivelConfig[] = [
   {
     level: 10, title: 'Gurú Financiero', xpRequired: 30000,
     color: '#EAB308', gradient: ['#FDE047', '#EAB308'],
-    unlock: { id: 'guru_badge', nombre: 'Insignia Gurú', descripcion: 'Eres de los mejores. Badge exclusivo + soporte prioritario + beneficios de por vida', icono: 'star', tipo: 'premium' },
+    unlock: { id: 'guru_badge', nombre: 'Insignia Gurú', descripcion: 'Eres de los mejores. Insignia exclusiva del nivel máximo', icono: 'star', tipo: 'premium' },
   },
 ];
 

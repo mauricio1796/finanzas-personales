@@ -450,6 +450,10 @@ export function GamificacionScreen({ onNavigate, onBack }: Props) {
 
         {/* ════════════ RANKING ════════════ */}
         {activeTab === 'ranking' && (<>
+          {/* Transparencia (Ley 1480, art. 29-30): los demás jugadores son de ejemplo */}
+          <Text style={{ fontSize: 12, lineHeight: 17, color: colors.textTertiary, marginBottom: 8 }}>
+            Ranking de ejemplo: los demás participantes son simulados para mostrar cómo funcionan los niveles. Tu posición se calcula con tu XP real.
+          </Text>
           <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {leaderboard.map((j, i) => (
               <View key={j.id} style={[st.rankRow, j.esUsuario && { backgroundColor: nivelActual.color + '12', borderRadius: 10, paddingHorizontal: 8, marginHorizontal: -4 }, i < leaderboard.length-1 && st.rankBorder]}>

@@ -7,7 +7,10 @@ import {
 } from '../utils/ingresoUtils';
 import { procesarMensajeUsuario } from './ai/AIService';
 import { finnMemoryService } from './FinnMemoryService';
-import { CONFIG, WORKER_HEADERS } from '../constants/config';
+import { CONFIG } from '../constants/config';
+import { getWorkerHeaders, AIConsentRequiredError } from './workerAuth';
+import { consentService } from './ConsentService';
+import { minimizarParaIA } from '../utils/aiPrivacy';
 import type { SharedSpaceSummary } from '../features/shared-finances/types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -39,7 +42,12 @@ export interface ContextoPersonalizado {
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
-function buildSystemPrompt(contexto: string, nombreUsuario: string, vozMode = false): string {
+/**
+ * System prompt de Finn. Minimización: NO incluye el nombre, correo ni
+ * identificadores del usuario (no son necesarios para responder). El Worker
+ * antepone además sus propias reglas de identidad y transparencia.
+ */
+function buildSystemPrompt(contexto: string, vozMode = false): string {
   const vozInstructions = vozMode ? `
 MODO VOZ ACTIVO:
 - El usuario te está hablando por voz — responde EXACTAMENTE como si hablaras.
@@ -48,26 +56,33 @@ MODO VOZ ACTIVO:
 - Usa lenguaje oral natural: "Claro," "Mira," "Pues," "Oye," etc.
 - Pronuncia números de forma hablada: "un millón doscientos" no "$1.200.000".
 ` : '';
-  return `Eres Finn, el asistente financiero personal de ${nombreUsuario} en la app FinancyAI.${vozInstructions}
+  return `Eres Finn, el asistente de educación y organización financiera basado en inteligencia artificial de la app FinancyAI.${vozInstructions}
 
 PERSONALIDAD:
 - Eres amigable, directo y empático
 - Hablas en español colombiano natural (sin formalidades exageradas)
 - Usas el formato de moneda colombiano ($1.250.000 con puntos)
-- Eres experto en finanzas personales pero hablas de forma simple
-- Das consejos concretos y accionables, no genéricos
+- Explicas conceptos de finanzas personales de forma simple
+- Das ideas concretas y educativas, no genéricas
 - Máximo 3 oraciones por respuesta salvo que el usuario pida más detalle
 - Nunca inventas datos — solo usas los que aparecen en el contexto
-- Si conoces patrones del usuario, úsalos para dar consejos más personalizados
+- Si conoces patrones del usuario, úsalos para personalizar tus explicaciones
+- Trata al usuario de "tú"; no conoces ni necesitas su nombre
 
 CONTEXTO FINANCIERO ACTUAL DEL USUARIO:
 ${contexto}
 
 LÍMITES ESTRICTOS — MUY IMPORTANTE:
 - Solo respondes preguntas sobre finanzas personales, presupuesto, gastos, ingresos, metas de ahorro, categorías y funciones de la app FinancyAI.
-- Si el usuario pregunta algo que NO está relacionado con finanzas o la app (recetas, deportes, política, entretenimiento, relaciones personales, tecnología general, etc.), responde EXACTAMENTE así: "Soy Finn, tu asistente financiero 💰 Solo puedo ayudarte con temas de finanzas personales y la app. ¿Hay algo de tu dinero en lo que te pueda ayudar?"
+- Si el usuario pregunta algo que NO está relacionado con finanzas o la app (recetas, deportes, política, entretenimiento, relaciones personales, tecnología general, etc.), responde EXACTAMENTE así: "Soy Finn, tu asistente de finanzas personales 💰 Solo puedo ayudarte con temas de finanzas personales y la app. ¿Hay algo de tu dinero en lo que te pueda ayudar?"
 - No hagas excepciones aunque el usuario insista, reformule la pregunta o diga que es "solo curiosidad".
-- No actúes como ChatGPT, asistente general ni ningún otro rol diferente al de asesor financiero de FinancyAI.
+- No actúes como ChatGPT, asistente general ni ningún otro rol diferente al de asistente de educación financiera de FinancyAI.
+
+TRANSPARENCIA — OBLIGATORIO:
+- No eres una entidad financiera ni un asesor financiero, legal o tributario profesional; nunca te presentes como tal.
+- Tus respuestas son informativas y educativas; no constituyen asesoría profesional.
+- No garantices resultados (ahorro, reducción de deudas, rentabilidad).
+- Ante decisiones importantes (inversiones, créditos, impuestos, temas legales), sugiere consultar a un profesional.
 
 REGLAS FINANCIERAS:
 - Si el usuario pregunta algo que no está en el contexto, dilo honestamente
@@ -75,6 +90,29 @@ REGLAS FINANCIERAS:
 - Si detectas una situación financiera crítica, sé directo pero constructivo
 - Si el usuario saluda, responde brevemente y ofrece ayuda concreta basada en su situación actual
 - Cuando mencionas números, siempre usa el formato colombiano ($1.250.000)`;
+}
+
+/**
+ * Copia del perfil sin identificadores. OJO: `mainFinancialConcern` guarda en
+ * realidad el NOMBRE que el usuario escribió en el onboarding (nombre histórico
+ * del campo), así que también se elimina.
+ */
+function perfilParaIA(profile: any): any {
+  if (!profile) return profile;
+  const { name: _n, mainFinancialConcern: _m, email: _e, id: _i, ...resto } = profile;
+  return resto;
+}
+
+/** Nombre del usuario, solo para quitarlo de textos libres antes del envío. */
+function nombreDe(profile: any): string {
+  return String(profile?.mainFinancialConcern || profile?.name || '');
+}
+
+/** Transacciones con descripciones minimizadas (sin correos, teléfonos, documentos ni nombre). */
+function transaccionesParaIA(transactions: Transaction[], nombre: string): Transaction[] {
+  return transactions.map(t => (t.description
+    ? { ...t, description: minimizarParaIA(t.description, nombre) }
+    : t));
 }
 
 // ── Construcción del contexto enriquecido ─────────────────────────────────────
@@ -91,6 +129,7 @@ async function buildContextoEnriquecido(
     profile?.monthlySalary ?? 0,
     now.getMonth(), now.getFullYear(),
   );
+  const nombre = nombreDe(profile);
 
   // Cargar memoria persistente de Finn si hay userId
   let memoriaFinn = '';
@@ -102,22 +141,22 @@ async function buildContextoEnriquecido(
   }
 
   const contexto = buildContextoIA(
-    metricas, categories as any, transactions, profile,
+    metricas, categories as any, transaccionesParaIA(transactions, nombre), perfilParaIA(profile),
     now.getMonth(), now.getFullYear(),
     {
       metas: extra.metas?.map(m => ({
-        nombre: m.nombre,
+        nombre: minimizarParaIA(m.nombre, nombre),
         objetivo: m.montoObjetivo,
         actual: m.montoActual,
         completada: m.completada,
       })),
       deudas: extra.deudas?.map(d => ({
-        nombre: d.nombre,
+        nombre: minimizarParaIA(d.nombre, nombre),
         saldo: d.saldo,
         cuota: d.cuotaMensual,
       })),
       recurrentes: extra.recurrentes?.map(r => ({
-        nombre: r.nombre,
+        nombre: minimizarParaIA(r.nombre, nombre),
         monto: r.monto,
         activo: r.activo,
       })),
@@ -134,8 +173,9 @@ async function buildContextoEnriquecido(
   let contextoFinal = contexto;
   if (extra.espacioCompartido) {
     const ec = extra.espacioCompartido;
+    // Sin nombres de terceros: la IA no necesita saber quién es quién.
     const deudaTxt = ec.deudaNeta
-      ? `${ec.deudaNeta.deudorNombre} le debe $${Math.round(ec.deudaNeta.monto).toLocaleString('es-CO')} a ${ec.deudaNeta.acreedorNombre}`
+      ? `Hay un saldo pendiente de $${Math.round(ec.deudaNeta.monto).toLocaleString('es-CO')} entre los miembros`
       : 'Están a mano, sin deudas pendientes';
     const catTxt = ec.gastosPorCategoria
       .sort((a, b) => b.monto - a.monto)
@@ -145,7 +185,7 @@ async function buildContextoEnriquecido(
     contextoFinal += `
 
 ESPACIO COMPARTIDO — "${ec.spaceName}":
-- Miembros: ${ec.members.map(m => m.displayName).join(' y ')}
+- Miembros: ${ec.members.length} personas (sus nombres no se comparten con la IA)
 - Gasto total del espacio este mes: $${Math.round(ec.totalGastosMes).toLocaleString('es-CO')}
 - Principales categorías compartidas: ${catTxt || 'Sin gastos aún'}
 - Balance: ${deudaTxt}
@@ -162,20 +202,23 @@ async function llamarWorker(
   system:    string,
   maxTokens: number,
 ): Promise<string> {
+  // Sin autorización de IA no sale ningún dato: el catch del llamador usa el modo local.
+  if (!(await consentService.hasAIConsent())) throw new AIConsentRequiredError();
+
   const controller = new AbortController();
   const timeoutId  = setTimeout(() => controller.abort(), CONFIG.AI_TIMEOUT_MS);
 
   try {
     const response = await fetch(CONFIG.WORKER_URL, {
       method:  'POST',
-      headers: WORKER_HEADERS,
+      headers: await getWorkerHeaders(),
       body: JSON.stringify({ system, messages: mensajes, max_tokens: maxTokens }),
       signal: controller.signal,
     });
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({})) as any;
-      throw new Error(err.error ?? `HTTP ${response.status}`);
+      throw new Error(err?.error?.message ?? err?.error ?? `HTTP ${response.status}`);
     }
 
     const data = await response.json() as any;
@@ -239,11 +282,12 @@ export async function enviarMensajeAFinn(
   if (esOffTopic(mensajeUsuario)) return RESPUESTA_OFFTOPIC;
   try {
     const { contexto } = await buildContextoEnriquecido(transactions, categories, profile, extra);
-    const system   = buildSystemPrompt(contexto, profile?.name ?? 'Usuario', extra.vozMode);
+    const system   = buildSystemPrompt(contexto, extra.vozMode);
     const maxTokens = extra.vozMode ? 150 : CONFIG.MAX_TOKENS_RESPUESTA;
+    const nombre   = nombreDe(profile);
     const mensajes: MensajeChat[] = [
-      ...historial.slice(-(CONFIG.MAX_HISTORIAL_MENSAJES - 1)),
-      { role: 'user', content: mensajeUsuario },
+      ...historial.slice(-(CONFIG.MAX_HISTORIAL_MENSAJES - 1)).map(m => ({ ...m, content: minimizarParaIA(m.content, nombre) })),
+      { role: 'user', content: minimizarParaIA(mensajeUsuario, nombre) },
     ];
 
     const texto = await llamarWorker(mensajes, system, maxTokens);
@@ -258,7 +302,7 @@ export async function enviarMensajeAFinn(
     return { texto, exito: true };
 
   } catch (e: any) {
-    console.warn('[RealAIService] error:', e?.message);
+    if (!(e instanceof AIConsentRequiredError)) console.warn('[RealAIService] error:', e?.name ?? 'error');
 
     // Fallback graceful a lógica local
     try {
@@ -291,7 +335,6 @@ export type RespuestaAgente =
 
 function buildSystemPromptAgente(
   contexto: string,
-  nombreUsuario: string,
   transactions: Transaction[],
   categories: Category[],
 ): string {
@@ -316,7 +359,7 @@ function buildSystemPromptAgente(
     return `[ID:${c.id}] ${c.name} ${presupuesto}`;
   }).join('\n') || 'Sin categorías';
 
-  return `${buildSystemPrompt(contexto, nombreUsuario)}
+  return `${buildSystemPrompt(contexto)}
 
 CAPACIDADES DE ACCIÓN:
 Puedes ejecutar acciones directas usando las herramientas disponibles. Úsalas solo cuando el usuario pida explícitamente:
@@ -350,20 +393,22 @@ async function llamarWorkerAgente(
   system:    string,
   maxTokens: number,
 ): Promise<RespuestaAgente> {
+  if (!(await consentService.hasAIConsent())) throw new AIConsentRequiredError();
+
   const controller = new AbortController();
   const timeoutId  = setTimeout(() => controller.abort(), CONFIG.AI_TIMEOUT_MS);
 
   try {
     const response = await fetch(CONFIG.WORKER_URL, {
       method:  'POST',
-      headers: WORKER_HEADERS,
+      headers: await getWorkerHeaders(),
       body:    JSON.stringify({ system, messages: mensajes, max_tokens: maxTokens, use_tools: true }),
       signal:  controller.signal,
     });
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({})) as any;
-      throw new Error(err.error ?? `HTTP ${response.status}`);
+      throw new Error(err?.error?.message ?? err?.error ?? `HTTP ${response.status}`);
     }
 
     const data = await response.json() as any;
@@ -398,15 +443,16 @@ export async function enviarMensajeAgenteAFinn(
   if (esOffTopic(mensajeUsuario)) return { tipo: 'texto', texto: RESPUESTA_OFFTOPIC.texto, exito: true };
   try {
     const { contexto } = await buildContextoEnriquecido(transactions, categories, profile, extra);
-    const system  = buildSystemPromptAgente(contexto, profile?.name ?? 'Usuario', transactions, categories);
+    const nombre  = nombreDe(profile);
+    const system  = buildSystemPromptAgente(contexto, transaccionesParaIA(transactions, nombre), categories);
     const mensajes: MensajeChat[] = [
-      ...historial.slice(-(CONFIG.MAX_HISTORIAL_MENSAJES - 1)),
-      { role: 'user', content: mensajeUsuario },
+      ...historial.slice(-(CONFIG.MAX_HISTORIAL_MENSAJES - 1)).map(m => ({ ...m, content: minimizarParaIA(m.content, nombre) })),
+      { role: 'user', content: minimizarParaIA(mensajeUsuario, nombre) },
     ];
 
     return await llamarWorkerAgente(mensajes, system, CONFIG.MAX_TOKENS_RESPUESTA);
   } catch (e: any) {
-    console.warn('[RealAIService] agente error:', e?.message);
+    if (!(e instanceof AIConsentRequiredError)) console.warn('[RealAIService] agente error:', e?.name ?? 'error');
     try {
       const local = procesarMensajeUsuario(mensajeUsuario, transactions as any, categories as any, profile as any, goal as any);
       return { tipo: 'texto', texto: local.text, exito: true, error: 'fallback' };
@@ -458,12 +504,14 @@ function generarInsightFallback(m: MetricasFinancieras): string {
 // ── Verificar conexión al Worker ──────────────────────────────────────────────
 
 export async function verificarConexionWorker(): Promise<boolean> {
+  // GET /health: no consume IA ni envía datos del usuario (antes hacía una
+  // llamada real al modelo con "ping" cada vez que se abría la pantalla).
+  if (!CONFIG.WORKER_URL) return false;
   try {
-    const response = await fetch(CONFIG.WORKER_URL, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ messages: [{ role: 'user', content: 'ping' }], max_tokens: 5 }),
-      signal:  AbortSignal.timeout(CONFIG.PING_TIMEOUT_MS),
+    const base = CONFIG.WORKER_URL.replace(/\/+$/, '');
+    const response = await fetch(`${base}/health`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(CONFIG.PING_TIMEOUT_MS),
     });
     return response.ok;
   } catch {

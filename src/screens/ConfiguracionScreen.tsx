@@ -479,7 +479,7 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
               </Text>
               <Text style={[styles.iaSub, { color: colors.textSecondary }]}>
                 {estadoIA === 'conectado'
-                  ? 'Usando claude-haiku-4-5 via Cloudflare Worker'
+                  ? 'Asistente de educación financiera con IA'
                   : 'Modo básico con respuestas locales'}
               </Text>
             </View>
@@ -497,7 +497,7 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
           {/* Nota informativa */}
           <View style={[styles.iaNota, { borderTopColor: colors.border }]}>
             <Text style={[styles.iaNotaText, { color: colors.textSecondary }]}>
-              Finn analiza tus finanzas en tiempo real. Tus datos se envían de forma segura al asistente y nunca se almacenan en servidores externos.
+              Con tu autorización, Finn envía a su proveedor de IA (Anthropic, EE. UU.) un resumen de tu contexto financiero, sin tu nombre, correo ni identificadores, a través de una conexión cifrada. Tus registros se guardan en nuestra base de datos en la nube (Supabase). Finn puede cometer errores y no brinda asesoría financiera, legal ni tributaria.
             </Text>
           </View>
         </View>

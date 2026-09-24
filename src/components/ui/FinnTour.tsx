@@ -28,7 +28,7 @@ export const FINN_TOUR_STEPS: FinnTourStep[] = [
   {
     id: 'welcome',
     title: 'Hola, soy Finn',
-    body: 'Tu asesor financiero personal. En los próximos segundos te mostraré las herramientas que tienes disponibles para tomar el control de tus finanzas.',
+    body: 'Tu asistente de educación y organización financiera con IA. En los próximos segundos te mostraré las herramientas que tienes disponibles para tomar el control de tus finanzas.',
     targetKey: null,
     tooltipPosition: 'center',
   },
@@ -50,7 +50,7 @@ export const FINN_TOUR_STEPS: FinnTourStep[] = [
   },
   {
     id: 'nav_ia',
-    title: 'Asesoría con Finn',
+    title: 'Aprende con Finn',
     body: 'Puedes consultarme sobre estrategias de ahorro, análisis de gastos o proyecciones. Respondo con base en tus datos reales, no en generalidades.',
     targetKey: 'tab_bot',
     tooltipPosition: 'top',
@@ -317,7 +317,7 @@ export const FinnTour: React.FC<FinnTourProps> = ({
               <FinnAvatar size={44} />
               <View style={s.headerMeta}>
                 <Text style={[s.headerName, { color: colors.textPrimary }]}>Finn</Text>
-                <Text style={[s.headerRole, { color: colors.textSecondary }]}>Asesor Financiero IA</Text>
+                <Text style={[s.headerRole, { color: colors.textSecondary }]}>Asistente de finanzas con IA</Text>
               </View>
             </View>
 

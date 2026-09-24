@@ -49,7 +49,7 @@ export const APP_TOUR_STEPS: TourStep[] = [
   {
     id: 'nav_ia',
     title: 'Asistente IA 🤖',
-    description: 'Tu asesor financiero personal disponible 24/7. Pregúntale sobre ahorros, presupuesto, metas o cualquier duda financiera.',
+    description: 'Tu asistente de educación financiera con IA. Pregúntale sobre ahorro, presupuesto o metas. Puede equivocarse y no reemplaza a un profesional.',
     targetKey: 'tab_bot',
     tooltipPosition: 'top',
     padding: 10,

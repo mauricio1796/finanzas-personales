@@ -9,7 +9,9 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { THEME } from '../constants/theme';
 
-export type ScreenName = 'dashboard' | 'ingresos' | 'gastos' | 'categorias' | 'estadisticas' | 'bot' | 'perfil' | 'explorar' | 'historial' | 'resumenSemanal' | 'gamificacion' | 'configuracion' | 'personalizacion' | 'retos' | 'calendario' | 'academia' | 'proyecciones' | 'resumenMensual' | 'simulador' | 'exportar' | 'widget' | 'metas' | 'deudas' | 'recurrentes' | 'compartido' | 'escanear' | 'alertas-preferencias' | 'premium';
+export type ScreenName = 'dashboard' | 'ingresos' | 'gastos' | 'categorias' | 'estadisticas' | 'bot' | 'perfil' | 'explorar' | 'historial' | 'resumenSemanal' | 'gamificacion' | 'configuracion' | 'personalizacion' | 'retos' | 'calendario' | 'academia' | 'proyecciones' | 'resumenMensual' | 'simulador' | 'exportar' | 'widget' | 'metas' | 'deudas' | 'recurrentes' | 'compartido' | 'escanear' | 'alertas-preferencias' | 'premium'
+  | 'privacidad' | 'eliminar-cuenta'
+  | 'legal-privacidad' | 'legal-terminos' | 'legal-ia' | 'legal-cookies' | 'legal-derechos' | 'legal-eliminacion';
 
 interface NavigationProps {
   currentScreen: ScreenName;
@@ -27,7 +29,7 @@ export function Navigation({ currentScreen, onScreenChange, userName }: Navigati
     { id: 'gastos', label: 'Gastos', icon: '💸', description: 'Registrar gastos' },
     { id: 'categorias', label: 'Categorías', icon: '🏷️', description: 'Administrar' },
     { id: 'estadisticas', label: 'Estadísticas', icon: '📉', description: 'Análisis' },
-    { id: 'bot', label: 'Asistente IA', icon: '🤖', description: 'Asesoría' },
+    { id: 'bot', label: 'Asistente IA', icon: '🤖', description: 'Educación financiera' },
     { id: 'perfil', label: 'Perfil', icon: '👤', description: 'Configuración' },
   ];
 

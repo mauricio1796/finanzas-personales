@@ -1,0 +1,385 @@
+{
+  "entity": {
+    "RESPONSABLE": "[COMPLETAR: nombre completo o razón social del responsable]",
+    "ID_RESPONSABLE": "[COMPLETAR: C.C. o NIT]",
+    "DOMICILIO": "[COMPLETAR: dirección física y ciudad en Colombia]",
+    "EMAIL_PRIVACIDAD": "[COMPLETAR: correo de privacidad, p. ej. privacidad@dominio.com]",
+    "EMAIL_SOPORTE": "[COMPLETAR: correo de soporte]",
+    "TELEFONO": "[COMPLETAR: teléfono de contacto]",
+    "SITIO_WEB": "[COMPLETAR: dominio de la landing]"
+  },
+  "status": "draft",
+  "statusNote": "Versión preparada para revisión jurídica. Antes de la publicación, un abogado debe validar el texto y deben completarse los datos del responsable.",
+  "documents": {
+    "privacy": {
+      "id": "privacy",
+      "slug": "privacidad",
+      "title": "Política de Tratamiento de Datos Personales",
+      "shortTitle": "Privacidad",
+      "version": "1.0.0",
+      "effectiveDate": "2026-09-24",
+      "summary": "Qué datos recogemos en FinancyAI, para qué los usamos, con quién los compartimos y cómo puedes ejercer tus derechos como titular.",
+      "sections": [
+        {
+          "heading": "1. Responsable del tratamiento",
+          "paragraphs": [
+            "El responsable del tratamiento de tus datos personales es {{RESPONSABLE}}, identificado con {{ID_RESPONSABLE}}, con domicilio en {{DOMICILIO}} (en adelante, «FinancyAI»).",
+            "Canal de atención de privacidad: {{EMAIL_PRIVACIDAD}} · Teléfono: {{TELEFONO}} · Sitio web: {{SITIO_WEB}}.",
+            "Esta política se adopta en cumplimiento de la Ley 1581 de 2012, el Decreto 1074 de 2015 (que compila el Decreto 1377 de 2013) y demás normas que las modifiquen o complementen."
+          ]
+        },
+        {
+          "heading": "2. Qué es FinancyAI",
+          "paragraphs": [
+            "FinancyAI es una aplicación de educación y organización financiera personal. No es una entidad financiera, no capta dinero, no mueve dinero, no se conecta a tus cuentas bancarias y no presta asesoría financiera, legal ni tributaria profesional. Toda la información financiera que procesa es la que tú registras voluntariamente."
+          ]
+        },
+        {
+          "heading": "3. Datos que recolectamos",
+          "bullets": [
+            "Datos de cuenta y autenticación: correo electrónico, nombre o alias que eliges y contraseña (la contraseña la gestiona nuestro proveedor de autenticación y FinancyAI nunca la conoce en texto claro).",
+            "Datos financieros que tú registras: ingresos, gastos, categorías, subcategorías, presupuestos, metas de ahorro, deudas, pagos recurrentes, descripción de movimientos y datos del perfil del onboarding (nombre o alias con el que quieres que Finn te hable, tipo de empleo, tipo de ingreso y salario mensual).",
+            "Conversaciones con Finn: los mensajes que escribes o dictas a Finn se procesan para generar la respuesta. El historial del chat se conserva solo en la memoria de la app mientras la pantalla está abierta; en nuestros servidores guardamos únicamente un resumen de patrones de uso (p. ej., tu categoría de mayor gasto) para personalizar las respuestas.",
+            "Voz e imágenes, solo si usas esas funciones: el audio que grabas para registrar un gasto se envía para transcribirlo y las fotos de recibos se envían para extraer el monto, la fecha y el comercio. FinancyAI no conserva el audio ni la imagen después de procesarlos.",
+            "Datos de gamificación y uso de funciones: nivel, experiencia, logros, retos y lecciones completadas.",
+            "Datos técnicos: versión de la app, plataforma, identificador para notificaciones push (si las activas) y registros técnicos mínimos de seguridad (fecha, ruta solicitada, resultado y una dirección IP parcialmente enmascarada).",
+            "Datos de pago, solo si compras Premium: identificador y estado de la transacción, plan, monto y fecha. Los datos de tu tarjeta, cuenta o billetera los recibe directamente la pasarela de pagos; FinancyAI nunca los conoce.",
+            "Consentimientos: qué autorizaciones otorgaste o revocaste, la versión del documento, la fecha y la versión de la app."
+          ],
+          "paragraphs": [
+            "FinancyAI no solicita datos sensibles en los términos del artículo 5 de la Ley 1581 de 2012. El desbloqueo con huella o Face ID lo realiza el sistema operativo de tu teléfono: la app solo recibe un resultado de «aprobado» o «rechazado» y nunca accede a tus datos biométricos. Te pedimos no incluir en descripciones o mensajes información sensible, números de documento, de tarjetas o contraseñas."
+          ]
+        },
+        {
+          "heading": "4. Finalidades del tratamiento",
+          "bullets": [
+            "Crear y administrar tu cuenta, autenticarte y mantener tu sesión segura.",
+            "Prestar las funciones de la app: registrar y organizar tus movimientos, calcular presupuestos, estadísticas, proyecciones, reportes y metas.",
+            "Generar respuestas, recomendaciones educativas e insights con Finn, el asistente basado en inteligencia artificial, si autorizas el procesamiento con IA.",
+            "Enviarte recordatorios y alertas que tú configures.",
+            "Gestionar la compra, activación y soporte del plan Premium, y conservar los soportes de pago que exija la ley.",
+            "Atender tus consultas, reclamos y solicitudes como titular.",
+            "Proteger la seguridad de la plataforma, prevenir fraude y abuso, y cumplir obligaciones legales.",
+            "Enviarte comunicaciones comerciales o novedades solo si otorgas esa autorización por separado; puedes retirarla en cualquier momento."
+          ]
+        },
+        {
+          "heading": "5. Autorización",
+          "paragraphs": [
+            "Tratamos tus datos con tu autorización previa, expresa e informada, que otorgas al crear tu cuenta marcando la casilla correspondiente. Las autorizaciones son independientes: aceptar esta política no implica aceptar comunicaciones comerciales ni el procesamiento con inteligencia artificial, que se solicitan por separado.",
+            "Guardamos prueba de cada autorización (tipo, versión del documento, fecha y versión de la app). Puedes revocarlas desde Perfil › Privacidad y mis datos, salvo cuando exista un deber legal o contractual de conservar la información."
+          ]
+        },
+        {
+          "heading": "6. Procesamiento con inteligencia artificial",
+          "paragraphs": [
+            "Si autorizas el procesamiento con IA, para responder tus preguntas enviamos al proveedor del modelo de lenguaje un resumen de tu contexto financiero (totales, categorías, presupuestos, metas, deudas y movimientos recientes) junto con tu mensaje. Aplicamos minimización: no enviamos tu nombre, correo ni identificador de cuenta, y eliminamos del texto patrones como correos, teléfonos y números de tarjeta o documento antes del envío.",
+            "Si no otorgas esta autorización, Finn funciona en modo básico con respuestas generadas localmente en tu dispositivo, y las funciones de voz y escaneo de recibos no estarán disponibles. Consulta el Aviso sobre Finn e inteligencia artificial para más detalle."
+          ]
+        },
+        {
+          "heading": "7. Encargados y transmisión internacional de datos",
+          "paragraphs": [
+            "Para prestar el servicio usamos proveedores tecnológicos que actúan como encargados del tratamiento y procesan los datos por cuenta de FinancyAI y según sus instrucciones. Algunos están ubicados o procesan datos fuera de Colombia, principalmente en Estados Unidos, lo que constituye una transmisión internacional de datos."
+          ],
+          "bullets": [
+            "Supabase (base de datos y autenticación; servidores en Estados Unidos): datos de cuenta, datos financieros registrados, consentimientos y solicitudes.",
+            "Cloudflare (servidor intermediario, transcripción de voz y síntesis de voz; red global): contenido de las solicitudes a Finn en tránsito, audio para transcribir y texto para convertir en voz.",
+            "Anthropic (modelo de lenguaje que potencia a Finn; Estados Unidos): contexto financiero minimizado, mensajes del chat, texto transcrito e imágenes de recibos.",
+            "Wompi (pasarela de pagos en Colombia): datos necesarios para procesar el pago de Premium.",
+            "Expo (servicio de notificaciones push; Estados Unidos): identificador del dispositivo para notificaciones, si las activas.",
+            "Apple y Google (distribución de la app y servicios del sistema operativo), según sus propias políticas."
+          ],
+          "after": [
+            "Exigimos a estos proveedores medidas de seguridad y confidencialidad acordes con la ley colombiana. Puedes solicitar información adicional sobre ellos a través del canal de privacidad."
+          ]
+        },
+        {
+          "heading": "8. Conservación",
+          "paragraphs": [
+            "Conservamos tus datos mientras tu cuenta esté activa. Cuando eliminas tu cuenta desde la app, borramos de nuestra base de datos tu perfil, movimientos, categorías, metas, memoria de Finn, alertas y consentimientos. Las copias de seguridad del proveedor de infraestructura se eliminan de acuerdo con su ciclo de rotación.",
+            "Conservamos, desvinculados de tu cuenta, los soportes mínimos de pagos realizados (identificador de la transacción, plan, monto y fecha) durante el tiempo que exijan las normas contables, tributarias y de protección al consumidor, así como el registro de las solicitudes de derechos que hayas presentado, sin su texto libre.",
+            "Los registros técnicos de seguridad se conservan por un período limitado y no contienen el contenido de tus mensajes ni tus datos financieros."
+          ]
+        },
+        {
+          "heading": "9. Seguridad",
+          "paragraphs": [
+            "Aplicamos medidas técnicas y organizativas razonables: cifrado en tránsito (HTTPS/TLS), almacenamiento de la sesión en el almacenamiento seguro del dispositivo (Keychain/Keystore), controles de acceso por usuario en la base de datos (Row Level Security), claves de servicios únicamente en el servidor, límites de uso, minimización de datos enviados a terceros y registros técnicos sin contenido personal. Ningún sistema es infalible; si ocurre un incidente que afecte tus datos, actuaremos según nuestro procedimiento de gestión de incidentes e informaremos a la Superintendencia de Industria y Comercio y a los titulares cuando corresponda."
+          ]
+        },
+        {
+          "heading": "10. Tus derechos como titular",
+          "paragraphs": ["De acuerdo con el artículo 8 de la Ley 1581 de 2012, tienes derecho a:"],
+          "bullets": [
+            "Conocer, actualizar y rectificar tus datos personales.",
+            "Solicitar prueba de la autorización que otorgaste.",
+            "Ser informado sobre el uso que se ha dado a tus datos.",
+            "Presentar quejas ante la Superintendencia de Industria y Comercio (SIC) por infracciones a la ley, una vez agotado el trámite de consulta o reclamo ante FinancyAI.",
+            "Revocar la autorización y/o solicitar la supresión de tus datos cuando no exista un deber legal o contractual de conservarlos.",
+            "Acceder en forma gratuita a tus datos personales."
+          ]
+        },
+        {
+          "heading": "11. Cómo ejercer tus derechos",
+          "bullets": [
+            "Desde la app: Perfil › Privacidad y mis datos. Allí puedes descargar tus datos, cambiar tus autorizaciones, eliminar tu cuenta y enviar una solicitud (consulta, actualización, rectificación, supresión, revocatoria o reclamo).",
+            "Por correo electrónico: {{EMAIL_PRIVACIDAD}}, indicando tu nombre, el correo de tu cuenta, la solicitud y los documentos que quieras hacer valer.",
+            "Consultas: se responden en un máximo de diez (10) días hábiles desde su recibo, prorrogables por cinco (5) días hábiles más, informándote el motivo (artículo 14 de la Ley 1581 de 2012).",
+            "Reclamos: se responden en un máximo de quince (15) días hábiles desde el día siguiente a su recibo, prorrogables por ocho (8) días hábiles más, informándote el motivo. Si el reclamo está incompleto, te pediremos completarlo dentro de los cinco (5) días siguientes; si pasan dos (2) meses sin respuesta, se entenderá que desististe (artículo 15 de la Ley 1581 de 2012)."
+          ]
+        },
+        {
+          "heading": "12. Menores de edad",
+          "paragraphs": [
+            "FinancyAI está dirigida a personas mayores de 18 años. No recolectamos intencionalmente datos de menores de edad. Si conoces que un menor creó una cuenta, escríbenos para eliminarla."
+          ]
+        },
+        {
+          "heading": "13. Vigencia y cambios",
+          "paragraphs": [
+            "Esta política rige desde la fecha indicada y las bases de datos estarán vigentes mientras se mantengan las finalidades descritas. Si hacemos cambios sustanciales, te lo informaremos en la app y, cuando la ley lo exija, solicitaremos de nuevo tu autorización antes de aplicarlos."
+          ]
+        }
+      ]
+    },
+    "terms": {
+      "id": "terms",
+      "slug": "terminos",
+      "title": "Términos y Condiciones de Uso",
+      "shortTitle": "Términos",
+      "version": "1.0.0",
+      "effectiveDate": "2026-09-24",
+      "summary": "Las reglas para usar FinancyAI y Finn, incluido el plan Premium.",
+      "sections": [
+        {
+          "heading": "1. Quién presta el servicio",
+          "paragraphs": [
+            "FinancyAI es operada por {{RESPONSABLE}}, identificado con {{ID_RESPONSABLE}}, con domicilio en {{DOMICILIO}}. Contacto: {{EMAIL_SOPORTE}} · {{TELEFONO}}.",
+            "Al crear una cuenta aceptas estos Términos. Si no estás de acuerdo, no uses la app."
+          ]
+        },
+        {
+          "heading": "2. Descripción del servicio",
+          "paragraphs": [
+            "FinancyAI es una herramienta de educación y organización financiera personal: te permite registrar ingresos y gastos, organizar categorías y presupuestos, ver estadísticas y reportes, definir metas, participar en retos y logros, aprender con contenidos educativos y conversar con Finn, un asistente basado en inteligencia artificial.",
+            "FinancyAI no es un banco, ni una entidad vigilada por la Superintendencia Financiera, ni un asesor financiero, legal, contable o tributario. No custodia ni mueve dinero, no otorga créditos y no se conecta a tus productos financieros."
+          ]
+        },
+        {
+          "heading": "3. Edad mínima y cuenta",
+          "bullets": [
+            "Debes ser mayor de 18 años para crear una cuenta.",
+            "Debes proporcionar un correo válido y mantener la confidencialidad de tu contraseña, PIN y dispositivo.",
+            "Eres responsable de la veracidad de la información que registras. Los cálculos de la app dependen de ella.",
+            "Una cuenta es personal e intransferible."
+          ]
+        },
+        {
+          "heading": "4. Uso permitido",
+          "paragraphs": ["Te comprometes a no:"],
+          "bullets": [
+            "Usar la app con fines ilícitos o para registrar información de terceros sin su autorización.",
+            "Intentar acceder a cuentas o datos de otros usuarios, eludir controles de seguridad, límites de uso o funciones de pago.",
+            "Usar a Finn para fines distintos a la organización y educación financiera personal, o intentar manipularlo para obtener contenidos ajenos a ese propósito.",
+            "Copiar, descompilar o explotar comercialmente la app, su código, diseño o contenidos sin autorización."
+          ]
+        },
+        {
+          "heading": "5. Finn y el contenido educativo",
+          "paragraphs": [
+            "Finn es un asistente de educación y organización financiera basado en inteligencia artificial. Sus respuestas se generan automáticamente, son informativas y pueden contener errores u omisiones. No constituyen asesoría financiera, legal ni tributaria profesional, ni una recomendación personalizada de inversión, y no reemplazan la opinión de un profesional idóneo.",
+            "FinancyAI no garantiza resultados financieros de ningún tipo: ahorro, reducción de deudas, rentabilidad o aprobación de productos. Las decisiones que tomes con base en la app son tuyas. Antes de ejecutar acciones que modifiquen o eliminen registros, Finn te pide confirmación.",
+            "Los contenidos de la Academia y los retos tienen fines exclusivamente educativos y pueden no reflejar cambios normativos recientes."
+          ]
+        },
+        {
+          "heading": "6. Plan gratuito y plan Premium",
+          "bullets": [
+            "El plan gratuito incluye las funciones esenciales sin costo.",
+            "Premium desbloquea funciones adicionales descritas en la pantalla de Premium. El precio se muestra en pesos colombianos (COP) antes de pagar.",
+            "Premium se compra como un pago único por el período elegido (mensual o anual). No se renueva ni se cobra automáticamente: al vencer, la cuenta vuelve al plan gratuito sin perder datos.",
+            "El pago lo procesa la pasarela Wompi. FinancyAI no recibe ni almacena los datos de tu tarjeta o cuenta.",
+            "Premium se activa cuando la pasarela confirma el pago como aprobado. Si pagaste y no se activó, escríbenos a {{EMAIL_SOPORTE}} con el comprobante.",
+            "Derecho de retracto: cuando aplique conforme al artículo 47 de la Ley 1480 de 2011, puedes retractarte dentro de los cinco (5) días hábiles siguientes a la compra escribiendo a {{EMAIL_SOPORTE}}; te reembolsaremos el valor pagado dentro de los plazos legales, salvo que opere una de las excepciones previstas en la ley.",
+            "Reversión del pago: si pagaste con tarjeta de crédito, débito o un instrumento de pago electrónico y fuiste objeto de fraude, la operación no fue solicitada, el servicio no se prestó o no corresponde a lo ofrecido, puedes solicitar la reversión dentro de los cinco (5) días hábiles siguientes a que tengas conocimiento, informándonos a nosotros y al emisor del instrumento, conforme al artículo 51 de la Ley 1480 de 2011 y su reglamentación.",
+            "Puedes presentar peticiones, quejas y reclamos en {{EMAIL_SOPORTE}}. Si no quedas satisfecho, puedes acudir a la Superintendencia de Industria y Comercio (www.sic.gov.co)."
+          ]
+        },
+        {
+          "heading": "7. Tratamiento de datos",
+          "paragraphs": [
+            "El tratamiento de tus datos personales se rige por la Política de Tratamiento de Datos Personales, que aceptas por separado al crear tu cuenta."
+          ]
+        },
+        {
+          "heading": "8. Propiedad intelectual",
+          "paragraphs": [
+            "La marca FinancyAI, el personaje Finn, el diseño, el código, los textos y los contenidos educativos son de propiedad de {{RESPONSABLE}} o de sus licenciantes y están protegidos por la ley. Los datos que registras son tuyos; nos otorgas únicamente la licencia necesaria para procesarlos y prestarte el servicio. Las librerías de código abierto se usan conforme a sus licencias."
+          ]
+        },
+        {
+          "heading": "9. Disponibilidad y limitaciones",
+          "paragraphs": [
+            "Procuramos que la app esté disponible y funcione correctamente, pero puede haber interrupciones por mantenimiento, fallas de proveedores o de conectividad. Algunas funciones de IA tienen límites de uso para proteger la plataforma. En la medida permitida por la ley, FinancyAI no responde por decisiones tomadas con base en la información de la app ni por datos incorrectos registrados por el usuario. Nada en estos Términos limita los derechos irrenunciables que te reconoce la Ley 1480 de 2011."
+          ]
+        },
+        {
+          "heading": "10. Terminación",
+          "paragraphs": [
+            "Puedes eliminar tu cuenta en cualquier momento desde Perfil › Privacidad y mis datos › Eliminar cuenta. Podemos suspender o cancelar cuentas que incumplan estos Términos o se usen de forma fraudulenta, informándote el motivo cuando sea posible. La eliminación de la cuenta no da derecho a reembolso del período Premium en curso, salvo lo previsto en la ley (por ejemplo, retracto o reversión)."
+          ]
+        },
+        {
+          "heading": "11. Modificaciones",
+          "paragraphs": [
+            "Podemos actualizar estos Términos. Si el cambio es sustancial, te lo informaremos en la app antes de que entre en vigor y te pediremos aceptarlo para seguir usando el servicio."
+          ]
+        },
+        {
+          "heading": "12. Ley aplicable y contacto",
+          "paragraphs": [
+            "Estos Términos se rigen por las leyes de la República de Colombia. Las controversias se resolverán ante las autoridades colombianas competentes, sin perjuicio de tus derechos como consumidor. Contacto: {{EMAIL_SOPORTE}}."
+          ]
+        }
+      ]
+    },
+    "ai": {
+      "id": "ai",
+      "slug": "ia",
+      "title": "Aviso sobre Finn e inteligencia artificial",
+      "shortTitle": "Aviso de IA",
+      "version": "1.0.0",
+      "effectiveDate": "2026-09-24",
+      "summary": "Qué es Finn, qué puede y qué no puede hacer, y qué datos usa.",
+      "sections": [
+        {
+          "heading": "Qué es Finn",
+          "paragraphs": [
+            "Finn es un asistente de educación y organización financiera basado en inteligencia artificial. Funciona con un modelo de lenguaje de un proveedor externo (Anthropic) al que FinancyAI da instrucciones y contexto; FinancyAI no entrena ese modelo con tus datos."
+          ]
+        },
+        {
+          "heading": "Lo que debes saber",
+          "bullets": [
+            "Finn puede cometer errores. Verifica la información importante.",
+            "Sus respuestas son informativas y educativas.",
+            "No reemplaza a profesionales: no constituye asesoría financiera, legal ni tributaria profesional.",
+            "No garantiza resultados financieros, ni ahorro, ni reducción de deudas, ni rentabilidad.",
+            "Finn no es una entidad financiera, no mueve dinero y no se conecta a tu banco.",
+            "Antes de modificar o eliminar un registro, Finn te pide confirmación."
+          ]
+        },
+        {
+          "heading": "Qué datos usa Finn",
+          "paragraphs": [
+            "Solo si autorizas el procesamiento con IA, para cada respuesta se envía al proveedor del modelo un resumen de tu contexto financiero (totales del mes, categorías y presupuestos, metas, deudas, hasta 20 movimientos recientes) y tu mensaje. No se envían tu nombre, correo ni identificador de cuenta, y se eliminan del texto correos, teléfonos y números de tarjeta o documento.",
+            "La transcripción de voz y la voz de Finn se procesan en la red de Cloudflare; el escaneo de recibos envía la imagen al modelo para extraer los datos. FinancyAI no conserva audios ni imágenes."
+          ]
+        },
+        {
+          "heading": "Tu control",
+          "paragraphs": [
+            "Puedes activar o desactivar el procesamiento con IA en cualquier momento desde Perfil › Privacidad y mis datos. Sin esta autorización, Finn responde en modo básico con cálculos locales."
+          ]
+        }
+      ]
+    },
+    "cookies": {
+      "id": "cookies",
+      "slug": "cookies",
+      "title": "Política de cookies y tecnologías similares",
+      "shortTitle": "Cookies",
+      "version": "1.0.0",
+      "effectiveDate": "2026-09-24",
+      "summary": "Qué tecnologías de seguimiento usan la landing y la app.",
+      "sections": [
+        {
+          "heading": "Landing page",
+          "paragraphs": [
+            "La página web de FinancyAI no instala cookies propias ni utiliza herramientas de analítica, publicidad o seguimiento (como Google Analytics, Meta Pixel, Hotjar o Microsoft Clarity).",
+            "Para mostrar las tipografías, la página carga fuentes desde Google Fonts. Al hacerlo, tu navegador se conecta a servidores de Google, que recibe tu dirección IP y datos técnicos del navegador según su propia política de privacidad. Google Fonts no instala cookies."
+          ]
+        },
+        {
+          "heading": "Aplicación móvil",
+          "paragraphs": [
+            "La app no usa cookies ni SDK de publicidad o analítica de terceros. Guarda en tu dispositivo preferencias y datos de funcionamiento (tema, configuración, caché de tus datos) y la sesión en el almacenamiento seguro del sistema operativo."
+          ]
+        },
+        {
+          "heading": "Cambios",
+          "paragraphs": [
+            "Si en el futuro incorporamos herramientas de analítica o marketing, solo se activarán después de que otorgues tu consentimiento en un panel de preferencias, y actualizaremos esta política."
+          ]
+        }
+      ]
+    },
+    "rights": {
+      "id": "rights",
+      "slug": "derechos",
+      "title": "Mis derechos y cómo ejercerlos",
+      "shortTitle": "Mis derechos",
+      "version": "1.0.0",
+      "effectiveDate": "2026-09-24",
+      "summary": "Guía rápida para consultar, corregir, eliminar tus datos o presentar un reclamo.",
+      "sections": [
+        {
+          "heading": "Qué puedes pedir",
+          "bullets": [
+            "Consultar qué datos tenemos y cómo los usamos.",
+            "Actualizar o rectificar datos incompletos o inexactos.",
+            "Pedir prueba de tu autorización.",
+            "Revocar autorizaciones (procesamiento con IA, comunicaciones comerciales).",
+            "Solicitar la supresión de tus datos o eliminar tu cuenta.",
+            "Presentar un reclamo."
+          ]
+        },
+        {
+          "heading": "Dónde hacerlo",
+          "bullets": [
+            "En la app: Perfil › Privacidad y mis datos.",
+            "Por correo: {{EMAIL_PRIVACIDAD}}.",
+            "Tiempos de respuesta: consultas hasta 10 días hábiles; reclamos hasta 15 días hábiles (Ley 1581 de 2012, arts. 14 y 15).",
+            "Si no quedas satisfecho después de tramitar tu solicitud con nosotros, puedes acudir a la Superintendencia de Industria y Comercio: www.sic.gov.co."
+          ]
+        }
+      ]
+    },
+    "deletion": {
+      "id": "deletion",
+      "slug": "eliminar-cuenta",
+      "title": "Eliminar tu cuenta de FinancyAI",
+      "shortTitle": "Eliminar cuenta",
+      "version": "1.0.0",
+      "effectiveDate": "2026-09-24",
+      "summary": "Cómo eliminar tu cuenta y qué ocurre con tus datos.",
+      "sections": [
+        {
+          "heading": "Desde la app",
+          "bullets": [
+            "Abre FinancyAI e inicia sesión.",
+            "Ve a Perfil › Privacidad y mis datos › Eliminar cuenta.",
+            "Lee la advertencia, confirma escribiendo ELIMINAR y, si tienes PIN, ingrésalo.",
+            "La cuenta se elimina de inmediato y se cierra la sesión en ese dispositivo."
+          ]
+        },
+        {
+          "heading": "Sin acceso a la app",
+          "paragraphs": [
+            "Escribe a {{EMAIL_PRIVACIDAD}} desde el correo de tu cuenta con el asunto «Eliminar mi cuenta». Verificaremos tu identidad y confirmaremos la eliminación dentro de los plazos legales."
+          ]
+        },
+        {
+          "heading": "Qué se elimina y qué se conserva",
+          "bullets": [
+            "Se eliminan: cuenta de acceso, perfil, movimientos, categorías, presupuestos, metas, memoria de Finn, alertas, preferencias, consentimientos y membresías en espacios compartidos.",
+            "Los espacios compartidos que tú creaste se eliminan también para los demás miembros.",
+            "Se conservan, sin vínculo con tu cuenta: soportes mínimos de pagos de Premium (identificador, plan, monto y fecha) por el tiempo que exija la ley, y el registro de las solicitudes de derechos sin su contenido.",
+            "Los datos guardados localmente en tu teléfono se borran al completar la eliminación desde la app."
+          ]
+        }
+      ]
+    }
+  }
+}

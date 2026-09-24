@@ -9,8 +9,15 @@ import { PLANES_PREMIUM, FEATURES_GRATIS, FEATURES_PREMIUM, refrescarPremiumTras
 import { crearCheckout, esperarConfirmacionPago, extraerIdDeRedirect, type RefPago } from '../services/PaymentsService';
 import { THEME } from '../constants/theme';
 import { AppColors } from '../constants/colors';
+import { CONFIG } from '../constants/config';
+import { ConsentCheckbox } from '../components/legal/ConsentCheckbox';
+import { LegalModal } from '../components/legal/LegalModal';
+import { resolverMarcadores } from '../legal';
 
 interface PremiumScreenProps { onBack?: () => void; }
+
+// Información previa a la compra (Ley 1480 de 2011, art. 50; Decreto 1074 de 2015).
+const PROVEEDOR = resolverMarcadores('{{RESPONSABLE}} · {{ID_RESPONSABLE}} · {{EMAIL_SOPORTE}}');
 
 // Métodos de pago colombianos reales que ofrece el checkout de Wompi
 const METODOS_PAGO = [
@@ -27,6 +34,9 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onBack }) => {
   const [planSel, setPlanSel] = useState<'mensual' | 'anual'>('anual');
   const [loading, setLoading] = useState(false);
   const [pagoPendiente, setPagoPendiente] = useState<RefPago | null>(null);
+  const [aceptaCondiciones, setAceptaCondiciones] = useState(false);
+  const [verTerminos, setVerTerminos] = useState(false);
+  const pagosHabilitados = Platform.OS === 'web' || CONFIG.EXTERNAL_PAYMENTS_ENABLED;
 
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -101,7 +111,7 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onBack }) => {
     }
   };
 
-  const handleSuscribirse = () => pagarConWompi();
+  const handleSuscribirse = () => { if (aceptaCondiciones && pagosHabilitados) pagarConWompi(); };
   const handleVerificar   = () => pagoPendiente && pagarConWompi(pagoPendiente);
 
   if (premium.isPremium) {
@@ -177,9 +187,43 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onBack }) => {
           ))}
         </View>
 
-        <TouchableOpacity style={[styles.ctaBtn, loading && { opacity: 0.7 }]} onPress={handleSuscribirse} disabled={loading} activeOpacity={0.85}>
-          <Text style={styles.ctaBtnText}>{loading ? 'Procesando...' : 'Pagar con Wompi'}</Text>
-        </TouchableOpacity>
+        {/* ── Condiciones de la compra (información previa al pago) ── */}
+        <View style={styles.card}>
+          <View style={{ padding: 14, gap: 6 }}>
+            <Text style={styles.condTitle}>Antes de pagar</Text>
+            <Text style={styles.condItem}>• Precio total: {PLANES_PREMIUM[planSel].etiqueta.replace('/mes', '').replace('/año', '')} COP por el período {planSel === 'anual' ? 'anual (12 meses)' : 'mensual (1 mes)'}.</Text>
+            <Text style={styles.condItem}>• Pago único: no se renueva ni se cobra automáticamente. Al vencer vuelves al plan gratis sin perder datos.</Text>
+            <Text style={styles.condItem}>• Premium se activa cuando Wompi confirma el pago como aprobado.</Text>
+            <Text style={styles.condItem}>• Derecho de retracto (5 días hábiles, cuando aplique) y reversión del pago según la Ley 1480 de 2011. Reclamos: soporte o www.sic.gov.co.</Text>
+            <Text style={styles.condItem}>• Proveedor: {PROVEEDOR}</Text>
+            <ConsentCheckbox
+              checked={aceptaCondiciones}
+              onToggle={() => setAceptaCondiciones(v => !v)}
+              required
+              label="He leído y acepto las condiciones de compra de Premium de los"
+              linkLabel="Términos y Condiciones"
+              onLinkPress={() => setVerTerminos(true)}
+              labelAfter="."
+              testID="premium-accept-terms"
+            />
+          </View>
+        </View>
+
+        {pagosHabilitados ? (
+          <TouchableOpacity
+            style={[styles.ctaBtn, (loading || !aceptaCondiciones) && { opacity: 0.5 }]}
+            onPress={handleSuscribirse}
+            disabled={loading || !aceptaCondiciones}
+            activeOpacity={0.85}
+            accessibilityState={{ disabled: loading || !aceptaCondiciones }}
+          >
+            <Text style={styles.ctaBtnText}>{loading ? 'Procesando...' : 'Pagar con Wompi'}</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.ctaBtn, { opacity: 0.6 }]}>
+            <Text style={styles.ctaBtnText}>Compra disponible próximamente</Text>
+          </View>
+        )}
 
         {!!pagoPendiente && (
           <TouchableOpacity style={[styles.verifyBtn, loading && { opacity: 0.7 }]} onPress={handleVerificar} disabled={loading} activeOpacity={0.85}>
@@ -190,6 +234,7 @@ export const PremiumScreen: React.FC<PremiumScreenProps> = ({ onBack }) => {
 
         <Text style={styles.legal}>Pago procesado por Wompi. FinancyAI nunca ve los datos de tu tarjeta.</Text>
       </ScrollView>
+      <LegalModal docId={verTerminos ? 'terms' : null} onClose={() => setVerTerminos(false)} />
     </View>
   );
 };
@@ -228,6 +273,8 @@ const makeStyles = (colors: AppColors) => StyleSheet.create({
   verifyBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 10 },
   verifyBtnText:  { fontSize: 13, fontWeight: '700', color: colors.primary },
   legal:          { fontSize: 12, color: colors.textTertiary, textAlign: 'center' },
+  condTitle:      { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: 2 },
+  condItem:       { fontSize: 12.5, lineHeight: 18, color: colors.textSecondary },
   activeCard:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   activeTitle:    { fontSize: 26, fontWeight: '800', color: colors.textPrimary },
   activePlan:     { fontSize: 15, color: colors.primary, fontWeight: '600' },

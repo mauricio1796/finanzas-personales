@@ -86,13 +86,13 @@ export function Usuario({ onReset, onStartTour, onStartDemo, onNavigate }: Usuar
 
   const handleReset = () => {
     if (Platform.OS === 'web') {
-      const ok = window.confirm('Se borrarán todas tus transacciones, perfil, progreso y configuración. ¿Estás seguro?');
+      const ok = window.confirm('Se borrarán tus transacciones, perfil, progreso y configuración en este dispositivo y en la nube, y se cerrará la sesión. Tu cuenta seguirá existiendo (para eliminarla usa «Eliminar cuenta»). ¿Continuar?');
       if (ok) { resetAll().then(() => onReset?.()); }
       return;
     }
     Alert.alert(
       'Reiniciar App',
-      'Se borrarán todas tus transacciones, perfil, progreso y configuración. ¿Estás seguro?',
+      'Se borrarán tus transacciones, perfil, progreso y configuración en este dispositivo y en la nube, y se cerrará la sesión. Tu cuenta seguirá existiendo; para eliminarla usa «Eliminar cuenta».',
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Reiniciar Todo', style: 'destructive', onPress: async () => { await resetAll(); onReset?.(); } },
@@ -529,6 +529,55 @@ export function Usuario({ onReset, onStartTour, onStartDemo, onNavigate }: Usuar
           <Icon name="chevron-right" size={16} color={colors.textTertiary} />
         </TouchableOpacity>
 
+        {/* ── Privacidad y legal ── */}
+        <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 8 }]}>PRIVACIDAD Y LEGAL</Text>
+
+        <TouchableOpacity
+          style={[styles.actionRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => onNavigate?.('privacidad')}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+        >
+          <View style={[styles.actionIconCircle, { backgroundColor: colors.primaryLight }]}>
+            <Icon name="shield" size={16} color={colors.primary} />
+          </View>
+          <View style={styles.actionInfo}>
+            <Text style={[styles.actionTitle, { color: colors.textPrimary }]}>Privacidad y mis datos</Text>
+            <Text style={[styles.actionSub, { color: colors.textTertiary }]}>Autorizaciones, descargar datos, mis derechos</Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => onNavigate?.('legal-terminos')}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+        >
+          <View style={[styles.actionIconCircle, { backgroundColor: colors.primaryLight }]}>
+            <Icon name="file-text" size={16} color={colors.primary} />
+          </View>
+          <View style={styles.actionInfo}>
+            <Text style={[styles.actionTitle, { color: colors.textPrimary }]}>Términos y Condiciones</Text>
+            <Text style={[styles.actionSub, { color: colors.textTertiary }]}>Reglas de uso y de Premium</Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => onNavigate?.('legal-ia')}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+        >
+          <View style={[styles.actionIconCircle, { backgroundColor: colors.primaryLight }]}>
+            <Icon name="cpu" size={16} color={colors.primary} />
+          </View>
+          <View style={styles.actionInfo}>
+            <Text style={[styles.actionTitle, { color: colors.textPrimary }]}>Aviso sobre Finn e IA</Text>
+            <Text style={[styles.actionSub, { color: colors.textTertiary }]}>Qué hace Finn y qué no</Text>
+          </View>
+          <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
+
         {/* Danger zone */}
         <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 8 }]}>CUENTA</Text>
 
@@ -543,6 +592,20 @@ export function Usuario({ onReset, onStartTour, onStartDemo, onNavigate }: Usuar
               <Icon name="trash-2" size={16} color={colors.danger} />
             </View>
             <Text style={[styles.dangerRowText, { color: colors.danger }]}>Reiniciar App</Text>
+            <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+          </TouchableOpacity>
+          {/* Eliminar cuenta (Ley 1581 — supresión; requisito de App Store y Google Play) */}
+          <TouchableOpacity
+            style={styles.dangerRow}
+            onPress={() => onNavigate?.('eliminar-cuenta')}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            testID="profile-delete-account"
+          >
+            <View style={[styles.actionIconCircle, { backgroundColor: colors.dangerLight }]}>
+              <Icon name="user-x" size={16} color={colors.danger} />
+            </View>
+            <Text style={[styles.dangerRowText, { color: colors.danger }]}>Eliminar cuenta</Text>
             <Icon name="chevron-right" size={16} color={colors.textTertiary} />
           </TouchableOpacity>
         </View>

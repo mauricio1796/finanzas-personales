@@ -3,6 +3,8 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import { CONFIG } from '../../../constants/config';
 import type { ReceiptScanResult } from '../types';
+import { getWorkerHeaders, AIConsentRequiredError } from '../../../services/workerAuth';
+import { consentService } from '../../../services/ConsentService';
 
 // ─── Configuración de compresión ──────────────────────────────────────────────
 // Máximo ~800px de ancho — suficiente para que Claude lea el texto del recibo.
@@ -17,9 +19,15 @@ export async function pedirPermisosCamara(): Promise<boolean> {
   return status === 'granted';
 }
 
+/**
+ * `launchImageLibraryAsync` abre el selector de fotos del sistema (Android
+ * Photo Picker / iOS PHPicker), que NO requiere permiso de acceso a la galería:
+ * el usuario elige una sola imagen y solo esa llega a la app. Pedir
+ * READ_MEDIA_IMAGES para esto está restringido por Google Play (política de
+ * permisos de fotos y videos), por eso ya no se solicita.
+ */
 export async function pedirPermisosGaleria(): Promise<boolean> {
-  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  return status === 'granted';
+  return true;
 }
 
 // ─── Captura de imagen ────────────────────────────────────────────────────────
@@ -92,6 +100,9 @@ export async function escanearRecibo(
     throw new Error('El Worker no está configurado. Verifica EXPO_PUBLIC_WORKER_URL en tu .env.local');
   }
 
+  // La imagen se procesa en un proveedor externo de IA: requiere autorización.
+  if (!(await consentService.hasAIConsent())) throw new AIConsentRequiredError();
+
   const controller = new AbortController();
   // 45s — visión puede tardar más que chat
   const timeoutId = setTimeout(() => controller.abort(), 45_000);
@@ -100,11 +111,7 @@ export async function escanearRecibo(
     const response = await fetch(`${CONFIG.WORKER_URL}/scan-receipt`, {
       method: 'POST',
       signal: controller.signal,
-      headers: {
-        'Content-Type':  'application/json',
-        'X-App-Version': CONFIG.APP_VERSION,
-        'X-App-Token':   CONFIG.WORKER_TOKEN,
-      },
+      headers: await getWorkerHeaders(),
       body: JSON.stringify({
         imagen_base64: opts.imagen.base64,
         media_type:    opts.imagen.mediaType,

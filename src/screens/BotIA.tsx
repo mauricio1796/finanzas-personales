@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
+  Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +38,7 @@ import { catalogoItemToCategory, CATALOGO_CATEGORIAS, getPaletaItem } from '../c
 import { THEME }  from '../constants/theme';
 import { CONFIG } from '../constants/config';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
+import { consentService } from '../services/ConsentService';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -73,6 +75,8 @@ interface BotIAProps {
   transactions:  any[];
   monthlySalary: number;
   onBack?:       () => void;
+  /** Navegación interna (aviso de IA, privacidad). */
+  onNavigate?: (screen: string) => void;
 }
 
 // ── Quick suggestions ─────────────────────────────────────────────────────────
@@ -209,9 +213,9 @@ const ConfirmacionCategorias: React.FC<ConfirmacionCategoriasProps> = ({
 
 // ── BotIA ─────────────────────────────────────────────────────────────────────
 
-export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
+export function BotIA({ transactions, monthlySalary, onBack, onNavigate }: BotIAProps) {
   const { colors } = useTheme();
-  const { profile, goal, categories, addCategory, updateCategory, deleteCategory, addTransaction, deleteTransaction, updateTransaction, setGoal } = useFinance();
+  const { user, profile, goal, categories, addCategory, updateCategory, deleteCategory, addTransaction, deleteTransaction, updateTransaction, setGoal } = useFinance();
   const insets = useSafeAreaInsets();
 
   const [messages, setMessages]   = useState<Message[]>([]);
@@ -229,6 +233,27 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
   const [pendingAction,     setPendingAction]     = useState<PendingAction | null>(null);
   const [vozModalVisible,   setVozModalVisible]   = useState(false);
 
+  // ── Autorización de procesamiento con IA (Ley 1581: consentimiento independiente) ──
+  const [aiConsent, setAiConsent] = useState<boolean | null>(null);
+  useEffect(() => {
+    consentService.hasAIConsent().then(setAiConsent);
+    return consentService.subscribe(st => setAiConsent(st.ai_processing?.granted === true));
+  }, []);
+
+  const activarIA = () => {
+    const msg = 'Para responderte con IA, Finn envía a su proveedor (Anthropic) un resumen de tu contexto financiero y tu mensaje, sin tu nombre, correo ni identificadores. Puedes desactivarlo cuando quieras en Perfil › Privacidad y mis datos.';
+    const conceder = () => consentService.record([{ type: 'ai_processing', granted: true }], 'finn', user?.id);
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${msg}\n\n¿Activar Finn IA?`)) conceder();
+      return;
+    }
+    Alert.alert('Activar Finn IA', msg, [
+      { text: 'Ahora no', style: 'cancel' },
+      { text: 'Ver aviso', onPress: () => onNavigate?.('legal-ia') },
+      { text: 'Activar', onPress: conceder },
+    ]);
+  };
+
   // ── Ping Worker + saludo inicial ──────────────────────────────────────────
   useEffect(() => {
     verificarConexionWorker().then(ok => setWorkerStatus(ok ? 'online' : 'offline'));
@@ -236,7 +261,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
     const genSaludo = async () => {
       setIsTyping(true);
       const resp = await enviarMensajeAFinn(
-        'Salúdame brevemente por mi nombre y menciona UNA cosa concreta e interesante de mis finanzas actuales. Sé muy breve y amigable.',
+        'Salúdame brevemente y menciona UNA cosa concreta e interesante de mis finanzas actuales. Sé muy breve y amigable.',
         [],
         transactions as any, categories as any, profile, goal,
       );
@@ -496,6 +521,33 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
         </Pressable>
       </View>
 
+      {/* ── Aviso permanente de transparencia ── */}
+      <Pressable
+        onPress={() => onNavigate?.('legal-ia')}
+        style={[st.aiNotice, { backgroundColor: colors.aiLight, borderBottomColor: colors.border }]}
+        accessibilityRole="link"
+        accessibilityLabel="Aviso sobre Finn e inteligencia artificial"
+        testID="finn-ai-disclaimer"
+      >
+        <Icon name="info" size={13} color={colors.aiText} />
+        <Text style={[st.aiNoticeText, { color: colors.aiText }]}>
+          Finn es un asistente de educación y organización financiera basado en IA. Puede cometer errores y no brinda asesoría financiera, legal ni tributaria.{' '}
+          <Text style={st.aiNoticeLink}>Más información</Text>
+        </Text>
+      </Pressable>
+
+      {aiConsent === false && (
+        <View style={[st.aiConsentCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[st.aiConsentTitle, { color: colors.textPrimary }]}>Finn está en modo básico</Text>
+          <Text style={[st.aiConsentBody, { color: colors.textSecondary }]}>
+            Responde con cálculos locales en tu teléfono. Para respuestas con IA necesitas autorizar el procesamiento de tu contexto financiero minimizado.
+          </Text>
+          <TouchableOpacity onPress={activarIA} style={[st.aiConsentBtn, { backgroundColor: colors.primary }]} accessibilityRole="button" testID="finn-enable-ai">
+            <Text style={st.aiConsentBtnText}>Activar Finn IA</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* ── Messages ── */}
       <FlatList
         ref={scrollRef}
@@ -512,7 +564,7 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
                 <Text style={st.emptyAvatarText}>FI</Text>
               </View>
               <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>Hola, soy Finn</Text>
-              <Text style={[st.emptySub, { color: colors.textTertiary }]}>Tu asistente financiero personal.{'\n'}Pregúntame cualquier cosa sobre tus finanzas.</Text>
+              <Text style={[st.emptySub, { color: colors.textTertiary }]}>Tu asistente de educación financiera.{'\n'}Pregúntame sobre tus finanzas.</Text>
             </View>
           ) : null
         }
@@ -652,6 +704,14 @@ export function BotIA({ transactions, monthlySalary, onBack }: BotIAProps) {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const st = StyleSheet.create({
+  aiNotice:       { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 0.5 },
+  aiNoticeText:   { flex: 1, fontSize: 11.5, lineHeight: 16 },
+  aiNoticeLink:   { fontWeight: '700', textDecorationLine: 'underline' },
+  aiConsentCard:  { margin: 12, marginBottom: 0, borderWidth: 1, borderRadius: 14, padding: 14, gap: 6 },
+  aiConsentTitle: { fontSize: 14, fontWeight: '700' },
+  aiConsentBody:  { fontSize: 13, lineHeight: 19 },
+  aiConsentBtn:   { alignSelf: 'flex-start', borderRadius: 100, paddingHorizontal: 16, paddingVertical: 9, marginTop: 4 },
+  aiConsentBtnText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
   root:    { flex: 1, backgroundColor: BG },
   listBg:  { backgroundColor: BG },
 

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -18,13 +18,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../state/ThemeContext';
+import { ConsentCheckbox } from '../components/legal/ConsentCheckbox';
+import { LegalModal } from '../components/legal/LegalModal';
+import { consentService } from '../services/ConsentService';
+import type { LegalDocId } from '../legal';
 
 const { width: W } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 
 // ── Feature chips data ────────────────────────────────────────────────────────
 const FEATURES: { icon: React.ComponentProps<typeof Feather>['name']; label: string; desc: string }[] = [
-  { icon: 'zap',           label: 'Finn IA',       desc: 'Tu asesor financiero personal 24/7'   },
+  { icon: 'zap',           label: 'Finn IA',       desc: 'Asistente de educación financiera con IA' },
   { icon: 'mic',           label: 'Voz',           desc: 'Registra gastos hablando'             },
   { icon: 'bar-chart-2',   label: 'Estadísticas',  desc: 'Tendencias y proyecciones en tiempo real' },
   { icon: 'award',         label: 'Logros',        desc: 'Gamifica tu salud financiera'         },
@@ -226,7 +230,7 @@ function WebBrandingPanel({ primary, primaryLight, textPrimary, textSecondary, t
         <FinnHero primary={primary} large />
         <Text style={[st.webBrandName, { color: textPrimary }]}>FinancyAI</Text>
         <Text style={[st.webBrandTagline, { color: primary }]}>
-          Tu asistente financiero con IA
+          Tu asistente de finanzas personales con IA
         </Text>
         <Text style={[st.webBrandDesc, { color: textSecondary }]}>
           Controla tus gastos, habla con Finn y alcanza{'\n'}tus metas financieras — todo desde el navegador.
@@ -281,6 +285,31 @@ function FormContent({
 
   const otpBoxSize = IS_WEB ? 52 : (W - 48 - 48 - 30) / 4;
 
+  // ── Autorizaciones del registro (independientes y sin pre-marcar) ──
+  const [cPrivacy,   setCPrivacy]   = useState(false);
+  const [cTerms,     setCTerms]     = useState(false);
+  const [cAge,       setCAge]       = useState(false);
+  const [cAI,        setCAI]        = useState(false);
+  const [cMarketing, setCMarketing] = useState(false);
+  const [docAbierto, setDocAbierto] = useState<LegalDocId | null>(null);
+  const obligatoriasOk = cPrivacy && cTerms && cAge;
+
+  /**
+   * Registra las autorizaciones como PENDIENTES (aún no existe user_id) y
+   * continúa con el alta. Se envían a Supabase al verificar el código OTP.
+   */
+  const registrarConConsentimiento = async () => {
+    if (!obligatoriasOk) return;
+    await consentService.record([
+      { type: 'privacy',          granted: true },
+      { type: 'terms',            granted: true },
+      { type: 'age_confirmation', granted: true },
+      { type: 'ai_processing',    granted: cAI },
+      { type: 'marketing',        granted: cMarketing },
+    ], 'registration', null);
+    handleRegisterOtp();
+  };
+
   return (
     <Animated.View style={{ transform: [{ translateY: slideAnim }] }}>
       {/* Mini logo (pasos 2 y 3) */}
@@ -319,7 +348,15 @@ function FormContent({
             primary={colors.primary} primaryDark={colors.primaryDark}
           />
           <Text style={[st.disclaimer, { color: colors.textTertiary }]}>
-            Al continuar aceptas nuestros términos de uso y política de privacidad
+            Consulta nuestra{' '}
+            <Text style={[st.legalLink, { color: colors.primary }]} onPress={() => setDocAbierto('privacy')} accessibilityRole="link">
+              Política de Tratamiento de Datos
+            </Text>
+            {' '}y los{' '}
+            <Text style={[st.legalLink, { color: colors.primary }]} onPress={() => setDocAbierto('terms')} accessibilityRole="link">
+              Términos y Condiciones
+            </Text>
+            . Te pediremos tu autorización de forma expresa.
           </Text>
         </>
       )}
@@ -359,19 +396,53 @@ function FormContent({
           <Field
             icon="🔐" placeholder="Confirmar contraseña"
             value={otpConfirm} onChange={setOtpConfirm}
-            secureTextEntry={!otpShowPwd} returnKeyType="send"
-            onSubmit={handleRegisterOtp} inputRef={otpCfmRef}
+            secureTextEntry={!otpShowPwd} returnKeyType="done"
+            onSubmit={registrarConConsentimiento} inputRef={otpCfmRef}
             {...fieldProps}
           />
+
+          {/* ── Autorizaciones (Ley 1581 de 2012) ── */}
+          <View style={[st.consentBox, { borderColor: colors.border }]}>
+            <ConsentCheckbox
+              checked={cPrivacy} onToggle={() => setCPrivacy(v => !v)} required
+              label="Acepto el tratamiento de mis datos personales conforme a la"
+              linkLabel="Política de Tratamiento de Datos" onLinkPress={() => setDocAbierto('privacy')}
+              labelAfter="."
+              testID="register-consent-privacy"
+            />
+            <ConsentCheckbox
+              checked={cTerms} onToggle={() => setCTerms(v => !v)} required
+              label="Acepto los" linkLabel="Términos y Condiciones" onLinkPress={() => setDocAbierto('terms')}
+              labelAfter="."
+              testID="register-consent-terms"
+            />
+            <ConsentCheckbox
+              checked={cAge} onToggle={() => setCAge(v => !v)} required
+              label="Declaro que soy mayor de 18 años."
+              testID="register-consent-age"
+            />
+            <ConsentCheckbox
+              checked={cAI} onToggle={() => setCAI(v => !v)}
+              label="Autorizo que Finn procese mi contexto financiero minimizado con su proveedor de IA, según el"
+              linkLabel="Aviso de IA" onLinkPress={() => setDocAbierto('ai')}
+              labelAfter="."
+              testID="register-consent-ai"
+            />
+            <ConsentCheckbox
+              checked={cMarketing} onToggle={() => setCMarketing(v => !v)}
+              label="Quiero recibir novedades y comunicaciones comerciales."
+              testID="register-consent-marketing"
+            />
+          </View>
           {authError ? (
             <View style={[st.errorBox, { backgroundColor: colors.expenseLight, borderColor: colors.expense }]}>
               <Text style={[st.errorText, { color: colors.expense }]}>⚠ {authError}</Text>
             </View>
           ) : null}
           <CTAButton
-            label="Crear cuenta →" onPress={handleRegisterOtp}
+            label="Crear cuenta →" onPress={registrarConConsentimiento}
             loading={authLoading}
-            disabled={otpPassword.length < 6 || otpPassword !== otpConfirm}
+            disabled={otpPassword.length < 6 || otpPassword !== otpConfirm || !obligatoriasOk}
             primary={colors.primary} primaryDark={colors.primaryDark}
           />
           <Pressable onPress={() => { setOtpStep('email'); setOtpPassword(''); setOtpConfirm(''); }} style={st.backLink}>
@@ -467,6 +538,7 @@ function FormContent({
           </Pressable>
         </>
       )}
+      <LegalModal docId={docAbierto} onClose={() => setDocAbierto(null)} />
     </Animated.View>
   );
 }
@@ -551,7 +623,7 @@ export function AuthScreen(props: AuthScreenProps) {
                 <FinnHero primary={colors.primary} />
                 <Text style={[st.brandName, { color: colors.textPrimary }]}>FinancyAI</Text>
                 <Text style={[st.brandTagline, { color: colors.textSecondary }]}>
-                  Tu asistente financiero con IA
+                  Tu asistente de finanzas personales con IA
                 </Text>
                 <View style={st.chipsRow}>
                   {FEATURES.map(f => (
@@ -658,7 +730,9 @@ const st = StyleSheet.create({
   errorBox: { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12 },
   errorText: { fontSize: 13, fontWeight: '500' },
 
-  disclaimer: { fontSize: 11, textAlign: 'center', marginTop: 14, lineHeight: 16 },
+  disclaimer: { fontSize: 12, textAlign: 'center', marginTop: 14, lineHeight: 18 },
+  legalLink:  { fontWeight: '700', textDecorationLine: 'underline' },
+  consentBox: { borderTopWidth: 1, marginTop: 16, paddingTop: 6 },
   backLink: { alignSelf: 'center', marginTop: 14, paddingVertical: 6 },
   backLinkText: { fontSize: 13, fontWeight: '500' },
 

@@ -34,14 +34,14 @@ export const PLANES_PREMIUM = {
   mensual: {
     precio: 12900,
     etiqueta: '$12.900/mes',
-    descripcion: 'Cancela cuando quieras',
+    descripcion: 'Pago único · sin renovación automática',
     ahorro: null as string | null,
     destacado: false,
   },
   anual: {
     precio: 89900,
     etiqueta: '$89.900/año',
-    descripcion: 'Equivale a $7.491/mes',
+    descripcion: 'Pago único · equivale a $7.491/mes',
     ahorro: 'Ahorras $64.900 vs mensual',
     destacado: true,
   },
@@ -64,8 +64,7 @@ export const FEATURES_PREMIUM = [
   'Analisis de anomalias avanzado',
   'Exportar reportes en PDF',
   'Estadisticas historicas (12 meses)',
-  'Retos comunidad con ranking real',
-  'Soporte prioritario',
+  'Retos adicionales',
 ];
 
 export const PREMIUM_LIBRE: PremiumState = POLITICA_LIBRE;

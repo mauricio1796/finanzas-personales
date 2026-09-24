@@ -29,6 +29,7 @@ import {
 import type { MensajeChat }       from './RealAIService';
 import type { Transaction, Category } from '../types';
 import type { ContextoPersonalizado } from './RealAIService';
+import { getWorkerHeaders } from './workerAuth';
 
 // ── Active sound handle (only one at a time) ──────────────────────────────────
 
@@ -61,11 +62,7 @@ export async function sintetizarTexto(texto: string): Promise<string | null> {
   try {
     const response = await fetch(`${CONFIG.WORKER_URL}/tts`, {
       method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'X-App-Version': CONFIG.APP_VERSION,
-        'X-App-Token':   CONFIG.WORKER_TOKEN,
-      },
+      headers: await getWorkerHeaders(),
       body:   JSON.stringify({ text: limpio }),
       signal: controller.signal,
     });

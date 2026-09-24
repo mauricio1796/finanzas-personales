@@ -209,7 +209,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
           <Text style={[s.finnBarText, { color: colors.textSecondary }]}>
             {items.length === 0
               ? 'Sin alertas por ahora. Tu situación financiera está al día.'
-              : `${items.length} alerta${items.length > 1 ? 's' : ''} de tu asesor financiero.`}
+              : `${items.length} alerta${items.length > 1 ? 's' : ''} de Finn.`}
           </Text>
         </View>
 
