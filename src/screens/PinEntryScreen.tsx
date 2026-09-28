@@ -9,6 +9,8 @@ import {
   Vibration,
   ScrollView,
   Platform,
+  AppState,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,9 +21,11 @@ import {
   getBiometricAvailability,
   isBiometricEnabled,
   authenticateBiometric,
+  etiquetaBiometria,
   getEstadoIntentos,
   MAX_INTENTOS as MAX_ATTEMPTS,
   type BiometricKind,
+  type EstadoBiometria,
   type ResultadoVerificacion,
 } from '../services/PinService';
 
@@ -148,7 +152,11 @@ export function PinEntryScreen({
 
   const [bioKind,    setBioKind]    = useState<BiometricKind>('none');
   const [bioEnabled, setBioEnabled] = useState(false);
-  const bioTried = useRef(false);
+  const [bioEstado,  setBioEstado]  = useState<EstadoBiometria>('sin_hardware');
+  const [bioMsg,     setBioMsg]     = useState<{ texto: string; ajustes: boolean } | null>(null);
+  const bioTried    = useRef(false);
+  const bioBusy     = useRef(false);
+  const bioPendiente = useRef(false);   // auto-prompt que el sistema interrumpió
 
   const shake = useRef(new Animated.Value(0)).current;
   const enter = useRef(new Animated.Value(0)).current;
@@ -156,19 +164,46 @@ export function PinEntryScreen({
   const firstName = userName?.trim().split(' ')[0];
   const initials  = (userName ?? 'U').trim().split(/\s+/).slice(0, 2).map(s => s[0]?.toUpperCase()).join('');
 
-  const bioLabel = bioKind === 'face' ? 'Face ID'
-    : bioKind === 'iris' ? 'reconocimiento de iris'
-    : 'huella';
+  const bioLabel = etiquetaBiometria(bioKind);
   const bioIcon: React.ComponentProps<typeof Icon>['name'] =
     bioKind === 'face' ? 'smile' : 'unlock';
 
-  const tryBiometric = useCallback(async () => {
-    const ok = await authenticateBiometric(`Desbloquea FinancyAI, ${firstName ?? ''}`.trim());
-    if (ok) {
+  /**
+   * `auto` = lanzado al abrir la pantalla. Si el sistema lo interrumpe (la app
+   * aún no está activa, llega una llamada…) se reintenta al volver al frente en
+   * vez de quedarse sin Face ID hasta que el usuario toque el botón.
+   */
+  const tryBiometric = useCallback(async (kind: BiometricKind, auto = false) => {
+    if (bioBusy.current) return;
+    if (auto && AppState.currentState !== 'active') { bioPendiente.current = true; return; }
+    bioBusy.current = true;
+    setBioMsg(null);
+    const r = await authenticateBiometric(
+      firstName ? `Desbloquea FinancyAI, ${firstName}` : 'Desbloquea FinancyAI', kind,
+    );
+    bioBusy.current = false;
+    if (r.ok) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       onSuccess();
+      return;
+    }
+    if (r.motivo === 'interrumpido' && auto) { bioPendiente.current = true; return; }
+    if (r.mensaje) {
+      setBioMsg({ texto: r.mensaje, ajustes: !!r.abrirAjustes });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
     }
   }, [firstName, onSuccess]);
+
+  // Reintento del auto-prompt cuando la app vuelve a estar activa
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', st => {
+      if (st === 'active' && bioPendiente.current) {
+        bioPendiente.current = false;
+        setTimeout(() => tryBiometric(bioKind, true), 300);
+      }
+    });
+    return () => sub.remove();
+  }, [bioKind, tryBiometric]);
 
   // Entrada + disponibilidad biométrica + auto-prompt
   useEffect(() => {
@@ -186,15 +221,22 @@ export function PinEntryScreen({
       }
       setAttempts(MAX_ATTEMPTS - intentos.intentosRestantes);
 
-      const [{ available, kind }, enabled] = await Promise.all([
+      const [{ available, kind, estado }, enabled] = await Promise.all([
         getBiometricAvailability(),
         isBiometricEnabled(),
       ]);
-      setBioKind(available ? kind : 'none');
+      setBioKind(kind);
+      setBioEstado(estado);
       setBioEnabled(available && enabled);
       if (available && enabled && !bioTried.current) {
         bioTried.current = true;
-        setTimeout(tryBiometric, 350);
+        setTimeout(() => tryBiometric(kind, true), 350);
+      } else if (enabled && estado === 'sin_permiso') {
+        // Lo activó antes, pero luego negó el permiso en iOS: antes el botón
+        // simplemente desaparecía sin explicación.
+        setBioMsg({ texto: `${etiquetaBiometria(kind)} está desactivado para FinancyAI. Actívalo en Ajustes › FinancyAI.`, ajustes: true });
+      } else if (enabled && estado === 'no_configurado') {
+        setBioMsg({ texto: `Ya no hay ${etiquetaBiometria(kind)} configurado en este teléfono. Entra con tu PIN.`, ajustes: false });
       }
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -214,7 +256,7 @@ export function PinEntryScreen({
   const handleKey = async (key: string) => {
     if (checking) return;
 
-    if (key === 'bio') { tryBiometric(); return; }
+    if (key === 'bio') { tryBiometric(bioKind); return; }
     if (key === 'del') {
       setPin(p => p.slice(0, -1));
       setHasError(false); setErrorMsg('');
@@ -324,7 +366,8 @@ export function PinEntryScreen({
         {bioKind !== 'none' && bioEnabled && (
           <Animated.View style={fadeUp}>
             <Pressable
-              onPress={tryBiometric}
+              onPress={() => tryBiometric(bioKind)}
+              accessibilityRole="button"
               style={({ pressed }) => [
                 st.bioBtn,
                 { borderColor: colors.primary, backgroundColor: pressed ? colors.primaryLight : 'transparent' },
@@ -332,10 +375,24 @@ export function PinEntryScreen({
             >
               <Icon name={bioIcon} size={20} color={colors.primary} />
               <Text style={[st.bioText, { color: colors.primary }]}>
-                Ingresar con {bioLabel === 'Face ID' ? 'Face ID' : `tu ${bioLabel}`}
+                Ingresar con {Platform.OS === 'ios' ? bioLabel : `tu ${bioLabel}`}
               </Text>
             </Pressable>
           </Animated.View>
+        )}
+
+        {bioMsg && (
+          <View style={[st.bioMsg, { backgroundColor: colors.warningLight }]} accessibilityLiveRegion="polite">
+            <Icon name="info" size={14} color={colors.warningText} />
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={[st.bioMsgText, { color: colors.warningText }]}>{bioMsg.texto}</Text>
+              {bioMsg.ajustes && (
+                <Pressable onPress={() => Linking.openSettings()} hitSlop={6} accessibilityRole="link">
+                  <Text style={[st.bioMsgLink, { color: colors.warningText }]}>Abrir Ajustes</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
         )}
 
         {/* ── Noticia de Finn ── */}
@@ -459,6 +516,9 @@ const st = StyleSheet.create({
     borderWidth: 1.5, borderRadius: 16, paddingVertical: 15,
   },
   bioText: { fontSize: 14, fontWeight: '700' },
+  bioMsg: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', borderRadius: 14, padding: 12 },
+  bioMsgText: { fontSize: 12.5, lineHeight: 18, fontWeight: '500' },
+  bioMsgLink: { fontSize: 12.5, fontWeight: '800', textDecorationLine: 'underline' },
 
   // Finn news
   finnCard: { flexDirection: 'row', gap: 11, borderRadius: 18, padding: 14 },

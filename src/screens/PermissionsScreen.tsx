@@ -1,161 +1,125 @@
-import React, { useEffect, useState } from 'react';
+/**
+ * PermissionsScreen — permisos del dispositivo en el primer arranque.
+ *
+ * Diseñado para pasar revisión en App Store y Google Play:
+ * - Un permiso por paso, explicando para qué sirve ANTES del diálogo nativo.
+ * - El botón dice "Continuar" y abre SIEMPRE el diálogo del sistema: la
+ *   decisión (Permitir / No permitir) la toma el usuario ahí. No hay "Omitir"
+ *   antes del diálogo (Apple 5.1.1 rechaza pre-permisos que lo evitan).
+ * - Los permisos ya decididos se saltan. Cámara y Face ID se piden en
+ *   contexto, cuando el usuario usa esa función.
+ */
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable, ScrollView,
-  Animated, Linking, Platform,
+  View, Text, StyleSheet, Pressable, ScrollView, Animated, Image,
+  Linking, Platform, AccessibilityInfo, ActivityIndicator,
 } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
 import { useTheme } from '../state/ThemeContext';
 import { storageService } from '../services/storage/StorageService';
+import { Icon, type FeatherName } from '../components/ui/Icon';
+import {
+  estadoPermisoNotificaciones, solicitarPermisoNotificaciones, enviarNotificacionBienvenida,
+  type EstadoPermisoNotif,
+} from '../services/NotificacionesService';
 
-// ── Tipos ──────────────────────────────────────────────────────────────────────
+const APP_ICON = require('../../assets/images/icon.png');
+const FINN_AVATAR = require('../../assets/images/finn-avatar.png');
 
-type PermStatus = 'idle' | 'granted' | 'denied' | 'loading';
+// ── Permisos ──────────────────────────────────────────────────────────────────
 
-interface PermItem {
-  key: 'notifications' | 'microphone';
-  icon: string;
-  title: string;
-  description: string;
-  why: string;
-  optional: boolean;
+type PermKey = 'notificaciones' | 'microfono';
+type Estado = EstadoPermisoNotif;
+
+async function estadoMicrofono(): Promise<Estado> {
+  if (Platform.OS === 'web') return 'no_disponible';
+  const p = await getRecordingPermissionsAsync();
+  if (p.granted) return 'concedido';
+  if (p.status === 'undetermined') return 'sin_preguntar';
+  return p.canAskAgain ? 'denegado' : 'bloqueado';
 }
 
-const PERMISSIONS: PermItem[] = [
-  {
-    key: 'notifications',
-    icon: '🔔',
-    title: 'Notificaciones',
-    description: 'Recordatorios de pagos, alertas de presupuesto y resúmenes financieros.',
-    why: 'Para avisarte cuando un pago se acerca, cuando superas tu presupuesto o cuando alcanzas una meta.',
-    optional: false,
+async function solicitarMicrofono(): Promise<Estado> {
+  await requestRecordingPermissionsAsync();
+  return estadoMicrofono();
+}
+
+const leer: Record<PermKey, () => Promise<Estado>> = {
+  notificaciones: estadoPermisoNotificaciones,
+  microfono:      estadoMicrofono,
+};
+
+const pedir: Record<PermKey, () => Promise<Estado>> = {
+  notificaciones: solicitarPermisoNotificaciones,
+  microfono:      solicitarMicrofono,
+};
+
+/** Solo se muestran los pasos que el sistema todavía puede preguntar. */
+const sePuedePreguntar = (e: Estado) => e === 'sin_preguntar' || e === 'denegado';
+
+interface PasoInfo {
+  badge:     FeatherName;
+  titulo:    string;
+  subtitulo: string;
+  beneficios: { icon: FeatherName; texto: string }[];
+  nota:      string;
+}
+
+const PASOS: Record<PermKey, PasoInfo> = {
+  notificaciones: {
+    badge: 'bell',
+    titulo: 'Deja que Finn te avise a tiempo',
+    subtitulo: 'Te escribiré solo cuando valga la pena: nada de spam.',
+    beneficios: [
+      { icon: 'calendar',     texto: 'Recordatorios antes de que venza un pago' },
+      { icon: 'alert-circle', texto: 'Alertas cuando una categoría se acerca a su límite' },
+      { icon: 'bar-chart-2',  texto: 'Tu resumen de la semana y el cierre de mes' },
+    ],
+    nota: 'En la pantalla de bloqueo no se muestran montos. Puedes elegir qué avisos recibir en Configuración.',
   },
-  {
-    key: 'microphone',
-    icon: '🎤',
-    title: 'Micrófono',
-    description: 'Registra gastos e ingresos con tu voz en segundos.',
-    why: 'Solo se activa cuando presionas el botón de voz. Nunca grabamos en segundo plano.',
-    optional: true,
+  microfono: {
+    badge: 'mic',
+    titulo: 'Háblale a Finn',
+    subtitulo: 'Di "gasté 18 mil en almuerzo" y queda registrado.',
+    beneficios: [
+      { icon: 'zap',        texto: 'Registra gastos e ingresos en segundos' },
+      { icon: 'mic',        texto: 'Solo escucho mientras mantienes el botón de voz' },
+      { icon: 'shield',     texto: 'Nunca grabo en segundo plano' },
+    ],
+    nota: 'Si prefieres escribir, puedes usar la app sin micrófono.',
   },
-];
+};
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Vista previa de notificación ──────────────────────────────────────────────
 
-async function checkNotifications(): Promise<PermStatus> {
-  if (Platform.OS === 'web') return 'granted';
-  const { status } = await Notifications.getPermissionsAsync();
-  if (status === 'granted') return 'granted';
-  if (status === 'denied') return 'denied';
-  return 'idle';
-}
-
-async function checkMicrophone(): Promise<PermStatus> {
-  if (Platform.OS === 'web') return 'granted';
-  const { status } = await getRecordingPermissionsAsync();
-  if (status === 'granted') return 'granted';
-  if (status === 'denied') return 'denied';
-  return 'idle';
-}
-
-async function requestNotifications(): Promise<PermStatus> {
-  const { status } = await Notifications.requestPermissionsAsync({
-    ios: { allowAlert: true, allowBadge: false, allowSound: true },
-  });
-  return status === 'granted' ? 'granted' : 'denied';
-}
-
-async function requestMicrophone(): Promise<PermStatus> {
-  const { status } = await requestRecordingPermissionsAsync();
-  return status === 'granted' ? 'granted' : 'denied';
-}
-
-// ── Componente de tarjeta de permiso ──────────────────────────────────────────
-
-interface CardProps {
-  item: PermItem;
-  status: PermStatus;
-  onRequest: () => void;
-}
-
-function PermissionCard({ item, status, onRequest }: CardProps) {
-  const { colors } = useTheme();
-
-  const openSettings = () => Linking.openSettings();
-
-  const statusLabel = () => {
-    switch (status) {
-      case 'granted': return '✓ Permitido';
-      case 'denied':  return 'Bloqueado';
-      case 'loading': return 'Solicitando…';
-      default:        return item.optional ? 'Opcional' : 'Requerido';
-    }
-  };
-
-  const statusColor = () => {
-    switch (status) {
-      case 'granted': return '#10B981';
-      case 'denied':  return '#EF4444';
-      default:        return item.optional ? '#9CA3AF' : '#F59E0B';
-    }
-  };
-
+const NotifPreview: React.FC<{ titulo: string; grupo: string; cuerpo: string; hace: string; dim?: boolean }> = ({ titulo, grupo, cuerpo, hace, dim }) => {
+  const { colors, isDark } = useTheme();
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      {/* Header */}
-      <View style={styles.cardHeader}>
-        <View style={[styles.iconCircle, { backgroundColor: status === 'granted' ? '#ECFDF5' : '#EEF2FF' }]}>
-          <Text style={styles.iconText}>{item.icon}</Text>
+    <View
+      style={[
+        s.notif,
+        { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#FFFFFF', borderColor: colors.border, opacity: dim ? 0.55 : 1 },
+        dim && { transform: [{ scale: 0.94 }], marginTop: -10 },
+      ]}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Image source={APP_ICON} style={s.notifIcon} />
+      <View style={{ flex: 1 }}>
+        <View style={s.notifTop}>
+          <Text style={[s.notifApp, { color: colors.textTertiary }]}>FINANCYAI</Text>
+          <Text style={[s.notifApp, { color: colors.textTertiary }]}>{hace}</Text>
         </View>
-        <View style={styles.cardTitles}>
-          <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>{item.title}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor() + '20' }]}>
-            <Text style={[styles.statusText, { color: statusColor() }]}>{statusLabel()}</Text>
-          </View>
-        </View>
+        <Text style={[s.notifTitle, { color: colors.textPrimary }]} numberOfLines={1}>{titulo}</Text>
+        <Text style={[s.notifGroup, { color: colors.textPrimary }]} numberOfLines={1}>{grupo}</Text>
+        <Text style={[s.notifBody, { color: colors.textSecondary }]} numberOfLines={2}>{cuerpo}</Text>
       </View>
-
-      {/* Descripción */}
-      <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{item.description}</Text>
-
-      {/* Por qué */}
-      <View style={[styles.whyBox, { backgroundColor: colors.background }]}>
-        <Text style={[styles.whyLabel, { color: colors.textSecondary }]}>¿Por qué?</Text>
-        <Text style={[styles.whyText, { color: colors.textSecondary }]}>{item.why}</Text>
-      </View>
-
-      {/* Acción */}
-      {status === 'idle' && (
-        <Pressable
-          style={[styles.allowBtn, { backgroundColor: '#6156E8' }]}
-          onPress={onRequest}
-        >
-          <Text style={styles.allowBtnText}>Permitir acceso</Text>
-        </Pressable>
-      )}
-      {status === 'granted' && (
-        <View style={styles.grantedRow}>
-          <Text style={styles.grantedText}>✓ Listo</Text>
-        </View>
-      )}
-      {status === 'denied' && (
-        <Pressable
-          style={[styles.allowBtn, { backgroundColor: '#6B7280' }]}
-          onPress={openSettings}
-        >
-          <Text style={styles.allowBtnText}>Abrir Configuración</Text>
-        </Pressable>
-      )}
-      {status === 'loading' && (
-        <View style={[styles.allowBtn, { backgroundColor: '#6156E820' }]}>
-          <Text style={[styles.allowBtnText, { color: '#6156E8' }]}>Solicitando…</Text>
-        </View>
-      )}
     </View>
   );
-}
+};
 
-// ── Pantalla principal ─────────────────────────────────────────────────────────
+// ── Pantalla ──────────────────────────────────────────────────────────────────
 
 interface Props {
   onDone: () => void;
@@ -163,262 +127,287 @@ interface Props {
 
 export function PermissionsScreen({ onDone }: Props) {
   const { colors } = useTheme();
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
 
-  const [statuses, setStatuses] = useState<Record<string, PermStatus>>({
-    notifications: 'idle',
-    microphone: 'idle',
-  });
+  const [pasos, setPasos]       = useState<PermKey[] | null>(null);
+  const [idx, setIdx]           = useState(0);
+  const [pidiendo, setPidiendo] = useState(false);
+  const [resultados, setResultados] = useState<Partial<Record<PermKey, Estado>>>({});
 
-  // Verificar permisos ya otorgados al montar
+  const anim = useRef(new Animated.Value(0)).current;
+  const reduceMotion = useRef(false);
+
   useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-
+    AccessibilityInfo.isReduceMotionEnabled().then(v => { reduceMotion.current = v; }).catch(() => {});
     (async () => {
-      const [notif, mic] = await Promise.all([checkNotifications(), checkMicrophone()]);
-      setStatuses({ notifications: notif, microphone: mic });
+      const keys: PermKey[] = ['notificaciones', 'microfono'];
+      const estados = await Promise.all(keys.map(k => leer[k]().catch(() => 'no_disponible' as Estado)));
+      setResultados(Object.fromEntries(keys.map((k, i) => [k, estados[i]])));
+      const pendientes = keys.filter((_, i) => sePuedePreguntar(estados[i]));
+      if (pendientes.length === 0) { terminar(); return; }
+      setPasos(pendientes);
     })();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleRequest = async (key: 'notifications' | 'microphone') => {
-    setStatuses(prev => ({ ...prev, [key]: 'loading' }));
-    const result = key === 'notifications'
-      ? await requestNotifications()
-      : await requestMicrophone();
-    setStatuses(prev => ({ ...prev, [key]: result }));
-  };
+  // Entrada de cada paso
+  useEffect(() => {
+    if (!pasos) return;
+    anim.setValue(0);
+    Animated.timing(anim, {
+      toValue: 1, duration: reduceMotion.current ? 0 : 320, useNativeDriver: true,
+    }).start();
+  }, [idx, pasos, anim]);
 
-  const handleContinue = async () => {
+  const terminar = async () => {
     await storageService.setPermissionsShown(true);
     onDone();
   };
 
-  // El botón continuar siempre está disponible (los permisos opcionales no bloquean)
-  const requiredGranted = statuses.notifications !== 'idle';
+  const esResumen = pasos !== null && idx >= pasos.length;
+  const pasoActual = pasos && !esResumen ? pasos[idx] : null;
+
+  const continuar = async () => {
+    if (!pasoActual || pidiendo) return;
+    setPidiendo(true);
+    try {
+      const estado = await pedir[pasoActual]();
+      setResultados(r => ({ ...r, [pasoActual]: estado }));
+      if (pasoActual === 'notificaciones' && estado === 'concedido') {
+        enviarNotificacionBienvenida().catch(() => {});
+      }
+    } catch {
+      // Si el sistema falla, se sigue: el usuario puede activarlo en Configuración.
+    } finally {
+      setPidiendo(false);
+      setIdx(i => i + 1);
+    }
+  };
+
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
+
+  if (!pasos) {
+    return (
+      <View style={[s.root, s.center, { backgroundColor: colors.background }]}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
-    <Animated.View style={[styles.root, { backgroundColor: colors.background, opacity: fadeAnim }]}>
+    <View style={[s.root, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[s.scroll, { paddingTop: insets.top + 24, paddingBottom: 24 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero */}
-        <View style={styles.hero}>
-          <View style={styles.heroIconWrap}>
-            <Text style={styles.heroIcon}>🔐</Text>
+        {/* Progreso */}
+        {!esResumen && pasos.length > 1 && (
+          <View style={s.dots} accessibilityLabel={`Paso ${idx + 1} de ${pasos.length}`}>
+            {pasos.map((_, i) => (
+              <View
+                key={i}
+                style={[s.dot, { backgroundColor: i <= idx ? colors.primary : colors.border, width: i === idx ? 22 : 8 }]}
+              />
+            ))}
           </View>
-          <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
-            Permisos de la app
-          </Text>
-          <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            FinancyAI necesita acceso a algunos servicios del dispositivo para funcionar correctamente. Tú decides qué permitir.
-          </Text>
-        </View>
-
-        {/* Cards */}
-        <View style={styles.cards}>
-          {PERMISSIONS.map(item => (
-            <PermissionCard
-              key={item.key}
-              item={item}
-              status={statuses[item.key]}
-              onRequest={() => handleRequest(item.key)}
-            />
-          ))}
-        </View>
-
-        {/* Nota de privacidad */}
-        <View style={[styles.privacyBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={styles.privacyIcon}>🛡️</Text>
-          <Text style={[styles.privacyText, { color: colors.textSecondary }]}>
-            Nunca vendemos ni compartimos tus datos. Los permisos se usan únicamente para las funciones descritas arriba. Puedes revocarlos en cualquier momento desde Configuración del dispositivo.
-          </Text>
-        </View>
-
-        {/* Botón continuar */}
-        <Pressable
-          style={[
-            styles.continueBtn,
-            { backgroundColor: requiredGranted ? '#6156E8' : '#6156E860' },
-          ]}
-          onPress={handleContinue}
-        >
-          <Text style={styles.continueBtnText}>
-            {requiredGranted ? 'Continuar →' : 'Omitir por ahora'}
-          </Text>
-        </Pressable>
-
-        {!requiredGranted && (
-          <Text style={[styles.skipNote, { color: colors.textSecondary }]}>
-            Podrás activar los permisos más tarde desde Configuración
-          </Text>
         )}
+
+        <Animated.View style={{ opacity: anim, transform: [{ translateY }] }}>
+          {pasoActual ? (
+            <PasoView paso={pasoActual} />
+          ) : (
+            <Resumen resultados={resultados} />
+          )}
+        </Animated.View>
       </ScrollView>
-    </Animated.View>
+
+      {/* Acción */}
+      <View style={[s.footer, { paddingBottom: insets.bottom + 16, borderTopColor: colors.border, backgroundColor: colors.background }]}>
+        {pasoActual ? (
+          <>
+            <Pressable
+              onPress={continuar}
+              disabled={pidiendo}
+              style={({ pressed }) => [s.primaryBtn, { backgroundColor: colors.primary, opacity: pressed || pidiendo ? 0.85 : 1 }]}
+              accessibilityRole="button"
+            >
+              {pidiendo
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={s.primaryBtnText}>Continuar</Text>}
+            </Pressable>
+            <Text style={[s.footNote, { color: colors.textTertiary }]}>
+              A continuación verás el aviso del sistema para elegir.
+            </Text>
+          </>
+        ) : (
+          <Pressable
+            onPress={terminar}
+            style={({ pressed }) => [s.primaryBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
+            accessibilityRole="button"
+          >
+            <Text style={s.primaryBtnText}>Empezar</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
   );
 }
 
-// ── Estilos ────────────────────────────────────────────────────────────────────
+// ── Paso ──────────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 56,
-    paddingBottom: 40,
-  },
+const PasoView: React.FC<{ paso: PermKey }> = ({ paso }) => {
+  const { colors } = useTheme();
+  const info = PASOS[paso];
+  return (
+    <View>
+      <View style={s.hero}>
+        <View>
+          <Image source={FINN_AVATAR} style={s.avatar} accessibilityLabel="Finn" />
+          <View style={[s.avatarBadge, { backgroundColor: colors.primary, borderColor: colors.background }]}>
+            <Icon name={info.badge} size={14} color="#fff" />
+          </View>
+        </View>
+        <Text style={[s.title, { color: colors.textPrimary }]} accessibilityRole="header">{info.titulo}</Text>
+        <Text style={[s.subtitle, { color: colors.textSecondary }]}>{info.subtitulo}</Text>
+      </View>
 
-  // Hero
-  hero: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  heroIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#EEF2FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  heroIcon: {
-    fontSize: 36,
-  },
-  heroTitle: {
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  heroSubtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-    maxWidth: 300,
-  },
+      {paso === 'notificaciones' && (
+        <View style={s.previews}>
+          <NotifPreview
+            hace="ahora"
+            titulo="Arriendo vence en 3 días"
+            grupo="Finn · Pagos"
+            cuerpo="El día 5 vence Arriendo. Si ya lo pagaste, márcalo y dejo de recordártelo."
+          />
+          <NotifPreview
+            dim
+            hace="lun"
+            titulo="Tu semana en números 📈"
+            grupo="Finn · Resumen"
+            cuerpo="Ya preparé tu resumen semanal."
+          />
+        </View>
+      )}
 
-  // Cards
-  cards: {
-    gap: 12,
-    marginBottom: 20,
-  },
-  card: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 20,
-    gap: 12,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconText: {
-    fontSize: 22,
-  },
-  cardTitles: {
-    flex: 1,
-    gap: 4,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  cardDesc: {
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  whyBox: {
-    borderRadius: 12,
-    padding: 12,
-    gap: 2,
-  },
-  whyLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  whyText: {
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  allowBtn: {
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  allowBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  grantedRow: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  grantedText: {
-    color: '#10B981',
-    fontWeight: '700',
-    fontSize: 14,
-  },
+      <View style={[s.benefits, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {info.beneficios.map(b => (
+          <View key={b.texto} style={s.benefitRow}>
+            <View style={[s.benefitIcon, { backgroundColor: colors.primary + '14' }]}>
+              <Icon name={b.icon} size={15} color={colors.primary} />
+            </View>
+            <Text style={[s.benefitText, { color: colors.textPrimary }]}>{b.texto}</Text>
+          </View>
+        ))}
+      </View>
 
-  // Privacidad
-  privacyBox: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-start',
-    marginBottom: 24,
-  },
-  privacyIcon: {
-    fontSize: 18,
-    marginTop: 1,
-  },
-  privacyText: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 17,
-  },
+      <View style={s.noteRow}>
+        <Icon name="lock" size={13} color={colors.textTertiary} />
+        <Text style={[s.note, { color: colors.textTertiary }]}>{info.nota}</Text>
+      </View>
+    </View>
+  );
+};
 
-  // Continuar
-  continueBtn: {
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 12,
+// ── Resumen ───────────────────────────────────────────────────────────────────
+
+const Resumen: React.FC<{ resultados: Partial<Record<PermKey, Estado>> }> = ({ resultados }) => {
+  const { colors } = useTheme();
+  const filas = useMemo(() => ([
+    { key: 'notificaciones' as const, label: 'Notificaciones', icon: 'bell' as FeatherName },
+    { key: 'microfono' as const,      label: 'Micrófono',      icon: 'mic' as FeatherName },
+  ]).filter(f => resultados[f.key] && resultados[f.key] !== 'no_disponible'), [resultados]);
+
+  const algunoNo = filas.some(f => resultados[f.key] !== 'concedido');
+
+  return (
+    <View>
+      <View style={s.hero}>
+        <Image source={FINN_AVATAR} style={s.avatar} accessibilityLabel="Finn" />
+        <Text style={[s.title, { color: colors.textPrimary }]} accessibilityRole="header">¡Todo listo!</Text>
+        <Text style={[s.subtitle, { color: colors.textSecondary }]}>
+          Así quedaron tus permisos. Puedes cambiarlos cuando quieras.
+        </Text>
+      </View>
+
+      <View style={[s.benefits, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {filas.map(f => {
+          const ok = resultados[f.key] === 'concedido';
+          return (
+            <View key={f.key} style={s.benefitRow}>
+              <View style={[s.benefitIcon, { backgroundColor: (ok ? colors.income : colors.textTertiary) + '18' }]}>
+                <Icon name={f.icon} size={15} color={ok ? colors.income : colors.textTertiary} />
+              </View>
+              <Text style={[s.benefitText, { color: colors.textPrimary }]}>{f.label}</Text>
+              <Text style={[s.statusText, { color: ok ? colors.income : colors.textTertiary }]}>
+                {ok ? 'Activado' : 'Desactivado'}
+              </Text>
+            </View>
+          );
+        })}
+        <View style={s.benefitRow}>
+          <View style={[s.benefitIcon, { backgroundColor: colors.primary + '14' }]}>
+            <Icon name="camera" size={15} color={colors.primary} />
+          </View>
+          <Text style={[s.benefitText, { color: colors.textSecondary }]}>
+            Cámara y {Platform.OS === 'ios' ? 'Face ID' : 'huella'} te los pediré cuando uses esas funciones.
+          </Text>
+        </View>
+      </View>
+
+      {algunoNo && (
+        <Pressable onPress={() => Linking.openSettings()} style={s.settingsLink} accessibilityRole="link">
+          <Icon name="settings" size={13} color={colors.primary} />
+          <Text style={[s.settingsText, { color: colors.primary }]}>Abrir ajustes del dispositivo</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+};
+
+// ── Estilos ───────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  root:   { flex: 1 },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  scroll: { flexGrow: 1, paddingHorizontal: 24 },
+
+  dots: { flexDirection: 'row', gap: 6, justifyContent: 'center', marginBottom: 20 },
+  dot:  { height: 8, borderRadius: 4 },
+
+  hero:     { alignItems: 'center', marginBottom: 22 },
+  avatar:   { width: 96, height: 96, borderRadius: 48, marginBottom: 18 },
+  avatarBadge: {
+    position: 'absolute', right: -2, bottom: 14, width: 32, height: 32, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 3,
   },
-  continueBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 16,
+  title:    { fontSize: 25, fontWeight: '800', letterSpacing: -0.6, textAlign: 'center', marginBottom: 8 },
+  subtitle: { fontSize: 14.5, lineHeight: 21, textAlign: 'center', maxWidth: 320 },
+
+  previews: { marginBottom: 20 },
+  notif: {
+    flexDirection: 'row', gap: 10, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, padding: 12,
+    shadowColor: '#0B1220', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 3,
   },
-  skipNote: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
+  notifIcon:  { width: 36, height: 36, borderRadius: 9 },
+  notifTop:   { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
+  notifApp:   { fontSize: 10.5, fontWeight: '600', letterSpacing: 0.4 },
+  notifTitle: { fontSize: 13.5, fontWeight: '700' },
+  notifGroup: { fontSize: 12.5, fontWeight: '600', opacity: 0.85 },
+  notifBody:  { fontSize: 12.5, lineHeight: 17, marginTop: 1 },
+
+  benefits:    { borderRadius: 20, borderWidth: 1, padding: 16, gap: 14 },
+  benefitRow:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  benefitIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  benefitText: { flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '500' },
+  statusText:  { fontSize: 12.5, fontWeight: '700' },
+
+  noteRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 14, paddingHorizontal: 4 },
+  note:    { flex: 1, fontSize: 12, lineHeight: 17 },
+
+  settingsLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 16, padding: 8 },
+  settingsText: { fontSize: 13, fontWeight: '700' },
+
+  footer:     { paddingHorizontal: 24, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
+  primaryBtn: { borderRadius: 16, height: 54, alignItems: 'center', justifyContent: 'center' },
+  primaryBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  footNote:   { fontSize: 11.5, textAlign: 'center' },
 });

@@ -10,7 +10,7 @@
  *   6. Devolver alertas de hoy para el dashboard
  */
 
-import * as Notifications from 'expo-notifications';
+import { notificar } from '../../services/NotificacionesService';
 import { Platform }       from 'react-native';
 import { supabase }       from '../../lib/supabase';
 import {
@@ -144,18 +144,13 @@ async function insertarAlerta(
 async function notificarLocal(candidato: AlertaCandidato): Promise<void> {
   if (Platform.OS === 'web') return;
   try {
-    const { status } = await Notifications.getPermissionsAsync();
-    if (status !== 'granted') return;
-
     const esPositiva = ALERTAS_POSITIVAS.includes(candidato.tipo);
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: esPositiva ? 'Finn · Buena noticia' : 'Finn · Alerta financiera',
-        body:  candidato.mensaje,
-        sound: true,
-        data:  { tipo: candidato.tipo, referencia_id: candidato.referencia_id },
-      },
-      trigger: null, // inmediata
+    // notificar() verifica permiso, preferencias y aplica la identidad de Finn.
+    await notificar('finn_alerta', {
+      titulo: esPositiva ? '¡Buena noticia!' : 'Ojo con esto',
+      cuerpo: candidato.mensaje,
+      screen: 'bot',
+      extra:  { alerta: candidato.tipo, referencia_id: candidato.referencia_id },
     });
   } catch {
     // notificaciones opcionales — nunca rompen el flujo

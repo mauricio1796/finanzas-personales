@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Crypto from 'expo-crypto';
 import { MAX_INTENTOS, calcularEsperaMs } from '../utils/pinPolicy';
+import { traducirErrorBiometria, type ResultadoBiometria } from '../utils/biometriaPolicy';
 
 const PIN_KEY        = 'financyai_pin_v1';        // legado: PIN en texto plano
 const PIN_HASH_KEY   = 'financyai_pin_hash_v2';   // { salt, hash, iteraciones }
@@ -253,27 +254,54 @@ export async function clearRememberedUser(): Promise<void> {
   await removeItem(REMEMBERED_KEY);
 }
 
-// ── Biometría (Face ID / huella) ────────────────────────────────────────────
+// ── Biometría (Face ID / Touch ID / huella) ─────────────────────────────────
 
 export type BiometricKind = 'face' | 'fingerprint' | 'iris' | 'none';
 
-/** Hardware presente + al menos una biometría registrada en el dispositivo. */
-export async function getBiometricAvailability(): Promise<{ available: boolean; kind: BiometricKind }> {
-  if (Platform.OS === 'web') return { available: false, kind: 'none' };
-  try {
-    const hasHardware = await LocalAuthentication.hasHardwareAsync();
-    const enrolled    = await LocalAuthentication.isEnrolledAsync();
-    if (!hasHardware || !enrolled) return { available: false, kind: 'none' };
+/**
+ * - disponible:     se puede usar ya.
+ * - sin_permiso:    (iOS) el teléfono tiene Face ID pero el usuario le negó el
+ *                   permiso a FinancyAI; solo se reactiva en Ajustes.
+ * - no_configurado: el hardware existe pero no hay rostro/huella registrados.
+ * - sin_hardware:   el dispositivo no tiene biometría (o es web).
+ */
+export type EstadoBiometria = 'disponible' | 'sin_permiso' | 'no_configurado' | 'sin_hardware';
 
-    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+/** Nombre correcto para mostrar: "Face ID" solo existe en iPhone. */
+export function etiquetaBiometria(kind: BiometricKind): string {
+  if (Platform.OS === 'ios') return kind === 'face' ? 'Face ID' : 'Touch ID';
+  if (kind === 'face') return 'reconocimiento facial';
+  if (kind === 'iris') return 'reconocimiento de iris';
+  return 'huella';
+}
+
+export async function getBiometricAvailability(): Promise<{
+  available: boolean; kind: BiometricKind; estado: EstadoBiometria;
+}> {
+  if (Platform.OS === 'web') return { available: false, kind: 'none', estado: 'sin_hardware' };
+  try {
+    const [hasHardware, enrolled, types] = await Promise.all([
+      LocalAuthentication.hasHardwareAsync(),
+      LocalAuthentication.isEnrolledAsync(),
+      LocalAuthentication.supportedAuthenticationTypesAsync(),
+    ]);
     const T = LocalAuthentication.AuthenticationType;
-    let kind: BiometricKind = 'fingerprint';
-    if (types.includes(T.FACIAL_RECOGNITION)) kind = 'face';
-    else if (types.includes(T.IRIS))          kind = 'iris';
-    else if (types.includes(T.FINGERPRINT))   kind = 'fingerprint';
-    return { available: true, kind };
+    const kind: BiometricKind =
+      types.includes(T.FACIAL_RECOGNITION) ? 'face'
+        : types.includes(T.IRIS) ? 'iris'
+          : types.includes(T.FINGERPRINT) ? 'fingerprint'
+            : 'none';
+
+    if (!hasHardware) {
+      // iOS reporta "no disponible" cuando el usuario negó el permiso de Face ID
+      // a la app, pero sigue informando el tipo de sensor: así se distingue.
+      if (Platform.OS === 'ios' && kind !== 'none') return { available: false, kind, estado: 'sin_permiso' };
+      return { available: false, kind: 'none', estado: 'sin_hardware' };
+    }
+    if (!enrolled) return { available: false, kind, estado: 'no_configurado' };
+    return { available: true, kind: kind === 'none' ? 'fingerprint' : kind, estado: 'disponible' };
   } catch {
-    return { available: false, kind: 'none' };
+    return { available: false, kind: 'none', estado: 'sin_hardware' };
   }
 }
 
@@ -288,28 +316,43 @@ export async function setBiometricEnabled(enabled: boolean): Promise<void> {
   else         await removeItem(BIOMETRIC_KEY);
 }
 
+export type { MotivoFalloBiometria, ResultadoBiometria } from '../utils/biometriaPolicy';
+
 /**
- * Lanza el prompt biométrico del sistema. Devuelve true si autenticó.
- * El bloqueo por intentos también aplica aquí: si el PIN está bloqueado, la
- * biometría no puede usarse como vía para saltárselo.
+ * Lanza el diálogo biométrico del sistema y traduce cada error a un mensaje
+ * accionable (antes se devolvía un booleano y los fallos pasaban en silencio).
+ * El bloqueo por intentos del PIN también aplica aquí: la biometría no puede
+ * usarse como vía para saltárselo.
  */
 export async function authenticateBiometric(
   prompt = 'Desbloquea FinancyAI',
-): Promise<boolean> {
-  if (Platform.OS === 'web') return false;
+  kind: BiometricKind = 'face',
+): Promise<ResultadoBiometria> {
+  if (Platform.OS === 'web') return { ok: false, motivo: 'no_soportado', mensaje: null };
 
   const estado = await getEstadoIntentos();
-  if (estado.bloqueado) return false;
+  if (estado.bloqueado) {
+    return { ok: false, motivo: 'bloqueado_pin', mensaje: 'El acceso está bloqueado temporalmente por intentos fallidos.' };
+  }
 
+  const nombre = etiquetaBiometria(kind);
+  let error = '';
   try {
     const res = await LocalAuthentication.authenticateAsync({
-      promptMessage:       prompt,
-      cancelLabel:         'Usar PIN',
-      disableDeviceFallback: true,
+      promptMessage:         prompt,
+      cancelLabel:           'Cancelar',
+      fallbackLabel:         'Usar PIN',     // iOS: botón tras un intento fallido
+      disableDeviceFallback: true,           // el respaldo es el PIN de la app, no el código del teléfono
+      requireConfirmation:   false,          // Android: rostro sin tocar "Confirmar"
     });
-    if (res.success) await limpiarFallos();
-    return res.success;
+    if (res.success) {
+      await limpiarFallos();
+      return { ok: true };
+    }
+    error = String((res as { error?: string }).error ?? '');
   } catch {
-    return false;
+    error = 'unknown';
   }
+
+  return traducirErrorBiometria(error, Platform.OS, nombre);
 }

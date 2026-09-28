@@ -14,7 +14,6 @@
         "NSMicrophoneUsageDescription": "FinancyAI usa el micrófono para que puedas registrar gastos e ingresos con tu voz.",
         "NSCameraUsageDescription": "FinancyAI usa la cámara para escanear recibos y registrar gastos automáticamente.",
         "NSPhotoLibraryUsageDescription": "FinancyAI accede a tu galería para que puedas escanear fotos de recibos y facturas.",
-        "NSUserNotificationsUsageDescription": "FinancyAI te enviará recordatorios de pagos, alertas de presupuesto y resúmenes financieros.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
@@ -40,18 +39,18 @@
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.CAMERA"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#C4F1FF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
       "blockedPermissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.USE_EXACT_ALARM",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_IMAGES",
@@ -82,11 +81,24 @@
       ],
       "expo-secure-store",
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "FinancyAI usa Face ID para desbloquear la app de forma segura sin escribir tu PIN."
+        }
+      ],
+      [
         "expo-notifications",
         {
-          "color": "#6156E8",
-          "defaultChannel": "default",
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#36ACFF",
+          "defaultChannel": "finn-general",
           "sounds": []
+        }
+      ],
+      [
+        "./plugins/withFinnNotificationLargeIcon",
+        {
+          "icon": "./assets/images/notification-large-icon.png"
         }
       ],
       [

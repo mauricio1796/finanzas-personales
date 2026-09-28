@@ -53,6 +53,8 @@ const TIPO_META: Record<NotifTipo, TipoMeta> = {
   ingreso_no_registrado:{ icono: '💰', color: '#1D9E75', etiqueta: 'Ingreso pendiente'  },
   gasto_inusual:        { icono: '🔍', color: '#EF4444', etiqueta: 'Gasto inusual'     },
   dia_sin_gastar:       { icono: '✅', color: '#1D9E75', etiqueta: 'Día verde'          },
+  finn_alerta:          { icono: '💡', color: '#36ACFF', etiqueta: 'Consejo de Finn'    },
+  finn_general:         { icono: '🤖', color: '#36ACFF', etiqueta: 'Finn'               },
 };
 
 // ─── Props ────────────────────────────────────────────────────────────────────

@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
 import { Transaction } from '../types';
 import { calcularMetricasFinancieras, MetricasFinancieras } from './ingresoUtils';
 
@@ -257,47 +256,8 @@ export async function marcarResumenVisto(año: number, mes: number): Promise<voi
   await AsyncStorage.setItem(storageKey(año, mes), '1');
 }
 
-// ── Notificación de cierre de mes ─────────────────────────────────────────────
-
-export async function programarNotificacionCierreMes(): Promise<void> {
-  try {
-    const { status } = await Notifications.requestPermissionsAsync();
-    if (status !== 'granted') return;
-
-    // Cancelar notificación anterior del mismo tipo
-    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    for (const n of scheduled) {
-      if (n.content.data?.type === 'cierre_mes') {
-        await Notifications.cancelScheduledNotificationAsync(n.identifier);
-      }
-    }
-
-    const hoy = new Date();
-    const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
-    const penultimoDia = ultimoDia - 1;
-
-    // Si ya pasó el penúltimo día de este mes, programar para el siguiente
-    let año = hoy.getFullYear();
-    let mes = hoy.getMonth();
-    if (hoy.getDate() >= penultimoDia) {
-      mes = mes === 11 ? 0 : mes + 1;
-      año = mes === 0 ? año + 1 : año;
-    }
-
-    const fechaDisparo = new Date(año, mes, new Date(año, mes + 1, 0).getDate() - 1, 20, 0, 0);
-
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: '¡Cierre de mes!',
-        body: 'Revisa tu resumen mensual y descubre cómo te fue este mes.',
-        data: { type: 'cierre_mes' },
-      },
-      trigger: { date: fechaDisparo } as any,
-    });
-  } catch (_) {
-    // Notificaciones opcionales — nunca rompen el flujo
-  }
-}
+// La notificación de cierre de mes vive en NotificacionesService.programarCierreMes
+// (esta copia pedía permiso por su cuenta y duplicaba el aviso).
 
 // ── Helpers de presentación ───────────────────────────────────────────────────
 

@@ -5,6 +5,7 @@ import { supabaseService } from '../services/supabase/SupabaseService';
 import type { ServerData } from '../services/supabase/SupabaseService';
 import { syncQueue, type SyncStatus } from '../services/SyncQueueService';
 import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
+import { limpiarDispositivo } from '../services/LocalWipeService';
 import { computeGamification, reconcileXp, buildUserLevel, LOGROS, RARITY_STYLE } from '../services/GamificacionService';
 import { emitRewardToast } from '../utils/rewardToastBus';
 import { getIngresoEfectivoMes } from '../utils/ingresoUtils';
@@ -91,7 +92,10 @@ interface FinanceContextType {
   addIncome: (amount: number, category: string, date: Date, description?: string, subcategory?: string) => void;
   addExpense: (amount: number, category: string, date: Date, description?: string, subcategory?: string) => void;
   updateUserSalary: (salary: number) => void;
-  resetAll: () => Promise<void>;
+  /** Reiniciar app: borra en el servidor y, solo si lo logra, en el dispositivo. */
+  resetAll: () => Promise<{ ok: boolean; error?: string }>;
+  /** Deja el dispositivo y el estado en memoria como recién instalados (sin tocar el servidor). */
+  limpiarEstadoLocal: () => Promise<void>;
 
   // Sync: importa datos del servidor al contexto local (usado en login/registro)
   importServerData: (data: Partial<ServerData>) => Promise<void>;
@@ -879,11 +883,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return updated;
     }));
 
-  const resetAll = async () => {
-    if (user) {
-      await supabaseService.deleteAllUserData(user.id).catch(() => {});
-    }
-    await storageService.clearAll();
+  const limpiarEstadoLocal = async () => {
+    await limpiarDispositivo();
     setUserState(null);
     setTransactions([]);
     setCategoriesState([]);
@@ -899,6 +900,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setMetas([]);
     setDeudas([]);
     setRecurrentes([]);
+  };
+
+  const resetAll = async (): Promise<{ ok: boolean; error?: string }> => {
+    if (user) {
+      // Nada en cola puede re-crear datos después del borrado en el servidor.
+      await syncQueue.clear();
+      const r = await supabaseService.resetMyData();
+      // Si el servidor falla NO se borra nada local: al volver a entrar los
+      // datos se descargarían otra vez y el usuario creería que se borraron.
+      if (!r.ok) return r;
+    }
+    await limpiarEstadoLocal();
+    return { ok: true };
   };
 
   // ── Saldo disponible (salario + ingresos extra − gastos del mes actual) ──────
@@ -975,6 +989,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setPremium,
     updateUserSalary,
     resetAll,
+    limpiarEstadoLocal,
     addCategory,
     updateCategory,
     deleteCategory,

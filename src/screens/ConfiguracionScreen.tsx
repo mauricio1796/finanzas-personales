@@ -1,18 +1,24 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  Animated,
+  Animated, AppState, Linking, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
 import { useTheme, ThemePreference } from '../state/ThemeContext';
 import { useFinance } from '../state';
 import { Icon } from '../components/ui/Icon';
 import { useHaptics } from '../hooks/useHaptics';
 import { Toast, useToast } from '../components/ui/Toast';
-import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesService';
+import {
+  reprogramarTodasLasNotificaciones, estadoPermisoNotificaciones, solicitarPermisoNotificaciones,
+  obtenerPreferenciasNotif, guardarPreferenciasNotif, enviarNotificacionPrueba,
+  NOTIF_PREFS_DEFAULT, type NotifPrefs, type EstadoPermisoNotif,
+} from '../services/NotificacionesService';
 import { verificarConexionWorker } from '../services/RealAIService';
+import {
+  getBiometricAvailability, isBiometricEnabled, setBiometricEnabled, authenticateBiometric,
+  etiquetaBiometria, hasPin, type BiometricKind, type EstadoBiometria,
+} from '../services/PinService';
 import { THEME } from '../constants/theme';
 
 interface ConfiguracionScreenProps {
@@ -210,29 +216,82 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
   }, []);
 
   // ── Notification state ───────────────────────────────────────────────────
-  const [permisosNotif, setPermisosNotif] = useState(false);
-  const [notifConfig, setNotifConfig] = useState({
-    pagos:       true,
-    presupuesto: true,
-    racha:       true,
-    semanal:     true,
-    inusual:     true,
-  });
+  const [estadoNotif, setEstadoNotif] = useState<EstadoPermisoNotif>('sin_preguntar');
+  const [notifConfig, setNotifConfig] = useState<NotifPrefs>(NOTIF_PREFS_DEFAULT);
+  const permisosNotif = estadoNotif === 'concedido';
+
+  const reprogramar = () => reprogramarTodasLasNotificaciones(
+    categories, transactions, profile?.monthlySalary ?? 0,
+  );
+
+  // ── Seguridad: desbloqueo biométrico ───────────────────────────────────
+  const [bio, setBio] = useState<{
+    kind: BiometricKind; estado: EstadoBiometria; activo: boolean; tienePin: boolean;
+  } | null>(null);
+
+  const refrescarBio = async () => {
+    const [disp, activo, tienePin] = await Promise.all([
+      getBiometricAvailability(), isBiometricEnabled(), hasPin(),
+    ]);
+    setBio({ kind: disp.kind, estado: disp.estado, activo: activo && disp.available, tienePin });
+  };
+
+  const toggleBio = async () => {
+    if (!bio) return;
+    const nombre = etiquetaBiometria(bio.kind);
+    haptics.selection();
+    if (bio.activo) {
+      await setBiometricEnabled(false);
+      setBio({ ...bio, activo: false });
+      mostrarToast(`${nombre} desactivado`, 'info');
+      return;
+    }
+    if (bio.estado !== 'disponible') { Linking.openSettings(); return; }
+    // Se verifica antes de activar (en iOS aquí aparece el permiso de Face ID).
+    const r = await authenticateBiometric(`Confirma para activar ${nombre}`, bio.kind);
+    if (r.ok) {
+      await setBiometricEnabled(true);
+      setBio({ ...bio, activo: true });
+      mostrarToast(`${nombre} activado`, 'success');
+    } else if (r.mensaje) {
+      mostrarToast(r.mensaje, 'error');
+      refrescarBio().catch(() => {});
+    }
+  };
 
   useEffect(() => {
-    Notifications.getPermissionsAsync().then(({ status }) => {
-      setPermisosNotif(status === 'granted');
-    });
-    AsyncStorage.getItem('@financy_notif_config').then(raw => {
-      if (raw) setNotifConfig(JSON.parse(raw));
-    });
+    const refrescar = () => {
+      estadoPermisoNotificaciones().then(setEstadoNotif).catch(() => {});
+      refrescarBio().catch(() => {});
+    };
+    refrescar();
+    obtenerPreferenciasNotif().then(setNotifConfig).catch(() => {});
+    // El usuario puede volver de los Ajustes del sistema con el permiso cambiado.
+    const sub = AppState.addEventListener('change', st => { if (st === 'active') refrescar(); });
+    return () => sub.remove();
   }, []);
 
-  const toggleNotif = async (key: keyof typeof notifConfig) => {
+  const toggleNotif = async (key: keyof NotifPrefs) => {
     const nueva = { ...notifConfig, [key]: !notifConfig[key] };
     setNotifConfig(nueva);
-    await AsyncStorage.setItem('@financy_notif_config', JSON.stringify(nueva));
     haptics.selection();
+    await guardarPreferenciasNotif(nueva);   // cancela lo programado si se apaga
+    if (nueva[key]) reprogramar().catch(() => {});
+  };
+
+  const activarNotificaciones = async () => {
+    haptics.medium();
+    if (estadoNotif === 'bloqueado') { Linking.openSettings(); return; }
+    const estado = await solicitarPermisoNotificaciones();
+    setEstadoNotif(estado);
+    if (estado === 'concedido') mostrarToast('Notificaciones activadas', 'success');
+    else if (estado === 'bloqueado') mostrarToast('Actívalas desde los ajustes del dispositivo', 'info');
+  };
+
+  const probarNotificacion = async () => {
+    haptics.light();
+    const ok = await enviarNotificacionPrueba();
+    mostrarToast(ok ? 'Te llegará en un par de segundos' : 'No se pudo enviar la notificación', ok ? 'success' : 'error');
   };
 
   // Animate preview when theme changes
@@ -376,6 +435,45 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
           </TouchableOpacity>
         </View>
 
+        {/* ── Seguridad ── */}
+        {bio && bio.tienePin && bio.estado !== 'sin_hardware' && (() => {
+          const nombre = etiquetaBiometria(bio.kind);
+          const titulo = Platform.OS === 'ios' ? `Desbloquear con ${nombre}` : `Desbloquear con tu ${nombre}`;
+          const desc = bio.estado === 'sin_permiso'
+            ? `Desactivado para FinancyAI en los ajustes del teléfono`
+            : bio.estado === 'no_configurado'
+              ? `Configura ${nombre} en tu teléfono para usarlo aquí`
+              : bio.activo ? 'Entras sin escribir el PIN' : `Usa ${nombre} en vez del PIN al abrir la app`;
+          return (
+            <>
+              <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 24 }]}>
+                SEGURIDAD
+              </Text>
+              <View style={[styles.notifCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.notifStatusRow}>
+                  <View style={[styles.notifStatusIcon, { backgroundColor: colors.primaryLight }]}>
+                    <Icon name={bio.kind === 'face' ? 'smile' : 'unlock'} size={18} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.notifStatusTitle, { color: colors.textPrimary }]}>{titulo}</Text>
+                    <Text style={[styles.notifStatusSub, { color: colors.textSecondary }]}>{desc}</Text>
+                  </View>
+                  {bio.estado === 'disponible' ? (
+                    <NotifToggle active={bio.activo} disabled={false} onPress={toggleBio} colors={colors} />
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => Linking.openSettings()}
+                      style={[styles.notifActivateBtn, { backgroundColor: colors.primary }]}
+                    >
+                      <Text style={styles.notifActivateBtnTxt}>Ajustes</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </>
+          );
+        })()}
+
         {/* ── Notificaciones ── */}
         <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 24 }]}>
           NOTIFICACIONES
@@ -401,20 +499,17 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
               <Text style={[styles.notifStatusSub, { color: colors.textSecondary }]}>
                 {permisosNotif
                   ? 'Recibes alertas financieras inteligentes'
-                  : 'Activaelas para no perder pagos importantes'}
+                  : estadoNotif === 'bloqueado'
+                    ? 'Están bloqueadas en los ajustes del dispositivo'
+                    : 'Actívalas para no perder pagos importantes'}
               </Text>
             </View>
             {!permisosNotif && (
               <TouchableOpacity
-                onPress={() => {
-                  haptics.medium();
-                  Notifications.requestPermissionsAsync().then(({ status }) => {
-                    setPermisosNotif(status === 'granted');
-                  });
-                }}
+                onPress={activarNotificaciones}
                 style={[styles.notifActivateBtn, { backgroundColor: colors.primary }]}
               >
-                <Text style={styles.notifActivateBtnTxt}>Activar</Text>
+                <Text style={styles.notifActivateBtnTxt}>{estadoNotif === 'bloqueado' ? 'Ajustes' : 'Activar'}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -422,11 +517,12 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
           {/* Toggles por tipo */}
           {(
             [
-              { key: 'pagos',       label: 'Pagos proximos y vencidos', icon: 'calendar',    desc: 'Alertas 3 dias antes y el dia del vencimiento' },
-              { key: 'presupuesto', label: 'Limites de presupuesto',    icon: 'alert-circle', desc: 'Cuando llegas al 80% y 100% de una categoria'  },
-              { key: 'racha',       label: 'Racha en riesgo',           icon: 'zap',          desc: 'Si no registras actividad en el dia'           },
-              { key: 'semanal',     label: 'Resumen semanal',           icon: 'bar-chart-2',  desc: 'Cada lunes a las 9am'                          },
-              { key: 'inusual',     label: 'Gastos inusuales',          icon: 'trending-up',  desc: 'Cuando un gasto supera 2.5x tu promedio'       },
+              { key: 'pagos',       label: 'Pagos próximos y vencidos', icon: 'calendar',       desc: '3 días antes y el día del vencimiento'               },
+              { key: 'presupuesto', label: 'Límites de presupuesto',    icon: 'alert-circle',   desc: 'Cuando llegas al 80% y al 100% de una categoría'     },
+              { key: 'inusual',     label: 'Gastos inusuales',          icon: 'trending-up',    desc: 'Cuando un gasto supera 2,5 veces tu promedio'        },
+              { key: 'semanal',     label: 'Resúmenes',                 icon: 'bar-chart-2',    desc: 'Cada lunes a las 9 a. m. y el cierre de mes'         },
+              { key: 'racha',       label: 'Rachas y días verdes',      icon: 'zap',            desc: 'Si tu racha está en riesgo o pasas un día sin gastar' },
+              { key: 'finn',        label: 'Consejos y logros de Finn', icon: 'message-circle', desc: 'Metas alcanzadas, ingreso pendiente y alertas'       },
             ] as const
           ).map(item => (
             <View
@@ -450,6 +546,21 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
               />
             </View>
           ))}
+
+          {permisosNotif && (
+            <TouchableOpacity
+              onPress={probarNotificacion}
+              style={[styles.notifItem, { borderTopColor: colors.borderSubtle }]}
+              accessibilityRole="button"
+            >
+              <Icon name="send" size={16} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.notifItemLabel, { color: colors.primary }]}>Enviar notificación de prueba</Text>
+                <Text style={[styles.notifItemDesc, { color: colors.textTertiary }]}>Mira cómo te llegan los avisos de Finn</Text>
+              </View>
+              <Icon name="chevron-right" size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Reprogramar manualmente */}
@@ -505,9 +616,7 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
         <TouchableOpacity
           onPress={async () => {
             haptics.medium();
-            await reprogramarTodasLasNotificaciones(
-              categories, transactions, profile?.monthlySalary ?? 0,
-            );
+            await reprogramar();
             mostrarToast('Notificaciones actualizadas', 'success');
           }}
           style={[styles.notifReprogramBtn, { borderColor: colors.border }]}

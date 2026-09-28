@@ -70,6 +70,24 @@ class SyncQueueService {
     this.processNext();
   }
 
+  /**
+   * Descarta lo pendiente y espera a que termine la operación en curso.
+   * Se usa antes de borrar los datos del usuario: una escritura que quedara en
+   * cola y se ejecutara después del borrado volvería a crear el dato.
+   */
+  async clear(timeoutMs = 5000): Promise<void> {
+    this.queue = [];
+    if (this.retryTimeoutId) {
+      clearTimeout(this.retryTimeoutId);
+      this.retryTimeoutId = null;
+    }
+    const limite = Date.now() + timeoutMs;
+    while (this.isProcessing && Date.now() < limite) {
+      await new Promise(r => setTimeout(r, 50));
+    }
+    this.setStatus('idle', 0);
+  }
+
   // ─── Procesamiento interno ─────────────────────────────────────────────────
 
   private async processNext(): Promise<void> {

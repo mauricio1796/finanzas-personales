@@ -4,10 +4,10 @@
  * y supresión (eliminación de cuenta).
  */
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { consentService } from './ConsentService';
-import { clearPin, clearRememberedUser } from './PinService';
+import { limpiarDispositivo } from './LocalWipeService';
+import { syncQueue } from './SyncQueueService';
 import { CONFIG } from '../constants/config';
 
 export type PrivacyRequestType =
@@ -128,16 +128,16 @@ export async function listarSolicitudes(): Promise<PrivacyRequest[]> {
 export async function eliminarCuenta(): Promise<{ ok: boolean; error?: string; pagosConservados?: boolean }> {
   if (!supabase) return { ok: false, error: 'El servicio no está disponible. Escríbenos por correo para eliminar tu cuenta.' };
   try {
+    // Nada en cola puede escribir mientras (o después de que) se borra la cuenta.
+    await syncQueue.clear();
     const { data, error } = await supabase.rpc('delete_my_account');
     if (error) return { ok: false, error: 'No pudimos eliminar la cuenta. Revisa tu conexión e intenta de nuevo.' };
     const pagosConservados = !!(data as any)?.payment_records_retained;
 
-    // Limpieza local: sesión, PIN, usuario recordado, consentimientos y datos.
+    // Limpieza local: sesión y todo el dispositivo (datos, PIN, notificaciones
+    // programadas, widget, consentimientos en caché).
     try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* la cuenta ya no existe */ }
-    await clearPin().catch(() => {});
-    await clearRememberedUser().catch(() => {});
-    await consentService.clearLocal();
-    try { await AsyncStorage.clear(); } catch { /* noop */ }
+    await limpiarDispositivo();
     return { ok: true, pagosConservados };
   } catch {
     return { ok: false, error: 'Sin conexión. Intenta de nuevo cuando tengas internet.' };

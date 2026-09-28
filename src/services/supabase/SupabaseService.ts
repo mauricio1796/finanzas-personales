@@ -753,34 +753,21 @@ class SupabaseService {
     }
   }
 
-  async deleteAllUserData(userId: string): Promise<void> {
+  /**
+   * «Reiniciar app»: RPC `reset_my_data` (migración 20260928). Borra físicamente
+   * los datos financieros del usuario autenticado y conserva la cuenta.
+   * Antes se hacía desde el cliente con borrado lógico de transacciones y
+   * categorías, que quedaban en el servidor indefinidamente.
+   */
+  async resetMyData(): Promise<{ ok: boolean; error?: string }> {
     const db = this.db;
-    if (!db) return;
+    if (!db) return { ok: true };   // modo sin nube: solo hay datos locales
     try {
-      const now = new Date().toISOString();
-      await Promise.all([
-        // Soft delete transactions y categories — preserva auditoría
-        db.from('transactions').update({ deleted_at: now }).eq('user_id', userId).is('deleted_at', null),
-        db.from('categories').update({ deleted_at: now }).eq('user_id', userId).is('deleted_at', null),
-        db.from('financial_profiles').delete().eq('user_id', userId),
-        db.from('financial_goals').delete().eq('user_id', userId),
-        db.from('user_levels').delete().eq('user_id', userId),
-        db.from('finn_memory').delete().eq('user_id', userId),
-        db.from('metas').delete().eq('user_id', userId),
-        db.from('deudas').delete().eq('user_id', userId),
-        db.from('gastos_recurrentes').delete().eq('user_id', userId),
-        db.from('profiles').update({
-          monthly_salary: 0,
-          is_onboarded: false,
-          paid_tx_ids: [],
-          lecciones_completadas: [],
-          retos_completados: [],
-          reto_activo: null,
-          premium: DEFAULT_PREMIUM,
-        }).eq('id', userId),
-      ]);
-    } catch (e) {
-      console.warn('[SupabaseService] deleteAllUserData error:', e);
+      const { error } = await db.rpc('reset_my_data');
+      if (error) return { ok: false, error: 'No pudimos borrar tus datos en la nube. Revisa tu conexión e intenta de nuevo.' };
+      return { ok: true };
+    } catch {
+      return { ok: false, error: 'Sin conexión. Intenta de nuevo cuando tengas internet.' };
     }
   }
 }

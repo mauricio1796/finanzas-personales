@@ -116,7 +116,7 @@ export default function HomeScreen() {
     transactions, categories, goal, userLevel, leccionesCompletadas, retosCompletados, retoActivo, premium,
     addTransaction: ctxAddTransaction, deleteTransaction: ctxDeleteTransaction,
     addCategory,
-    isLoading, importServerData, saldoDisponible, resetAll,
+    isLoading, importServerData, saldoDisponible, limpiarEstadoLocal,
     syncFailureMessage, clearSyncFailure,
   } = useFinance();
   useTheme(); // keep context subscription
@@ -446,6 +446,7 @@ export default function HomeScreen() {
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Notification listeners — tap opens the target screen (native only)
+  const notifManejadaRef = useRef<string | null>(null);
   useEffect(() => {
     if (Platform.OS === 'web') return;
     const SCREEN_MAP: Record<string, string> = {
@@ -459,7 +460,11 @@ export default function HomeScreen() {
       'bot':            'bot',
     };
 
-    const tapSub = Notifications.addNotificationResponseReceivedListener(response => {
+    const manejarRespuesta = (response: Notifications.NotificationResponse) => {
+      // Una misma respuesta puede llegar por el listener y por la consulta de arranque.
+      const id = response.notification.request.identifier;
+      if (notifManejadaRef.current === id) return;
+      notifManejadaRef.current = id;
       const data = response.notification.request.content.data as unknown as NotifData | undefined;
 
       // New format: data.screen
@@ -473,7 +478,15 @@ export default function HomeScreen() {
       const legacyType = (data as any)?.type;
       if (legacyType === 'weekly_summary') navegarA('resumenSemanal');
       if (legacyType === 'cierre_mes') { setResumenMensualMes(undefined); navegarA('resumenMensual'); }
-    });
+    };
+
+    const tapSub = Notifications.addNotificationResponseReceivedListener(manejarRespuesta);
+
+    // App abierta desde cero al tocar una notificación: el listener se registra
+    // después de que el sistema entregó la respuesta, así que se consulta aquí.
+    Notifications.getLastNotificationResponseAsync()
+      .then(r => { if (r) manejarRespuesta(r); })
+      .catch(() => {});
 
     const foregroundSub = Notifications.addNotificationReceivedListener(notification => {
       const data = notification.request.content.data as unknown as NotifData | undefined;
@@ -755,14 +768,16 @@ export default function HomeScreen() {
     if (authService.isReady) {
       try { await authService.signOut(); } catch {}
     }
-    // Limpiar PIN
-    await clearPin();
     setPinExists(false);
     setIsUnlocked(false);
     setShowPinSetup(false);
-    // Limpiar todos los datos persistidos
-    await resetAll();
+    // Dispositivo como recién instalado: datos, PIN, notificaciones programadas,
+    // widget, cola de sync. El borrado en el servidor ya lo hizo quien llama
+    // (Reiniciar app → reset_my_data; Eliminar cuenta → delete_my_account).
+    await limpiarEstadoLocal();
     await setIsOnboarded(false);
+    // La pantalla de permisos vuelve a evaluarse (salta lo que el sistema ya decidió).
+    if (Platform.OS !== 'web') setShowPermissions(true);
     // Limpiar estado OTP
     setOtpEmail('');
     setOtpName('');
@@ -984,16 +999,28 @@ export default function HomeScreen() {
 
             // Ofrecer desbloqueo biométrico si el dispositivo lo soporta
             try {
-              const { getBiometricAvailability, setBiometricEnabled } = await import('../../src/services/PinService');
+              const {
+                getBiometricAvailability, setBiometricEnabled, authenticateBiometric, etiquetaBiometria,
+              } = await import('../../src/services/PinService');
               const { available, kind } = await getBiometricAvailability();
               if (available) {
-                const etiqueta = kind === 'face' ? 'Face ID' : 'tu huella';
+                const etiqueta = etiquetaBiometria(kind);
+                const nombre = Platform.OS === 'ios' ? etiqueta : `tu ${etiqueta}`;
                 Alert.alert(
-                  `¿Desbloquear con ${etiqueta}?`,
-                  'Podrás entrar a FinancyAI sin escribir el PIN cada vez.',
+                  `¿Desbloquear con ${nombre}?`,
+                  'Podrás entrar a FinancyAI sin escribir el PIN cada vez. Puedes cambiarlo en Configuración › Seguridad.',
                   [
                     { text: 'Ahora no', style: 'cancel' },
-                    { text: 'Activar', onPress: () => setBiometricEnabled(true) },
+                    {
+                      text: 'Activar',
+                      // Se verifica antes de guardar: en iOS aquí aparece el permiso
+                      // de Face ID, y si falla no queda activado algo que no funciona.
+                      onPress: async () => {
+                        const r = await authenticateBiometric(`Confirma para activar ${etiqueta}`, kind);
+                        if (r.ok) await setBiometricEnabled(true);
+                        else if (r.mensaje) Alert.alert(`No se activó ${etiqueta}`, r.mensaje);
+                      },
+                    },
                   ],
                 );
               }

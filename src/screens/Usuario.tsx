@@ -84,18 +84,32 @@ export function Usuario({ onReset, onStartTour, onStartDemo, onNavigate }: Usuar
     setIsEditing(false);
   };
 
+  const MENSAJE_REINICIO =
+    'Se borrarán de forma definitiva, en este dispositivo y en la nube: movimientos, categorías, metas, deudas, ' +
+    'gastos recurrentes, progreso, memoria de Finn y recordatorios. Se cerrará la sesión.\n\n' +
+    'Tu cuenta, tu plan Premium y los espacios compartidos se conservan. Para eliminar la cuenta usa «Eliminar cuenta».';
+
+  const reiniciar = async () => {
+    const r = await resetAll();
+    if (!r.ok) {
+      const msg = r.error ?? 'No pudimos reiniciar. Intenta de nuevo.';
+      if (Platform.OS === 'web') window.alert(msg); else Alert.alert('No se borró nada', msg);
+      return;
+    }
+    onReset?.();
+  };
+
   const handleReset = () => {
     if (Platform.OS === 'web') {
-      const ok = window.confirm('Se borrarán tus transacciones, perfil, progreso y configuración en este dispositivo y en la nube, y se cerrará la sesión. Tu cuenta seguirá existiendo (para eliminarla usa «Eliminar cuenta»). ¿Continuar?');
-      if (ok) { resetAll().then(() => onReset?.()); }
+      if (window.confirm(`${MENSAJE_REINICIO}\n\n¿Continuar?`)) reiniciar();
       return;
     }
     Alert.alert(
-      'Reiniciar App',
-      'Se borrarán tus transacciones, perfil, progreso y configuración en este dispositivo y en la nube, y se cerrará la sesión. Tu cuenta seguirá existiendo; para eliminarla usa «Eliminar cuenta».',
+      'Reiniciar app',
+      MENSAJE_REINICIO,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Reiniciar Todo', style: 'destructive', onPress: async () => { await resetAll(); onReset?.(); } },
+        { text: 'Borrar y reiniciar', style: 'destructive', onPress: reiniciar },
       ],
     );
   };

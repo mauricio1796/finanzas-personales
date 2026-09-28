@@ -23,6 +23,13 @@ import {
   getHeatIntensity, getHeatColor,
   type HeatCell,
 } from '../utils/statsUtils';
+import {
+  analizarEstadisticas, buildContextoEstadisticas, preguntaDeGrafica,
+  type StatsChartId,
+} from '../utils/statsCoach';
+import {
+  FinnPulseCard, FinnChartButton, FinnStatsSheet, type FinnStatsRequest,
+} from '../components/stats/FinnStatsCoach';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmtCOP = (n: number) =>
@@ -65,6 +72,7 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
   const [año,  setAño]  = useState(now.getFullYear());
   const [periodoBars, setPeriodoBars] = useState<PeriodoBars>(6);
   const [selectedHeatCell, setSelectedHeatCell] = useState<HeatCell | null>(null);
+  const [finnReq, setFinnReq] = useState<FinnStatsRequest | null>(null);
 
   // No animations — static professional charts
 
@@ -90,6 +98,19 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
   const areaData = useMemo(() => getAreaData(transactions, 6, salary), [transactions, salary]);
   const heatData = useMemo(() => getHeatmapData(transactions, mes, año), [transactions, mes, año]);
   const treemapData = useMemo(() => getTreemapData(transactions, mes, año), [transactions, mes, año]);
+
+  // ── Finn: lectura en vivo de lo que muestran las gráficas ─────────────────
+  const entradaFinn = useMemo(() => ({
+    transactions: transactions as any[], categories: categories as any[],
+    metricas: metricasIngreso, mes, año, barData, areaData,
+    metaAhorro: goal?.targetAmount ?? 0,
+  }), [transactions, categories, metricasIngreso, mes, año, barData, areaData, goal]);
+  const analisisFinn = useMemo(() => analizarEstadisticas(entradaFinn), [entradaFinn]);
+  const buildContextoFinn = (chart?: StatsChartId | null) =>
+    buildContextoEstadisticas(analisisFinn, entradaFinn, { tab, chart });
+  const abrirFinn = (pregunta?: string, chart?: StatsChartId) =>
+    setFinnReq({ id: Date.now(), pregunta, chart });
+  const explicarGrafica = (chart: StatsChartId) => abrirFinn(preguntaDeGrafica(chart), chart);
 
   const maxBarMonto  = useMemo(() => Math.max(...barData.flatMap(d => [d.gastoActual, d.gastoAnterior]), 1), [barData]);
   const maxHeatMonto = useMemo(() => Math.max(...heatData.map(c => c.monto), 1), [heatData]);
@@ -205,14 +226,18 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
     });
 
     const catGrid = (categories as any[]).filter(c => c.isSelected).slice(0, 8);
+    const cambio  = analisisFinn.cambioVsMesAnterior;
 
     return (
       <View>
         {/* ── Donut card ── */}
         <View style={[cs.card, { backgroundColor: card }]}>
           <View style={cs.cardHeader}>
-            <Text style={[cs.cardTitle, { color: txt }]}>Gastos por categoría</Text>
-            <Text style={[cs.cardSub, { color: txtT }]}>{capitalize(getMesLabelLargo(mes, año))}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[cs.cardTitle, { color: txt }]}>Gastos por categoría</Text>
+              <Text style={[cs.cardSub, { color: txtT }]}>{capitalize(getMesLabelLargo(mes, año))}</Text>
+            </View>
+            {totalGastos > 0 && <FinnChartButton chart="donut" onPress={explicarGrafica} />}
           </View>
 
           {totalGastos === 0 ? (
@@ -270,22 +295,20 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
                 ))}
               </View>
 
-              {/* Change badge */}
-              {metricas.cambioPctVsMesAnterior !== 0 && (
+              {/* Change badge — misma comparación que usa Finn: a la misma altura
+                  del mes (un mes a medias contra uno completo siempre "bajaba"). */}
+              {!!cambio && (
                 <View style={[cs.badge, {
-                  backgroundColor: metricas.cambioPctVsMesAnterior < 0
-                    ? income + '18' : expense + '18',
+                  backgroundColor: cambio < 0 ? income + '18' : expense + '18',
                   alignSelf: 'center', marginTop: 12,
                 }]}>
                   <Icon
-                    name={metricas.cambioPctVsMesAnterior < 0 ? 'trending-down' : 'trending-up'}
+                    name={cambio < 0 ? 'trending-down' : 'trending-up'}
                     size={11}
-                    color={metricas.cambioPctVsMesAnterior < 0 ? income : expense}
+                    color={cambio < 0 ? income : expense}
                   />
-                  <Text style={[cs.badgeText, {
-                    color: metricas.cambioPctVsMesAnterior < 0 ? income : expense,
-                  }]}>
-                    {Math.abs(metricas.cambioPctVsMesAnterior)}% vs mes anterior
+                  <Text style={[cs.badgeText, { color: cambio < 0 ? income : expense }]}>
+                    {Math.abs(cambio)}% vs {getMesLabel(mes === 0 ? 11 : mes - 1)}{analisisFinn.esMesActual ? ' a esta fecha' : ''}
                   </Text>
                 </View>
               )}
@@ -382,12 +405,13 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
         <View style={[cs.card, { backgroundColor: card }]}>
           <View style={cs.cardHeader}>
             <Text style={[cs.cardTitle, { color: txt }]}>Gastos mensuales</Text>
-            <View style={cs.legendRow}>
-              <View style={[cs.legendDot, { backgroundColor: primary, opacity: 0.35 }]} />
-              <Text style={[cs.legendName, { color: txts, fontSize: 10 }]}>Ant.</Text>
-              <View style={[cs.legendDot, { backgroundColor: primary }]} />
-              <Text style={[cs.legendName, { color: txts, fontSize: 10 }]}>Act.</Text>
-            </View>
+            {hasBars && <FinnChartButton chart="barras" onPress={explicarGrafica} />}
+          </View>
+          <View style={[cs.legendRow, { marginTop: -8, marginBottom: 12 }]}>
+            <View style={[cs.legendDot, { backgroundColor: primary, opacity: 0.35 }]} />
+            <Text style={[cs.barLegendText, { color: txts }]}>Año anterior</Text>
+            <View style={[cs.legendDot, { backgroundColor: primary }]} />
+            <Text style={[cs.barLegendText, { color: txts }]}>Este año</Text>
           </View>
 
           {!hasBars ? (
@@ -469,12 +493,15 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
         {/* Area chart — ahorro */}
         <View style={[cs.card, { backgroundColor: card }]}>
           <View style={cs.cardHeader}>
-            <Text style={[cs.cardTitle, { color: txt }]}>Ahorro acumulado</Text>
-            {goalAmt > 0 && (
-              <View style={[cs.badge, { backgroundColor: income + '18' }]}>
-                <Text style={[cs.badgeText, { color: income }]}>Meta: {fmtShort(goalAmt)}</Text>
-              </View>
-            )}
+            <Text style={[cs.cardTitle, { color: txt, flex: 1 }]}>Ahorro acumulado</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {goalAmt > 0 && (
+                <View style={[cs.badge, { backgroundColor: income + '18' }]}>
+                  <Text style={[cs.badgeText, { color: income }]}>Meta: {fmtShort(goalAmt)}</Text>
+                </View>
+              )}
+              {!sinAhorro && <FinnChartButton chart="ahorro" onPress={explicarGrafica} />}
+            </View>
           </View>
 
           {sinAhorro ? (
@@ -566,8 +593,11 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
       <View>
         <View style={[cs.card, { backgroundColor: card }]}>
           <View style={cs.cardHeader}>
-            <Text style={[cs.cardTitle, { color: txt }]}>Intensidad de gasto</Text>
-            <Text style={[cs.cardSub, { color: txtT }]}>{capitalize(getMesLabelLargo(mes, año))}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[cs.cardTitle, { color: txt }]}>Intensidad de gasto</Text>
+              <Text style={[cs.cardSub, { color: txtT }]}>{capitalize(getMesLabelLargo(mes, año))}</Text>
+            </View>
+            {diaMax.monto > 0 && <FinnChartButton chart="calor" onPress={explicarGrafica} />}
           </View>
 
           <View style={{ alignItems: 'center' }}>
@@ -675,8 +705,11 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
       <View>
         <View style={[cs.card, { backgroundColor: card }]}>
           <View style={cs.cardHeader}>
-            <Text style={[cs.cardTitle, { color: txt }]}>Distribución de gastos</Text>
-            <Text style={[cs.cardSub, { color: txtT }]}>{capitalize(getMesLabel(mes))}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[cs.cardTitle, { color: txt }]}>Distribución de gastos</Text>
+              <Text style={[cs.cardSub, { color: txtT }]}>{capitalize(getMesLabel(mes))}</Text>
+            </View>
+            {!sinDatos && <FinnChartButton chart="mapa" onPress={explicarGrafica} />}
           </View>
 
           {sinDatos ? (
@@ -767,7 +800,10 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
             <Text style={cs.heroTitle}>Estadísticas</Text>
             <Text style={cs.heroSub}>{capitalize(getMesLabelLargo(mes, año))}</Text>
           </View>
-          <TouchableOpacity onPress={() => onNavigate?.('exportar')} style={cs.heroAction}>
+          <TouchableOpacity onPress={() => abrirFinn()} style={cs.heroAction} accessibilityLabel="Hablar con Finn sobre tus estadísticas">
+            <Icon name="message-circle" size={16} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => onNavigate?.('exportar')} style={cs.heroAction} accessibilityLabel="Exportar">
             <Icon name="download" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -827,11 +863,27 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
         contentContainerStyle={[cs.content, { paddingBottom: 56 + insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
       >
+        <FinnPulseCard
+          analisis={analisisFinn}
+          tab={tab}
+          mesLabel={capitalize(getMesLabelLargo(mes, año))}
+          onAsk={pregunta => abrirFinn(pregunta)}
+        />
         {tab === 'resumen'      && renderResumen()}
         {tab === 'tendencia'    && renderTendencia()}
         {tab === 'calor'        && renderCalor()}
         {tab === 'distribucion' && renderDistribucion()}
       </ScrollView>
+
+      <FinnStatsSheet
+        request={finnReq}
+        onClose={() => setFinnReq(null)}
+        analisis={analisisFinn}
+        tab={tab}
+        mesLabel={capitalize(getMesLabelLargo(mes, año))}
+        buildContexto={buildContextoFinn}
+        onNavigate={onNavigate}
+      />
     </View>
   );
 };
@@ -933,6 +985,7 @@ const cs = StyleSheet.create({
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   legendDot: { width: 9, height: 9, borderRadius: 2.5 },
   legendName: { fontSize: 12, fontWeight: '500', width: 90 },
+  barLegendText: { fontSize: 10.5, fontWeight: '500', marginRight: 8 },
   legendTrack: { flex: 1, height: 5, borderRadius: 3, overflow: 'hidden' },
   legendFill: { height: 5, borderRadius: 3 },
   legendPct: { fontSize: 11, fontWeight: '700', width: 32, textAlign: 'right' },

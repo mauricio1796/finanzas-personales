@@ -9,27 +9,37 @@ import {
   limpiarNotificacionesCategoria,
   limpiarCacheMensualNotificaciones,
   programarDiaSinGastar,
+  inicializarNotificaciones,
+  onPermisoNotificacionesConcedido,
 } from '../services/NotificacionesService';
 import { calcularMetricasFinancieras } from '../utils/ingresoUtils';
 import { calcularRachaActual } from '../services/GamificacionService';
 
 export function useNotificacionesManager() {
-  const { transactions, categories, profile, goal } = useFinance();
+  const { transactions, categories, profile, goal, user } = useFinance();
   if (Platform.OS === 'web') return; // notificaciones push no disponibles en web
 
   const prevTxLen       = useRef(transactions.length);
   const prevCatSnapshot = useRef('');
   const appState        = useRef(AppState.currentState);
 
-  // ── Inicializar al montar ────────────────────────────────────────────────
+  // Siempre lee el estado más reciente (el permiso puede concederse más tarde).
+  const latest = useRef({ transactions, categories, profile, goal, user });
+  latest.current = { transactions, categories, profile, goal, user };
+
+  // ── Inicializar al montar y cuando el usuario concede el permiso ─────────
   useEffect(() => {
     const inicializar = async () => {
+      const { transactions, categories, profile, goal, user } = latest.current;
+      // Canales + handler; no pide permisos.
+      await inicializarNotificaciones();
+      // Sin sesión (p. ej. justo después de borrar los datos) no se programa nada.
+      if (!user) return;
       // No intentar programar notificaciones si el permiso no está concedido
       const { status } = await import('expo-notifications').then(m => m.getPermissionsAsync());
       if (status !== 'granted') return;
 
       await limpiarCacheMensualNotificaciones();
-      await programarDiaSinGastar();
 
       const salary     = profile?.monthlySalary ?? 0;
       const racha      = calcularRachaActual(transactions);
@@ -50,8 +60,10 @@ export function useNotificacionesManager() {
     };
 
     inicializar().catch(() => {});
+    return onPermisoNotificacionesConcedido(() => { inicializar().catch(() => {}); });
+  // Se re-ejecuta al iniciar sesión (el usuario se carga después del montaje).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.id]);
 
   // ── Detectar nueva transacción ───────────────────────────────────────────
   useEffect(() => {
@@ -71,6 +83,7 @@ export function useNotificacionesManager() {
     const salary = profile?.monthlySalary ?? 0;
 
     verificarGastoInusual(nuevaTx, transactions).catch(() => {});
+    programarDiaSinGastar(transactions).catch(() => {});
 
     if (nuevaTx.type === 'expense') {
       verificarPresupuestosLimite(
@@ -98,6 +111,7 @@ export function useNotificacionesManager() {
     );
     if (snapshot === prevCatSnapshot.current) return;
     prevCatSnapshot.current = snapshot;
+    if (!latest.current.user) return;
 
     // Limpiar notificaciones de categorías recién marcadas como pagadas
     categories
@@ -113,7 +127,7 @@ export function useNotificacionesManager() {
   // ── App vuelve a foreground ──────────────────────────────────────────────
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
-      if (appState.current.match(/inactive|background/) && nextState === 'active') {
+      if (appState.current.match(/inactive|background/) && nextState === 'active' && latest.current.user) {
         const racha  = calcularRachaActual(transactions);
         const salary = profile?.monthlySalary ?? 0;
         reprogramarTodasLasNotificaciones(

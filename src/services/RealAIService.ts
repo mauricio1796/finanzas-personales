@@ -38,6 +38,12 @@ export interface ContextoPersonalizado {
   vozMode?: boolean;
   /** Contexto del espacio compartido — solo datos del espacio, NUNCA finanzas personales del otro miembro */
   espacioCompartido?: SharedSpaceSummary | null;
+  /**
+   * Descripción de la pantalla que el usuario está viendo (p. ej. las gráficas
+   * de Estadísticas, ver utils/statsCoach). Se añade al final del contexto para
+   * que Finn pueda explicar "esta gráfica" con los mismos números.
+   */
+  contextoPantalla?: string;
 }
 
 // ── System prompt ─────────────────────────────────────────────────────────────
@@ -190,6 +196,11 @@ ESPACIO COMPARTIDO — "${ec.spaceName}":
 - Principales categorías compartidas: ${catTxt || 'Sin gastos aún'}
 - Balance: ${deudaTxt}
 IMPORTANTE: Solo usa datos del espacio compartido para responder preguntas sobre el espacio. No reveles ni compares las finanzas personales de ningún miembro.`;
+  }
+
+  if (extra.contextoPantalla) {
+    // Incluye nombres de categorías escritos por el usuario: misma minimización que el resto.
+    contextoFinal += `\n\n${minimizarParaIA(extra.contextoPantalla, nombre)}`;
   }
 
   return { contexto: contextoFinal, metricas };
