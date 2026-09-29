@@ -145,7 +145,7 @@ interface FinanceContextType {
   abonarMeta: (id: string, monto: number, fecha?: Date) => void;
   /** Baja el saldo de la meta y devuelve al disponible lo que salió de él. */
   retirarDeMeta: (id: string, monto: number) => void;
-  /** Compras que el usuario decidió no hacer (Simulador). Solo en el dispositivo. */
+  /** Compras que el usuario decidió no hacer (Simulador). Sincronizadas con compras_evitadas. */
   comprasEvitadas: CompraEvitada[];
   registrarCompraEvitada: (monto: number, descripcion?: string) => void;
 
@@ -480,6 +480,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
     if (data.deudas !== undefined) setDeudas(data.deudas);
     if (data.recurrentes !== undefined) setRecurrentes(data.recurrentes);
+    if (data.comprasEvitadas !== undefined) setComprasEvitadas(data.comprasEvitadas);
   };
 
   // ─── Core methods ─────────────────────────────────────────────────────────
@@ -955,10 +956,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const registrarCompraEvitada = (monto: number, descripcion?: string) => {
     if (!(monto > 0)) return;
     const ahora = new Date();
-    setComprasEvitadas(prev => [
-      { id: `evitada_${ahora.getTime()}`, monto: Math.round(monto), fecha: ahora.toISOString(), ...(descripcion ? { descripcion } : {}) },
-      ...prev,
-    ].slice(0, 200));
+    const compra: CompraEvitada = {
+      id: `evitada_${ahora.getTime()}`, monto: Math.round(monto), fecha: ahora.toISOString(),
+      ...(descripcion ? { descripcion } : {}),
+    };
+    setComprasEvitadas(prev => [compra, ...prev].slice(0, 200));
+    if (user) {
+      const uid = user.id;
+      syncQueue.enqueue('registrar compra evitada', () => supabaseService.upsertCompraEvitada(uid, compra));
+    }
   };
 
   // ─── Deudas ───────────────────────────────────────────────────────────────

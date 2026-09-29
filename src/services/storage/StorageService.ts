@@ -104,7 +104,7 @@ class StorageService {
   async getDeudas(): Promise<Deuda[] | null> { return this.getData<Deuda[]>(this.KEYS.DEUDAS); }
   async saveRecurrentes(recurrentes: GastoRecurrente[]): Promise<void> { return this.saveData(this.KEYS.RECURRENTES, recurrentes); }
   async getRecurrentes(): Promise<GastoRecurrente[] | null> { return this.getData<GastoRecurrente[]>(this.KEYS.RECURRENTES); }
-  // Compras evitadas (Simulador): solo en el dispositivo; limpiarDispositivo las borra con AsyncStorage.clear().
+  // Compras evitadas (Simulador): caché local; se sincronizan con la tabla compras_evitadas.
   async saveComprasEvitadas(c: CompraEvitada[]): Promise<void> { return this.saveData(this.KEYS.COMPRAS_EVITADAS, c); }
   async getComprasEvitadas(): Promise<CompraEvitada[] | null> { return this.getData<CompraEvitada[]>(this.KEYS.COMPRAS_EVITADAS); }
 

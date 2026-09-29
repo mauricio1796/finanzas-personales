@@ -1,6 +1,6 @@
 import { supabase, isSupabaseReady } from '../../lib/supabase';
 import { getNivelActual } from '../GamificacionService';
-import type { Transaction, Category, FinancialProfile, FinancialGoal, UserLevel, Meta, Deuda, GastoRecurrente } from '../../types';
+import type { Transaction, Category, FinancialProfile, FinancialGoal, UserLevel, Meta, Deuda, GastoRecurrente, CompraEvitada } from '../../types';
 import type { PremiumState, RetoActivo } from '../../state/FinanceContext';
 
 // ─── Tipos públicos ───────────────────────────────────────────────────────────
@@ -21,6 +21,7 @@ export interface ServerData {
   metas: Meta[];
   deudas: Deuda[];
   recurrentes: GastoRecurrente[];
+  comprasEvitadas: CompraEvitada[];
 }
 
 export interface TransactionPage {
@@ -354,17 +355,12 @@ class SupabaseService {
         debt_amount: profile.debtAmount ?? null,
         main_financial_concern: profile.mainFinancialConcern,
         currency_preference: profile.currencyPreference,
+        // Migración 20260929_evidencia_ahorro. undefined (nunca declarado) y
+        // null (volvió al cálculo automático) se guardan igual: sin base declarada.
+        punto_partida: profile.puntoPartida ?? null,
       },
       { onConflict: 'user_id' }
     );
-    // UPDATE aparte y tolerante: si la migración 20260929_punto_partida_ahorro
-    // aún no está aplicada, el perfil igual se sincroniza.
-    if (profile.puntoPartida !== undefined) {
-      await db.from('financial_profiles')
-        .update({ punto_partida: profile.puntoPartida })
-        .eq('user_id', userId)
-        .then(() => {}, () => {});
-    }
   }
 
   async getFinancialProfile(userId: string): Promise<FinancialProfile | null> {
@@ -521,6 +517,9 @@ class SupabaseService {
       fechaLimite: r.fecha_limite ?? undefined,
       completada: r.completada,
       creadaEn: r.creada_en,
+      aportes: Array.isArray(r.aportes)
+        ? r.aportes.map((a: any) => ({ monto: Number(a.monto), fecha: String(a.fecha) }))
+        : [],
     } as Meta));
   }
 
@@ -538,6 +537,8 @@ class SupabaseService {
       fecha_limite: meta.fechaLimite ?? null,
       completada: meta.completada,
       creada_en: meta.creadaEn,
+      // Historial de abonos/retiros (antes solo local). Tope del CHECK: 2000.
+      aportes: (meta.aportes ?? []).slice(-2000),
     });
   }
 
@@ -545,6 +546,43 @@ class SupabaseService {
     const db = this.db;
     if (!db) return;
     await db.from('metas').delete().eq('id', id).eq('user_id', userId);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // COMPRAS EVITADAS (Simulador → "No la compré")
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async getComprasEvitadas(userId: string): Promise<CompraEvitada[] | null> {
+    const db = this.db;
+    if (!db) return null;
+    const { data, error } = await db
+      .from('compras_evitadas')
+      .select('id, monto, fecha, descripcion')
+      .eq('user_id', userId)
+      .order('fecha', { ascending: false })
+      .limit(200);
+    if (error || !data) return null;
+    return (data as any[]).map(r => ({
+      id: r.id,
+      monto: Number(r.monto),
+      fecha: r.fecha,
+      ...(r.descripcion ? { descripcion: r.descripcion } : {}),
+    }));
+  }
+
+  async upsertCompraEvitada(userId: string, c: CompraEvitada): Promise<void> {
+    const db = this.db;
+    if (!db) return;
+    await db.from('compras_evitadas').upsert(
+      {
+        user_id: userId,
+        id: c.id.substring(0, 64),
+        monto: c.monto,
+        fecha: c.fecha,
+        descripcion: c.descripcion?.substring(0, 200) ?? null,
+      },
+      { onConflict: 'user_id,id' },
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -681,7 +719,7 @@ class SupabaseService {
   async pullFromServer(userId: string): Promise<ServerData | null> {
     if (!this.db) return null;
     try {
-      const [transactions, categories, profile, goal, userLevel, userData, metas, deudas, recurrentes] = await Promise.all([
+      const [transactions, categories, profile, goal, userLevel, userData, metas, deudas, recurrentes, comprasEvitadas] = await Promise.all([
         this.getAllTransactions(userId),
         this.getCategories(userId),
         this.getFinancialProfile(userId),
@@ -691,6 +729,7 @@ class SupabaseService {
         this.getMetas(userId),
         this.getDeudas(userId),
         this.getRecurrentes(userId),
+        this.getComprasEvitadas(userId),
       ]);
 
       if (!transactions && !categories && !profile && !userData) return null;
@@ -712,6 +751,7 @@ class SupabaseService {
         metas: metas ?? [],
         deudas: deudas ?? [],
         recurrentes: recurrentes ?? [],
+        comprasEvitadas: comprasEvitadas ?? [],
       };
     } catch (e) {
       console.warn('[SupabaseService] pullFromServer error:', e);
