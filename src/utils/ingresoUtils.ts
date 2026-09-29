@@ -87,6 +87,91 @@ export function getDesgloseMes(
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
+// ── Ahorro real por mes ────────────────────────────────────────────────────────
+
+export interface AhorroMes {
+  /** true si el usuario registró al menos un movimiento ese mes. */
+  tieneDatos: boolean;
+  /** Salario base + ingresos registrados (misma convención que el motor). */
+  ingreso: number;
+  gastado: number;
+  /** ingreso − gastado, con signo: un mes en rojo resta. */
+  ahorro: number;
+}
+
+/**
+ * Ahorro de un mes calculado solo con lo que pasó: movimientos registrados.
+ * No descuenta compromisos pendientes (eso es una proyección del mes en curso
+ * y depende del estado actual de las categorías, no del mes consultado).
+ *
+ * Un mes sin movimientos NO es un mes de ahorro completo: es un mes sin datos.
+ */
+export function getAhorroRealMes(
+  transactions: Transaction[],
+  monthlySalary: number,
+  mes: number,
+  año: number,
+): AhorroMes {
+  let ingresos = 0;
+  let gastado = 0;
+  let tieneDatos = false;
+  for (const t of transactions) {
+    const d = new Date(t.date);
+    if (d.getMonth() !== mes || d.getFullYear() !== año) continue;
+    tieneDatos = true;
+    if (t.type === 'income') ingresos += t.amount;
+    else if (t.type === 'expense') gastado += t.amount;
+  }
+  if (!tieneDatos) return { tieneDatos: false, ingreso: 0, gastado: 0, ahorro: 0 };
+  const ingreso = monthlySalary + ingresos;
+  return { tieneDatos, ingreso, gastado, ahorro: ingreso - gastado };
+}
+
+export interface PuntoAhorro {
+  mes: number;
+  año: number;
+  /** Ahorro de ese mes (con signo). 0 si no hay datos. */
+  ahorroMes: number;
+  /** Suma de `ahorroMes` desde el primer mes con registros. */
+  acumulado: number;
+  sinDatos: boolean;
+  /** Mes actual: la cifra todavía puede cambiar. */
+  enCurso: boolean;
+}
+
+/**
+ * Serie de ahorro acumulado de los últimos `numMeses`, empezando en el primer
+ * mes con registros (un usuario nuevo no "ahorró" los meses antes de llegar).
+ * Los meses intermedios sin registros no suman; los meses en rojo restan.
+ */
+export function getSerieAhorro(
+  transactions: Transaction[],
+  monthlySalary: number,
+  numMeses: number,
+  hoy: Date = new Date(),
+): PuntoAhorro[] {
+  const meses = Array.from({ length: numMeses }, (_, i) => {
+    const f = new Date(hoy.getFullYear(), hoy.getMonth() - (numMeses - 1 - i), 1);
+    return { mes: f.getMonth(), año: f.getFullYear() };
+  });
+  const datos = meses.map(m => getAhorroRealMes(transactions, monthlySalary, m.mes, m.año));
+  const inicio = datos.findIndex(d => d.tieneDatos);
+  if (inicio === -1) return [];
+
+  let acumulado = 0;
+  return meses.slice(inicio).map((m, i) => {
+    const d = datos[inicio + i];
+    acumulado += d.ahorro;
+    return {
+      ...m,
+      ahorroMes: d.ahorro,
+      acumulado,
+      sinDatos: !d.tieneDatos,
+      enCurso: m.mes === hoy.getMonth() && m.año === hoy.getFullYear(),
+    };
+  });
+}
+
 // ── Métricas financieras ───────────────────────────────────────────────────────
 
 export interface MetricasFinancieras {

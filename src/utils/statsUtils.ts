@@ -1,4 +1,5 @@
 import { Transaction, Category } from '../types';
+import { getSerieAhorro } from './ingresoUtils';
 
 // ── Helpers de fecha ───────────────────────────────────────────────────────────
 
@@ -90,30 +91,35 @@ export function getBarData(transactions: Transaction[], numMeses: number): BarDa
 
 export interface AreaPoint {
   label: string;
+  /** Ahorro acumulado hasta este mes (con signo). */
   ahorro: number;
+  /** Ahorro de este mes solo (con signo). */
+  ahorroMes: number;
+  sinDatos: boolean;
+  enCurso: boolean;
   mes: number;
   año: number;
 }
 
+/**
+ * Antes, un mes sin movimientos contaba como "salario completo ahorrado" y los
+ * meses en rojo se truncaban a 0: un usuario recién llegado veía 6 salarios
+ * acumulados. La serie ahora sale del motor (`getSerieAhorro`).
+ */
 export function getAreaData(
   transactions: Transaction[],
   numMeses: number,
   monthlySalary: number,
 ): AreaPoint[] {
-  const now = new Date();
-  let acumulado = 0;
-  return Array.from({ length: numMeses }, (_, i) => {
-    const offset = numMeses - 1 - i;
-    const fecha = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-    const mes = fecha.getMonth();
-    const año = fecha.getFullYear();
-    const txs = txDelMes(transactions, mes, año);
-    const ingresos = totalIngresos(txs);
-    const gastos = totalGastos(txs);
-    const ingresosEfectivos = ingresos > 0 ? ingresos : monthlySalary;
-    acumulado += Math.max(0, ingresosEfectivos - gastos);
-    return { label: getMesLabel(mes), ahorro: acumulado, mes, año };
-  });
+  return getSerieAhorro(transactions, monthlySalary, numMeses).map(p => ({
+    label: getMesLabel(p.mes),
+    ahorro: p.acumulado,
+    ahorroMes: p.ahorroMes,
+    sinDatos: p.sinDatos,
+    enCurso: p.enCurso,
+    mes: p.mes,
+    año: p.año,
+  }));
 }
 
 // ── GRÁFICO 3: Mapa de calor ──────────────────────────────────────────────────

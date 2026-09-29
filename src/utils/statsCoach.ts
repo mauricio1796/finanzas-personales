@@ -465,8 +465,14 @@ export function buildContextoEstadisticas(a: AnalisisStats, e: EntradaStats, vis
 
   const ultimo = e.areaData[e.areaData.length - 1]?.ahorro ?? 0;
   lineas.push('');
-  lineas.push('ÁREA — AHORRO ACUMULADO (6 meses):');
-  lineas.push(`- ${e.areaData.map(d => `${d.label} ${fmt(d.ahorro)}`).join(' · ')}`);
+  lineas.push('ÁREA — AHORRO ACUMULADO (desde el primer mes con registros, máx. 6 meses):');
+  if (e.areaData.length === 0) {
+    lineas.push('- Sin registros todavía: no hay ahorro que mostrar.');
+  } else {
+    lineas.push(`- ${e.areaData.map(d =>
+      `${d.label} ${fmt(d.ahorro)}${d.sinDatos ? ' (sin registros ese mes)' : d.enCurso ? ' (mes en curso)' : ''}`,
+    ).join(' · ')}`);
+  }
   if ((e.metaAhorro ?? 0) > 0) {
     lineas.push(`- Meta de ahorro ${fmt(e.metaAhorro!)}: progreso ${pct(Math.min(100, (ultimo / e.metaAhorro!) * 100))}.`);
   }

@@ -115,6 +115,9 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
   const maxBarMonto  = useMemo(() => Math.max(...barData.flatMap(d => [d.gastoActual, d.gastoAnterior]), 1), [barData]);
   const maxHeatMonto = useMemo(() => Math.max(...heatData.map(c => c.monto), 1), [heatData]);
   const maxAreaMonto = useMemo(() => Math.max(...areaData.map(d => d.ahorro), goal?.targetAmount ?? 1, 1), [areaData, goal]);
+  // El acumulado puede ser negativo (meses en rojo): la escala incluye el 0.
+  const minAreaMonto = useMemo(() => Math.min(0, ...areaData.map(d => d.ahorro)), [areaData]);
+  const rangoArea    = maxAreaMonto - minAreaMonto || 1;
 
   // Gastado por categoría este mes
   const gastoPorCat = useMemo(() => {
@@ -166,21 +169,25 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
   const AREA_PAD_B = 24;
   const DRAW_H = AREA_H - AREA_PAD_T - AREA_PAD_B;
 
+  const yArea = (monto: number) => AREA_PAD_T + DRAW_H - ((monto - minAreaMonto) / rangoArea) * DRAW_H;
+  const areaZeroY = yArea(0);
+
   const areaPoints = useMemo(() =>
     areaData.map((d, i) => ({
       x: areaData.length > 1 ? (i / (areaData.length - 1)) * CHART_W : CHART_W / 2,
-      y: AREA_PAD_T + DRAW_H - (maxAreaMonto > 0 ? (d.ahorro / maxAreaMonto) * DRAW_H : 0),
+      y: yArea(d.ahorro),
       ...d,
     })),
-  [areaData, maxAreaMonto]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [areaData, maxAreaMonto, minAreaMonto]);
 
   const linePath = useMemo(() => buildSmoothPath(areaPoints), [areaPoints]);
   const areaPath = useMemo(() => {
     if (areaPoints.length < 2) return '';
     const last = areaPoints[areaPoints.length - 1];
     const first = areaPoints[0];
-    return `${linePath} L ${last.x.toFixed(1)},${(AREA_H - AREA_PAD_B).toFixed(1)} L ${first.x.toFixed(1)},${(AREA_H - AREA_PAD_B).toFixed(1)} Z`;
-  }, [linePath, areaPoints]);
+    return `${linePath} L ${last.x.toFixed(1)},${areaZeroY.toFixed(1)} L ${first.x.toFixed(1)},${areaZeroY.toFixed(1)} Z`;
+  }, [linePath, areaPoints, areaZeroY]);
 
   // Bar geometry
   const BAR_H  = 120;
@@ -381,10 +388,10 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
     const promedio = conDatos.length > 0
       ? conDatos.reduce((s, d) => s + d.gastoActual, 0) / conDatos.length : 0;
     const minG = conDatos.length > 0 ? Math.min(...conDatos.map(d => d.gastoActual)) : 0;
-    const sinAhorro = areaData.every(d => d.ahorro === 0);
+    const sinAhorro = areaData.length === 0;
     const goalAmt   = goal?.targetAmount ?? 0;
-    const goalY     = goalAmt > 0
-      ? AREA_PAD_T + DRAW_H - (goalAmt / maxAreaMonto) * DRAW_H : null;
+    const goalY     = goalAmt > 0 ? yArea(goalAmt) : null;
+    const acumulado = areaData[areaData.length - 1]?.ahorro ?? 0;
 
     return (
       <View>
@@ -521,10 +528,13 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
                   return (
                     <React.Fragment key={gi}>
                       <Line x1={0} y1={y} x2={CHART_W} y2={y} stroke={bdr} strokeWidth={0.5} strokeDasharray={gi > 0 ? '3 3' : undefined} />
-                      {pct > 0 && <SvgText x={2} y={y - 3} fontSize={8} fill={txtT}>{fmtShort(maxAreaMonto * pct)}</SvgText>}
+                      {pct > 0 && <SvgText x={2} y={y - 3} fontSize={8} fill={txtT}>{fmtShort(minAreaMonto + rangoArea * pct)}</SvgText>}
                     </React.Fragment>
                   );
                 })}
+                {minAreaMonto < 0 && (
+                  <Line x1={0} y1={areaZeroY} x2={CHART_W} y2={areaZeroY} stroke={txtT} strokeWidth={0.8} />
+                )}
 
                 {goalY !== null && (
                   <>
@@ -538,10 +548,12 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
 
                 {areaPoints.map((pt, i) => {
                   const isLast = i === areaPoints.length - 1;
+                  // Mes sin registros: punto hueco, no afirma nada sobre ese mes.
+                  const dot = pt.sinDatos ? card : pt.ahorroMes < 0 ? expense : income;
                   return (
                     <React.Fragment key={i}>
                       {isLast && <Circle cx={pt.x} cy={pt.y} r={10} fill={income} opacity={0.15} />}
-                      <Circle cx={pt.x} cy={pt.y} r={isLast ? 5 : 3} fill={income} stroke="#fff" strokeWidth={1.5} />
+                      <Circle cx={pt.x} cy={pt.y} r={isLast ? 5 : 3} fill={dot} stroke={pt.sinDatos ? txtT : '#fff'} strokeWidth={1.5} />
                     </React.Fragment>
                   );
                 })}
@@ -559,13 +571,15 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
 
               <View style={[cs.statStrip, { backgroundColor: cardSec, marginTop: 12 }]}>
                 <View style={cs.statStripCell}>
-                  <Text style={[cs.statStripVal, { color: income }]}>{fmtShort(areaData[areaData.length - 1]?.ahorro ?? 0)}</Text>
-                  <Text style={[cs.statStripLabel, { color: txtT }]}>Acumulado</Text>
+                  <Text style={[cs.statStripVal, { color: acumulado < 0 ? expense : income }]}>{fmtShort(acumulado)}</Text>
+                  <Text style={[cs.statStripLabel, { color: txtT }]}>
+                    Acumulado{areaData[areaData.length - 1]?.enCurso ? ' (mes en curso)' : ''}
+                  </Text>
                 </View>
                 {goalAmt > 0 && (
                   <View style={cs.statStripCell}>
                     <Text style={[cs.statStripVal, { color: primary }]}>
-                      {Math.min(100, Math.round(((areaData[areaData.length - 1]?.ahorro ?? 0) / goalAmt) * 100))}%
+                      {Math.max(0, Math.min(100, Math.round((acumulado / goalAmt) * 100)))}%
                     </Text>
                     <Text style={[cs.statStripLabel, { color: txtT }]}>Progreso meta</Text>
                   </View>
