@@ -14,6 +14,7 @@ import { borrarTodasLasNotificaciones } from './NotificacionesService';
 import { consentService } from './ConsentService';
 import { clearPin, clearRememberedUser } from './PinService';
 import { actualizarWidget, calcularWidgetData } from './WidgetService';
+import { olvidarOpcionBloqueo } from './AppLockService';
 
 export async function limpiarDispositivo(): Promise<void> {
   // 1. Nada pendiente puede volver a escribir en el servidor.
@@ -32,6 +33,9 @@ export async function limpiarDispositivo(): Promise<void> {
   // 5. Consentimientos en caché (y avisa a sus suscriptores en memoria).
   await consentService.clearLocal().catch(() => {});
 
-  // 6. Todo lo demás: datos, onboarding, pantalla de permisos, historial in-app…
+  // 6. Preferencias en memoria (bloqueo por inactividad).
+  olvidarOpcionBloqueo();
+
+  // 7. Todo lo demás: datos, onboarding, pantalla de permisos, historial in-app…
   try { await AsyncStorage.clear(); } catch { /* noop */ }
 }

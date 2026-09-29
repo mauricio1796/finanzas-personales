@@ -19,6 +19,8 @@ import {
   getBiometricAvailability, isBiometricEnabled, setBiometricEnabled, authenticateBiometric,
   etiquetaBiometria, hasPin, type BiometricKind, type EstadoBiometria,
 } from '../services/PinService';
+import { cargarOpcionBloqueo, guardarOpcionBloqueo } from '../services/AppLockService';
+import { OPCIONES_BLOQUEO, OPCION_BLOQUEO_DEFAULT, type OpcionBloqueo } from '../utils/appLockPolicy';
 import { THEME } from '../constants/theme';
 
 interface ConfiguracionScreenProps {
@@ -229,6 +231,15 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
     kind: BiometricKind; estado: EstadoBiometria; activo: boolean; tienePin: boolean;
   } | null>(null);
 
+  const [autoLock, setAutoLock] = useState<OpcionBloqueo>(OPCION_BLOQUEO_DEFAULT);
+  useEffect(() => { cargarOpcionBloqueo().then(setAutoLock).catch(() => {}); }, []);
+
+  const elegirAutoLock = async (o: OpcionBloqueo) => {
+    haptics.selection();
+    setAutoLock(o);
+    await guardarOpcionBloqueo(o);
+  };
+
   const refrescarBio = async () => {
     const [disp, activo, tienePin] = await Promise.all([
       getBiometricAvailability(), isBiometricEnabled(), hasPin(),
@@ -436,38 +447,71 @@ export function ConfiguracionScreen({ onBack, onNavigate }: ConfiguracionScreenP
         </View>
 
         {/* ── Seguridad ── */}
-        {bio && bio.tienePin && bio.estado !== 'sin_hardware' && (() => {
+        {Platform.OS !== 'web' && bio && bio.tienePin && (() => {
           const nombre = etiquetaBiometria(bio.kind);
+          const conBio = bio.estado !== 'sin_hardware';
           const titulo = Platform.OS === 'ios' ? `Desbloquear con ${nombre}` : `Desbloquear con tu ${nombre}`;
           const desc = bio.estado === 'sin_permiso'
-            ? `Desactivado para FinancyAI en los ajustes del teléfono`
+            ? 'Desactivado para FinancyAI en los ajustes del teléfono'
             : bio.estado === 'no_configurado'
               ? `Configura ${nombre} en tu teléfono para usarlo aquí`
               : bio.activo ? 'Entras sin escribir el PIN' : `Usa ${nombre} en vez del PIN al abrir la app`;
+          const descLock = autoLock === 'inmediato' ? 'Pide el PIN cada vez que sales de la app'
+            : autoLock === 'al_abrir' ? 'Solo al abrir la app desde cero'
+              : `Si la app pasa más de ${autoLock === '1min' ? '1 minuto' : '5 minutos'} en segundo plano`;
           return (
             <>
               <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: 24 }]}>
                 SEGURIDAD
               </Text>
               <View style={[styles.notifCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={styles.notifStatusRow}>
-                  <View style={[styles.notifStatusIcon, { backgroundColor: colors.primaryLight }]}>
-                    <Icon name={bio.kind === 'face' ? 'smile' : 'unlock'} size={18} color={colors.primary} />
+                {conBio && (
+                  <View style={styles.notifStatusRow}>
+                    <View style={[styles.notifStatusIcon, { backgroundColor: colors.primaryLight }]}>
+                      <Icon name={bio.kind === 'face' ? 'smile' : 'unlock'} size={18} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.notifStatusTitle, { color: colors.textPrimary }]}>{titulo}</Text>
+                      <Text style={[styles.notifStatusSub, { color: colors.textSecondary }]}>{desc}</Text>
+                    </View>
+                    {bio.estado === 'disponible' ? (
+                      <NotifToggle active={bio.activo} disabled={false} onPress={toggleBio} colors={colors} />
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() => Linking.openSettings()}
+                        style={[styles.notifActivateBtn, { backgroundColor: colors.primary }]}
+                      >
+                        <Text style={styles.notifActivateBtnTxt}>Ajustes</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.notifStatusTitle, { color: colors.textPrimary }]}>{titulo}</Text>
-                    <Text style={[styles.notifStatusSub, { color: colors.textSecondary }]}>{desc}</Text>
+                )}
+
+                {/* Bloqueo por inactividad */}
+                <View style={[conBio ? styles.notifItem : styles.notifStatusRow, conBio && { borderTopColor: colors.borderSubtle }, { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <Icon name="lock" size={16} color={colors.textSecondary} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.notifItemLabel, { color: colors.textPrimary }]}>Bloquear automáticamente</Text>
+                      <Text style={[styles.notifItemDesc, { color: colors.textTertiary }]}>{descLock}</Text>
+                    </View>
                   </View>
-                  {bio.estado === 'disponible' ? (
-                    <NotifToggle active={bio.activo} disabled={false} onPress={toggleBio} colors={colors} />
-                  ) : (
-                    <TouchableOpacity
-                      onPress={() => Linking.openSettings()}
-                      style={[styles.notifActivateBtn, { backgroundColor: colors.primary }]}
-                    >
-                      <Text style={styles.notifActivateBtnTxt}>Ajustes</Text>
-                    </TouchableOpacity>
-                  )}
+                  <View style={styles.lockSeg} accessibilityRole="radiogroup">
+                    {OPCIONES_BLOQUEO.map(o => {
+                      const activo = autoLock === o.valor;
+                      return (
+                        <TouchableOpacity
+                          key={o.valor}
+                          onPress={() => elegirAutoLock(o.valor)}
+                          style={[styles.lockSegItem, { backgroundColor: activo ? colors.primary : colors.cardSecondary }]}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: activo }}
+                        >
+                          <Text style={[styles.lockSegText, { color: activo ? '#fff' : colors.textSecondary }]}>{o.etiqueta}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </View>
               </View>
             </>
@@ -812,6 +856,9 @@ const styles = StyleSheet.create({
   },
 
   // Notif toggle switch (module-level)
+  lockSeg: { flexDirection: 'row', gap: 6 },
+  lockSegItem: { flex: 1, borderRadius: 10, paddingVertical: 8, alignItems: 'center' },
+  lockSegText: { fontSize: 12, fontWeight: '700' },
   notifCard: {
     borderRadius: 14,
     borderWidth: 0.5,

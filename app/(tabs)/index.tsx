@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
+  Modal,
   TextInput,
   View,
   Animated,
@@ -77,6 +78,8 @@ import {
   OnboardingConfirm,
 } from '../../src/screens/Onboarding';
 import { PermissionsScreen } from '../../src/screens/PermissionsScreen';
+import { PrivacyShield } from '../../src/components/ui/PrivacyShield';
+import { useBloqueoInactividad } from '../../src/hooks/useBloqueoInactividad';
 import { PinSetupScreen }   from '../../src/screens/PinSetupScreen';
 import { PinEntryScreen }   from '../../src/screens/PinEntryScreen';
 import { savePin, hasPin, verifyPin, clearPin, saveRememberedUser, clearRememberedUser } from '../../src/services/PinService';
@@ -876,6 +879,49 @@ export default function HomeScreen() {
     return () => subscription.remove();
   }, [quickAddMode, currentScreen, volver]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ==================== BLOQUEO POR INACTIVIDAD ====================
+  // Tras X tiempo en segundo plano (Configuración › Seguridad) se vuelve a pedir
+  // PIN/Face ID. Se muestra ENCIMA de la app (Modal) en vez de desmontarla: al
+  // desbloquear, el usuario sigue exactamente donde estaba.
+  const bloqueo = useBloqueoInactividad(
+    Platform.OS !== 'web' && !!user && pinExists && isUnlocked,
+  );
+
+  const renderPinEntry = (onSuccess: () => void) => {
+    const rachaDias = calcularRachaActual(transactions);
+    return (
+      <PinEntryScreen
+        userName={user?.name}
+        userEmail={user?.email}
+        userLevel={userLevel?.level}
+        userTitle={userLevel?.title}
+        streakDays={rachaDias}
+        finnNews={
+          rachaDias >= 3
+            ? `¡Llevas ${rachaDias} días cuidando tu plata! Entra y revisamos cómo vas. 💪`
+            : undefined
+        }
+        onSuccess={onSuccess}
+        onForgotPin={async () => {
+          bloqueo.desbloquear();
+          await clearPin();
+          setPinExists(false);
+          setIsUnlocked(false);
+          setUser(null);
+        }}
+        onSwitchUser={async () => {
+          bloqueo.desbloquear();
+          await clearPin();
+          await clearRememberedUser();
+          setPinExists(false);
+          setIsUnlocked(false);
+          setUser(null);
+        }}
+        verifyPin={verifyPin}
+      />
+    );
+  };
+
   // ==================== 0. SPLASH ====================
   if (showSplash) {
     return <MobileShell><SplashScreen onDone={() => setShowSplash(false)} /></MobileShell>;
@@ -891,38 +937,7 @@ export default function HomeScreen() {
   // ==================== 1. PIN ENTRY (usuario que regresa — antes que todo) ====================
   // Si el usuario ya está en storage Y tiene PIN → pedirlo antes que nada
   if (user && pinExists && !isUnlocked) {
-    const rachaDias = calcularRachaActual(transactions);
-    return (
-      <MobileShell>
-        <PinEntryScreen
-          userName={user.name}
-          userEmail={user.email}
-          userLevel={userLevel?.level}
-          userTitle={userLevel?.title}
-          streakDays={rachaDias}
-          finnNews={
-            rachaDias >= 3
-              ? `¡Llevas ${rachaDias} días cuidando tu plata! Entra y revisamos cómo vas. 💪`
-              : undefined
-          }
-          onSuccess={() => setIsUnlocked(true)}
-          onForgotPin={async () => {
-            await clearPin();
-            setPinExists(false);
-            setIsUnlocked(false);
-            setUser(null);
-          }}
-          onSwitchUser={async () => {
-            await clearPin();
-            await clearRememberedUser();
-            setPinExists(false);
-            setIsUnlocked(false);
-            setUser(null);
-          }}
-          verifyPin={verifyPin}
-        />
-      </MobileShell>
-    );
+    return <MobileShell>{renderPinEntry(() => setIsUnlocked(true))}</MobileShell>;
   }
 
   // ==================== 2. PERMISOS (primera vez) ====================
@@ -1228,6 +1243,28 @@ export default function HomeScreen() {
         }}
       />
       </WebSidebar>
+
+      {/* Bloqueo por inactividad: encima de todo, incluidas hojas abiertas */}
+      <Modal
+        visible={bloqueo.bloqueado}
+        animationType="fade"
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+        onRequestClose={() => { /* no se puede cerrar sin desbloquear */ }}
+      >
+        {bloqueo.bloqueado && renderPinEntry(bloqueo.desbloquear)}
+      </Modal>
+
+      {/* Cortina de privacidad para la vista previa del selector de apps */}
+      <Modal
+        visible={bloqueo.ocultarContenido && !bloqueo.bloqueado}
+        animationType="none"
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+        onRequestClose={() => {}}
+      >
+        <PrivacyShield />
+      </Modal>
     </MobileShell>
   );
 }

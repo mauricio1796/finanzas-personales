@@ -4,6 +4,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as Crypto from 'expo-crypto';
 import { MAX_INTENTOS, calcularEsperaMs } from '../utils/pinPolicy';
 import { traducirErrorBiometria, type ResultadoBiometria } from '../utils/biometriaPolicy';
+import { conSalidaPermitida } from './AppLockService';
 
 const PIN_KEY        = 'financyai_pin_v1';        // legado: PIN en texto plano
 const PIN_HASH_KEY   = 'financyai_pin_hash_v2';   // { salt, hash, iteraciones }
@@ -338,13 +339,14 @@ export async function authenticateBiometric(
   const nombre = etiquetaBiometria(kind);
   let error = '';
   try {
-    const res = await LocalAuthentication.authenticateAsync({
+    // El diálogo del sistema pone la app en "inactive": no es una salida real.
+    const res = await conSalidaPermitida(() => LocalAuthentication.authenticateAsync({
       promptMessage:         prompt,
       cancelLabel:           'Cancelar',
       fallbackLabel:         'Usar PIN',     // iOS: botón tras un intento fallido
       disableDeviceFallback: true,           // el respaldo es el PIN de la app, no el código del teléfono
       requireConfirmation:   false,          // Android: rostro sin tocar "Confirmar"
-    });
+    }));
     if (res.success) {
       await limpiarFallos();
       return { ok: true };

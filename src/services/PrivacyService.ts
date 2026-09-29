@@ -7,6 +7,7 @@ import { Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { consentService } from './ConsentService';
 import { limpiarDispositivo } from './LocalWipeService';
+import { conSalidaPermitida } from './AppLockService';
 import { syncQueue } from './SyncQueueService';
 import { CONFIG } from '../constants/config';
 
@@ -82,7 +83,7 @@ export async function compartirArchivoJSON(json: string, nombre = 'financyai-mis
   const Sharing = await import('expo-sharing');
   const path = `${FileSystem.cacheDirectory}${nombre}`;
   await FileSystem.writeAsStringAsync(path, json, { encoding: FileSystem.EncodingType.UTF8 });
-  await Sharing.shareAsync(path, { mimeType: 'application/json', dialogTitle: 'Descargar mis datos' });
+  await conSalidaPermitida(() => Sharing.shareAsync(path, { mimeType: 'application/json', dialogTitle: 'Descargar mis datos' }));
   // El archivo queda en caché solo lo necesario para compartirlo.
   setTimeout(() => { FileSystem.deleteAsync(path, { idempotent: true }).catch(() => {}); }, 60_000);
 }

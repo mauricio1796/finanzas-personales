@@ -11,6 +11,7 @@ import { Icon } from '../components/ui/Icon';
 import { PremiumBadge } from '../components/ui/PremiumBadge';
 import { THEME } from '../constants/theme';
 import { getNivelActual, getNivelSiguiente, getProgresoNivel } from '../services/GamificacionService';
+import { conSalidaPermitida } from '../services/AppLockService';
 
 const formatCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
 
@@ -132,7 +133,7 @@ export function Usuario({ onReset, onStartTour, onStartDemo, onNavigate }: Usuar
       const csv = header + rows;
       const path = (FileSystem.documentDirectory as string) + 'financy_export.csv';
       await FileSystem.writeAsStringAsync(path, csv, { encoding: FileSystem.EncodingType.UTF8 });
-      await Sharing.shareAsync(path, { mimeType: 'text/csv', dialogTitle: 'Exportar transacciones' });
+      await conSalidaPermitida(() => Sharing.shareAsync(path, { mimeType: 'text/csv', dialogTitle: 'Exportar transacciones' }));
     } catch {
       Alert.alert('Exportar datos', 'No fue posible exportar. Verifica que expo-file-system y expo-sharing esten instalados.');
     }

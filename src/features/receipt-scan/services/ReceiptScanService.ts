@@ -5,6 +5,7 @@ import { CONFIG } from '../../../constants/config';
 import type { ReceiptScanResult } from '../types';
 import { getWorkerHeaders, AIConsentRequiredError } from '../../../services/workerAuth';
 import { consentService } from '../../../services/ConsentService';
+import { conSalidaPermitida } from '../../../services/AppLockService';
 
 // ─── Configuración de compresión ──────────────────────────────────────────────
 // Máximo ~800px de ancho — suficiente para que Claude lea el texto del recibo.
@@ -42,11 +43,12 @@ export async function tomarFotoConCamara(): Promise<ImagenCapturada | null> {
   const permiso = await pedirPermisosCamara();
   if (!permiso) return null;
 
-  const result = await ImagePicker.launchCameraAsync({
+  // La cámara saca la app a segundo plano: no debe pedir PIN al volver.
+  const result = await conSalidaPermitida(() => ImagePicker.launchCameraAsync({
     mediaTypes: ['images'],
     allowsEditing: false,
     quality: 1, // Capturamos en máxima calidad y comprimimos nosotros
-  });
+  }));
 
   if (result.canceled || !result.assets[0]) return null;
   return comprimirImagen(result.assets[0].uri);
@@ -56,11 +58,11 @@ export async function elegirDesdGaleria(): Promise<ImagenCapturada | null> {
   const permiso = await pedirPermisosGaleria();
   if (!permiso) return null;
 
-  const result = await ImagePicker.launchImageLibraryAsync({
+  const result = await conSalidaPermitida(() => ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     allowsEditing: false,
     quality: 1,
-  });
+  }));
 
   if (result.canceled || !result.assets[0]) return null;
   return comprimirImagen(result.assets[0].uri);

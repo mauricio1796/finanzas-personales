@@ -1,6 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import { conSalidaPermitida } from './AppLockService';
 const documentDirectory: string = (FileSystem as any).documentDirectory ?? '';
 import { generarHTMLReporte, type DatosReporte } from '../utils/pdfUtils';
 
@@ -42,11 +43,11 @@ export async function generarYCompartirPDF(
     onEstado?.('listo');
     const canShare = await Sharing.isAvailableAsync();
     if (canShare) {
-      await Sharing.shareAsync(destUri, {
+      await conSalidaPermitida(() => Sharing.shareAsync(destUri, {
         mimeType: 'application/pdf',
         dialogTitle: `Reporte Financiero — ${nombre}`,
         UTI: 'com.adobe.pdf',
-      });
+      }));
     }
   } catch (err) {
     onEstado?.('error');
@@ -74,7 +75,7 @@ export async function guardarPDFLocal(
 
 export async function imprimirReporte(datos: DatosReporte): Promise<void> {
   const html = generarHTMLReporte(datos);
-  await Print.printAsync({ html });
+  await conSalidaPermitida(() => Print.printAsync({ html }));
 }
 
 export async function listarReportesGuardados(): Promise<ReporteGuardado[]> {
@@ -114,8 +115,8 @@ export async function eliminarReporte(uri: string): Promise<void> {
 export async function compartirReporteGuardado(uri: string): Promise<void> {
   const canShare = await Sharing.isAvailableAsync();
   if (!canShare) return;
-  await Sharing.shareAsync(uri, {
+  await conSalidaPermitida(() => Sharing.shareAsync(uri, {
     mimeType: 'application/pdf',
     UTI: 'com.adobe.pdf',
-  });
+  }));
 }
