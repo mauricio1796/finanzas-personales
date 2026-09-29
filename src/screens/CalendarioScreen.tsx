@@ -6,6 +6,7 @@ import { useFinance } from '../state/FinanceContext';
 import { useTheme } from '../state/ThemeContext';
 import { THEME } from '../constants/theme';
 import { AppColors } from '../constants/colors';
+import { claseMovimiento, esGastoConsumo, esIngresoGanado, montoApartado } from '../utils/ingresoUtils';
 
 const DIAS_SEMANA = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -26,19 +27,28 @@ export const CalendarioScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) 
 
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const mesStr = anio + '-' + String(mes + 1).padStart(2, '0');
-  const txDelMes = useMemo(() => transactions.filter(t => t.date.startsWith(mesStr)), [transactions, mesStr]);
+  // Mes LOCAL. Antes se filtraba con `date.startsWith('AAAA-MM')` sobre la fecha
+  // ISO en UTC: un gasto del 30 a las 9pm (Colombia) caía en el mes siguiente,
+  // y encima en la celda del día 30.
+  const txDelMes = useMemo(() => transactions.filter(t => {
+    const d = new Date(t.date);
+    return d.getMonth() === mes && d.getFullYear() === anio;
+  }), [transactions, mes, anio]);
 
-  const totalIngresos = txDelMes.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const totalGastos   = txDelMes.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  // Apartar / retirar ahorro no es gasto ni ingreso (mismo criterio que el motor).
+  const totalIngresos = txDelMes.filter(esIngresoGanado).reduce((s, t) => s + t.amount, 0);
+  const totalGastos   = txDelMes.filter(esGastoConsumo).reduce((s, t) => s + t.amount, 0);
+  const totalApartado = txDelMes.reduce((s, t) => s + montoApartado(t), 0);
 
   const diasConTx = useMemo(() => {
-    const map: Record<number, { ingresos: number; gastos: number; txs: typeof transactions }> = {};
+    const map: Record<number, { ingresos: number; gastos: number; ahorro: number; txs: typeof transactions }> = {};
     txDelMes.forEach(t => {
       const dia = new Date(t.date).getDate();
-      if (!map[dia]) map[dia] = { ingresos: 0, gastos: 0, txs: [] };
-      if (t.type === 'income') map[dia].ingresos += t.amount;
-      else map[dia].gastos += t.amount;
+      if (!map[dia]) map[dia] = { ingresos: 0, gastos: 0, ahorro: 0, txs: [] };
+      const clase = claseMovimiento(t);
+      if (clase === 'ingreso') map[dia].ingresos += t.amount;
+      else if (clase === 'gasto') map[dia].gastos += t.amount;
+      else map[dia].ahorro += t.amount;
       map[dia].txs.push(t);
     });
     return map;
@@ -75,8 +85,15 @@ export const CalendarioScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) 
           <View style={styles.resumenItem}><Icon name="trending-up"   size={14} color={colors.income}  /><Text style={styles.resumenLabel}>Ingresos</Text><Text style={[styles.resumenVal, { color: colors.income }]}>{fmtCOP(totalIngresos)}</Text></View>
           <View style={styles.resumenDivider} />
           <View style={styles.resumenItem}><Icon name="trending-down" size={14} color={colors.expense} /><Text style={styles.resumenLabel}>Gastos</Text><Text style={[styles.resumenVal, { color: colors.expense }]}>{fmtCOP(totalGastos)}</Text></View>
+          {totalApartado !== 0 && (
+            <>
+              <View style={styles.resumenDivider} />
+              <View style={styles.resumenItem}><Icon name="lock" size={14} color={colors.primary} /><Text style={styles.resumenLabel}>Ahorro</Text><Text style={[styles.resumenVal, { color: colors.primary }]}>{fmtCOP(totalApartado)}</Text></View>
+            </>
+          )}
           <View style={styles.resumenDivider} />
-          <View style={styles.resumenItem}><Icon name="dollar-sign"   size={14} color={colors.primary} /><Text style={styles.resumenLabel}>Balance</Text><Text style={[styles.resumenVal, { color: totalIngresos - totalGastos >= 0 ? colors.income : colors.expense }]}>{fmtCOP(totalIngresos - totalGastos)}</Text></View>
+          {/* "Neto" (no "Balance"): suma de lo registrado, no el disponible del Dashboard (BUG-05). */}
+          <View style={styles.resumenItem}><Icon name="dollar-sign"   size={14} color={colors.primary} /><Text style={styles.resumenLabel}>Neto</Text><Text style={[styles.resumenVal, { color: totalIngresos - totalGastos >= 0 ? colors.income : colors.expense }]}>{fmtCOP(totalIngresos - totalGastos)}</Text></View>
         </View>
 
         <View style={styles.weekRow}>
@@ -94,6 +111,7 @@ export const CalendarioScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) 
                 <View style={styles.celdaDots}>
                   {info?.ingresos > 0 && <View style={[styles.dot, { backgroundColor: colors.income }]} />}
                   {info?.gastos > 0  && <View style={[styles.dot, { backgroundColor: colors.expense }]} />}
+                  {info?.ahorro > 0  && <View style={[styles.dot, { backgroundColor: colors.primary }]} />}
                 </View>
               </TouchableOpacity>
             );
@@ -106,15 +124,22 @@ export const CalendarioScreen: React.FC<{ onBack?: () => void }> = ({ onBack }) 
             {txDiaSeleccionado.length === 0 ? (
               <Text style={styles.sinTx}>Sin movimientos</Text>
             ) : (
-              txDiaSeleccionado.map((tx, i) => (
-                <View key={tx.id} style={[styles.txRow, i < txDiaSeleccionado.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
-                  <View style={[styles.txIcon, { backgroundColor: tx.type === 'income' ? colors.incomeLight : colors.expenseLight }]}>
-                    <Icon name={getCategoryIcon(tx.category)} size={14} color={tx.type === 'income' ? colors.income : colors.expense} />
+              txDiaSeleccionado.map((tx, i) => {
+                const clase = claseMovimiento(tx);
+                const esAhorro = clase === 'ahorro' || clase === 'retiro_ahorro';
+                const color = esAhorro ? colors.primary : clase === 'ingreso' ? colors.income : colors.expense;
+                const bg    = esAhorro ? colors.primaryLight : clase === 'ingreso' ? colors.incomeLight : colors.expenseLight;
+                const signo = esAhorro ? '' : clase === 'ingreso' ? '+' : '-';
+                return (
+                  <View key={tx.id} style={[styles.txRow, i < txDiaSeleccionado.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+                    <View style={[styles.txIcon, { backgroundColor: bg }]}>
+                      <Icon name={esAhorro ? (clase === 'ahorro' ? 'lock' : 'unlock') : getCategoryIcon(tx.category)} size={14} color={color} />
+                    </View>
+                    <Text style={styles.txCat}>{tx.category}</Text>
+                    <Text style={[styles.txAmt, { color }]}>{signo}{fmtCOP(tx.amount)}</Text>
                   </View>
-                  <Text style={styles.txCat}>{tx.category}</Text>
-                  <Text style={[styles.txAmt, { color: tx.type === 'income' ? colors.income : colors.expense }]}>{tx.type === 'income' ? '+' : '-'}{fmtCOP(tx.amount)}</Text>
-                </View>
-              ))
+                );
+              })
             )}
           </View>
         )}

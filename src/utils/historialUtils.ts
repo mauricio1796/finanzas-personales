@@ -1,8 +1,10 @@
-import { Transaction } from '../types';
+import type { Transaction } from '../types';
+import { esGastoConsumo, esIngresoGanado, esMovimientoAhorro, montoApartado } from './ingresoUtils';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
-export type FiltroTipo    = 'todos' | 'ingresos' | 'gastos';
+/** 'ahorro': lo apartado y retirado del ahorro (no es gasto ni ingreso). */
+export type FiltroTipo    = 'todos' | 'ingresos' | 'gastos' | 'ahorro';
 export type FiltroOrden   = 'reciente' | 'antiguo' | 'mayor' | 'menor';
 export type FiltroPeriodo = 'todo' | 'hoy' | 'semana' | 'mes' | 'mes_anterior' | '3meses';
 
@@ -20,14 +22,20 @@ export interface TransaccionAgrupada {
   esHoy:         boolean;
   esAyer:        boolean;
   transacciones: Transaction[];
+  /** Gasto de consumo (sin lo apartado para ahorro). */
   totalGastos:   number;
+  /** Ingresos ganados (sin retiros de ahorro). */
   totalIngresos: number;
+  /** Neto movido al ahorro ese día (apartado − retirado). */
+  totalApartado: number;
 }
 
 export interface EstadisticasHistorial {
   totalTransacciones: number;
   totalGastos:        number;
   totalIngresos:      number;
+  /** Neto movido al ahorro en el período (apartado − retirado). No es gasto. */
+  totalApartado:      number;
   /**
    * BUG-05 — NETO DE LOS MOVIMIENTOS FILTRADOS, no el "balance disponible".
    *
@@ -94,8 +102,9 @@ export function filtrarTransacciones(
   if (desde) result = result.filter(t => new Date(t.date) >= desde);
   if (hasta) result = result.filter(t => new Date(t.date) <= hasta);
 
-  if (filtros.tipo === 'ingresos') result = result.filter(t => t.type === 'income');
-  if (filtros.tipo === 'gastos')   result = result.filter(t => t.type === 'expense');
+  if (filtros.tipo === 'ingresos') result = result.filter(esIngresoGanado);
+  if (filtros.tipo === 'gastos')   result = result.filter(esGastoConsumo);
+  if (filtros.tipo === 'ahorro')   result = result.filter(esMovimientoAhorro);
 
   if (filtros.categoria) {
     result = result.filter(t => t.category === filtros.categoria);
@@ -170,8 +179,9 @@ export function agruparPorFecha(
       esHoy,
       esAyer,
       transacciones: txs,
-      totalGastos:   txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0),
-      totalIngresos: txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0),
+      totalGastos:   txs.filter(esGastoConsumo).reduce((s, t) => s + t.amount, 0),
+      totalIngresos: txs.filter(esIngresoGanado).reduce((s, t) => s + t.amount, 0),
+      totalApartado: txs.reduce((s, t) => s + montoApartado(t), 0),
     });
   });
 
@@ -192,6 +202,7 @@ export function calcularEstadisticasHistorial(
       totalTransacciones: 0,
       totalGastos:        0,
       totalIngresos:      0,
+      totalApartado:      0,
       balance:            0,
       promedioGasto:      0,
       categoriaMasGasto:  '—',
@@ -199,8 +210,10 @@ export function calcularEstadisticasHistorial(
     };
   }
 
-  const gastos   = transactions.filter(t => t.type === 'expense');
-  const ingresos = transactions.filter(t => t.type === 'income');
+  // Apartar o retirar ahorro no es gasto ni ingreso: el neto es ingreso − consumo
+  // (lo que se ahorró en el período), igual que en el motor.
+  const gastos   = transactions.filter(esGastoConsumo);
+  const ingresos = transactions.filter(esIngresoGanado);
 
   const totalGastos   = gastos.reduce((s, t) => s + t.amount, 0);
   const totalIngresos = ingresos.reduce((s, t) => s + t.amount, 0);
@@ -222,6 +235,7 @@ export function calcularEstadisticasHistorial(
     totalTransacciones: transactions.length,
     totalGastos,
     totalIngresos,
+    totalApartado:      transactions.reduce((s, t) => s + montoApartado(t), 0),
     balance:            totalIngresos - totalGastos,
     promedioGasto:      gastos.length > 0 ? totalGastos / gastos.length : 0,
     categoriaMasGasto:  catMayor?.[0] ?? '—',

@@ -59,6 +59,15 @@ export function esMovimientoAhorro(t: Pick<Transaction, 'category'>): boolean {
   return esCategoriaAhorro(t.category) || esCategoriaRetiroAhorro(t.category);
 }
 
+/** Cómo se muestra y suma un movimiento en listas (Historial, Calendario…). */
+export type ClaseMovimiento = 'ingreso' | 'gasto' | 'ahorro' | 'retiro_ahorro';
+
+export function claseMovimiento(t: Pick<Transaction, 'category' | 'type'>): ClaseMovimiento {
+  if (esCategoriaRetiroAhorro(t.category)) return 'retiro_ahorro';
+  if (esCategoriaAhorro(t.category)) return 'ahorro';
+  return t.type === 'income' ? 'ingreso' : 'gasto';
+}
+
 /** Gasto de consumo: todo `expense` salvo lo apartado para ahorro. */
 export const esGastoConsumo = (t: Transaction) => t.type === 'expense' && !esMovimientoAhorro(t);
 /** Ingreso real: todo `income` salvo lo apartado para ahorro. */

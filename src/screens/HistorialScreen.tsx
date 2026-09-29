@@ -32,11 +32,42 @@ import {
 } from '../utils/historialUtils';
 import { type Transaction } from '../types';
 import { THEME } from '../constants/theme';
+import { claseMovimiento, type ClaseMovimiento } from '../utils/ingresoUtils';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const formatCOP = (n: number) =>
   '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
+
+const ETIQUETA_CLASE: Record<ClaseMovimiento, string> = {
+  ingreso:       'Ingreso',
+  gasto:         'Gasto',
+  ahorro:        'Apartado para ahorro',
+  retiro_ahorro: 'Retiro de ahorro',
+};
+
+/**
+ * Cómo se ve un movimiento. Apartar o retirar ahorro no es gasto ni ingreso:
+ * va en el color de marca y sin signo (antes un abono a meta salía en rojo "−").
+ */
+function visualMovimiento(tx: Transaction, colors: any) {
+  const clase = claseMovimiento(tx);
+  if (clase === 'ahorro' || clase === 'retiro_ahorro') {
+    return {
+      clase, signo: '', color: colors.primary, bg: colors.primaryLight,
+      icono: clase === 'ahorro' ? 'lock' : 'unlock', etiqueta: ETIQUETA_CLASE[clase],
+    };
+  }
+  const ingreso = clase === 'ingreso';
+  return {
+    clase,
+    signo:    ingreso ? '+' : '-',
+    color:    ingreso ? colors.income : colors.expense,
+    bg:       ingreso ? colors.incomeLight : colors.expenseLight,
+    icono:    getIconoTx(tx.category, tx.type),
+    etiqueta: ETIQUETA_CLASE[clase],
+  };
+}
 
 // ── FlatList item union ───────────────────────────────────────────────────────
 
@@ -262,6 +293,11 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
               -{formatCOP(grupo.totalGastos)}
             </Text>
           )}
+          {grupo.totalApartado !== 0 && (
+            <Text style={[s.grupoTotal, { color: colors.primary }]}>
+              {grupo.totalApartado > 0 ? 'ahorro ' : 'retiro '}{formatCOP(Math.abs(grupo.totalApartado))}
+            </Text>
+          )}
         </View>
       </View>
     ),
@@ -271,9 +307,12 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
   // ── Render: fila de transacción ───────────────────────────────────────────────
   const renderTransaccion = useCallback(
     (tx: Transaction) => {
-      const isIncome = tx.type === 'income';
+      const clase    = claseMovimiento(tx);
+      const isIncome = clase === 'ingreso';
+      // Apartar / retirar ahorro no es gasto ni ingreso: se ve en el color de marca, sin +/−.
+      const esAhorro = clase === 'ahorro' || clase === 'retiro_ahorro';
       const paleta   = getBgIconoCategoria(tx.category, isDark);
-      const icono    = getIconoTx(tx.category, tx.type);
+      const icono    = esAhorro ? (clase === 'ahorro' ? 'lock' : 'unlock') : getIconoTx(tx.category, tx.type);
       const hora     = new Date(tx.date).toLocaleTimeString('es-CO', {
         hour: '2-digit',
         minute: '2-digit',
@@ -282,12 +321,12 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
         <TransactionCard
           key={tx.id}
           title={tx.description || tx.category}
-          meta={[tx.category, hora]}
-          amountLabel={`${isIncome ? '+' : '-'}${formatCOP(tx.amount)}`}
-          amountColor={isIncome ? colors.income : colors.expense}
+          meta={[esAhorro ? ETIQUETA_CLASE[clase] : tx.category, hora]}
+          amountLabel={esAhorro ? formatCOP(tx.amount) : `${isIncome ? '+' : '-'}${formatCOP(tx.amount)}`}
+          amountColor={esAhorro ? colors.primary : isIncome ? colors.income : colors.expense}
           iconName={icono as any}
-          iconBg={isIncome ? colors.incomeLight : paleta.bg}
-          iconColor={isIncome ? colors.income : paleta.color}
+          iconBg={esAhorro ? colors.primaryLight : isIncome ? colors.incomeLight : paleta.bg}
+          iconColor={esAhorro ? colors.primary : isIncome ? colors.income : paleta.color}
           expanded={txExpandida === tx.id}
           onToggle={() => { haptics.light(); alternarTx(tx.id); }}
           onLongPress={() => { haptics.medium(); setTxSeleccionada(tx); }}
@@ -429,8 +468,8 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
           <View style={s.filtroGrupo}>
             <Text style={[s.filtroLabel, { color: colors.textTertiary }]}>TIPO</Text>
             <View style={s.filtroFila}>
-              {(['todos', 'ingresos', 'gastos'] as const).map((key, i) => {
-                const labels = ['Todos', 'Ingresos', 'Gastos'];
+              {(['todos', 'ingresos', 'gastos', 'ahorro'] as const).map((key, i) => {
+                const labels = ['Todos', 'Ingresos', 'Gastos', 'Ahorro'];
                 const activo = filtros.tipo === key;
                 return (
                   <TouchableOpacity
@@ -602,19 +641,24 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
           { label: 'Movimientos', value: String(estadisticas.totalTransacciones), color: colors.textPrimary },
           { label: 'Ingresos',    value: formatCOP(estadisticas.totalIngresos),   color: colors.income     },
           { label: 'Gastos',      value: formatCOP(estadisticas.totalGastos),     color: colors.expense    },
+          // Lo movido al ahorro va aparte: no es gasto ni ingreso.
+          ...(estadisticas.totalApartado !== 0
+            ? [{ label: 'Ahorro', value: formatCOP(estadisticas.totalApartado), color: colors.primary }]
+            : []),
           {
             // BUG-05: "Neto", no "Balance" — es la suma de los movimientos
             // filtrados, no el balance disponible que muestra el Dashboard.
+            // Neto = ingresos − gastos de consumo (lo ahorrado en el período).
             label: 'Neto',
             value: formatCOP(estadisticas.balance),
             color: estadisticas.balance >= 0 ? colors.income : colors.expense,
           },
-        ].map((stat, i) => (
+        ].map((stat, i, arr) => (
           <View
             key={stat.label}
             style={[
               s.statCell,
-              i < 3 && { borderRightWidth: 0.5, borderRightColor: colors.borderSubtle },
+              i < arr.length - 1 && { borderRightWidth: 0.5, borderRightColor: colors.borderSubtle },
             ]}
           >
             <Text
@@ -697,35 +741,22 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
             >
               {/* Monto grande */}
               <View style={s.modalAmountWrap}>
-                <View
-                  style={[
-                    s.modalAmountIcon,
-                    {
-                      backgroundColor:
-                        txSeleccionada.type === 'income'
-                          ? colors.incomeLight
-                          : colors.expenseLight,
-                    },
-                  ]}
-                >
-                  <Icon
-                    name={getIconoTx(txSeleccionada.category, txSeleccionada.type) as any}
-                    size={28}
-                    color={txSeleccionada.type === 'income' ? colors.income : colors.expense}
-                  />
-                </View>
-                <Text
-                  style={[
-                    s.modalAmount,
-                    { color: txSeleccionada.type === 'income' ? colors.income : colors.expense },
-                  ]}
-                >
-                  {txSeleccionada.type === 'income' ? '+' : '-'}
-                  {formatCOP(txSeleccionada.amount)}
-                </Text>
-                <Text style={[s.modalAmountSub, { color: colors.textSecondary }]}>
-                  {txSeleccionada.type === 'income' ? 'Ingreso' : 'Gasto'} · {txSeleccionada.category}
-                </Text>
+                {(() => {
+                  const v = visualMovimiento(txSeleccionada, colors);
+                  return (
+                    <>
+                      <View style={[s.modalAmountIcon, { backgroundColor: v.bg }]}>
+                        <Icon name={v.icono as any} size={28} color={v.color} />
+                      </View>
+                      <Text style={[s.modalAmount, { color: v.color }]}>
+                        {v.signo}{formatCOP(txSeleccionada.amount)}
+                      </Text>
+                      <Text style={[s.modalAmountSub, { color: colors.textSecondary }]}>
+                        {v.etiqueta} · {txSeleccionada.category}
+                      </Text>
+                    </>
+                  );
+                })()}
               </View>
 
               {/* Tabla de datos */}
@@ -794,7 +825,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
         visible={!!txAEliminar}
         title="¿Eliminar este movimiento?"
         message={txAEliminar
-          ? `${txAEliminar.type === 'income' ? 'Ingreso' : 'Gasto'} de ${formatCOP(txAEliminar.amount)} en ${txAEliminar.description || txAEliminar.category}. Esta acción no se puede deshacer.`
+          ? `${ETIQUETA_CLASE[claseMovimiento(txAEliminar)]} de ${formatCOP(txAEliminar.amount)} en ${txAEliminar.description || txAEliminar.category}. Esta acción no se puede deshacer.`
           : undefined}
         confirmLabel="Eliminar"
         onConfirm={ejecutarEliminar}

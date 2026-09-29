@@ -10,6 +10,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getAhorroRealMes, getSerieAhorro, compararAhorroMeses, calcularMetricasFinancieras, esCategoriaAhorro,
+  claseMovimiento,
 } from '../src/utils/ingresoUtils.ts';
 import { analizarEstadisticas } from '../src/utils/statsCoach.ts';
 import type { Transaction } from '../src/types/index.ts';
@@ -174,5 +175,15 @@ describe('retiro de ahorro (plata que vuelve de una meta)', () => {
       mes: 8, año: 2026, barData: [], areaData: [], hoy: HOY,
     });
     assert.equal(a.totalIngresosMes, 0);
+  });
+});
+
+describe('claseMovimiento (listas: Historial, Calendario)', () => {
+  test('ahorro y retiro se distinguen de gasto e ingreso, sin importar el type', () => {
+    assert.equal(claseMovimiento({ category: 'Mercado', type: 'expense' }), 'gasto');
+    assert.equal(claseMovimiento({ category: 'Freelance', type: 'income' }), 'ingreso');
+    assert.equal(claseMovimiento({ category: 'Ahorro', type: 'expense' }), 'ahorro');
+    assert.equal(claseMovimiento({ category: 'ahorro', type: 'income' }), 'ahorro');
+    assert.equal(claseMovimiento({ category: 'Retiro de ahorro', type: 'income' }), 'retiro_ahorro');
   });
 });
