@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Transaction } from '../types';
-import { calcularMetricasFinancieras, MetricasFinancieras } from './ingresoUtils';
+import { calcularMetricasFinancieras, compararAhorroMeses, MetricasFinancieras } from './ingresoUtils';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -20,8 +20,11 @@ export interface ComparativaMes {
   gastadoActual: number;
   gastadoAnterior: number;
   cambioPct: number;          // positivo = gastó más, negativo = gastó menos
+  /** Ahorro real (ingreso − gastado registrado), con signo. */
   ahorroActual: number;
   ahorroAnterior: number;
+  /** El mes anterior no tiene registros: no hay contra qué comparar. */
+  anteriorSinDatos: boolean;
 }
 
 export interface LogroDesbloqueado {
@@ -99,35 +102,22 @@ function calcularTopCategorias(
 
 function calcularComparativa(
   transactions: Transaction[],
-  categories: any[],
   monthlySalary: number,
   mes: number,
   año: number,
-  metricasActual: MetricasFinancieras,
 ): ComparativaMes {
-  const mesAnterior = mes === 0 ? 11 : mes - 1;
-  const añoAnterior = mes === 0 ? año - 1 : año;
-
-  const metricasAnterior = calcularMetricasFinancieras(
-    transactions,
-    categories,
-    monthlySalary,
-    mesAnterior,
-    añoAnterior,
-  );
-
-  const cambioPct = metricasAnterior.totalGastado > 0
-    ? Math.round(((metricasActual.totalGastado - metricasAnterior.totalGastado) / metricasAnterior.totalGastado) * 100)
-    : 0;
+  // Ambos meses con la misma regla (solo lo registrado): comparables entre sí.
+  const c = compararAhorroMeses(transactions, monthlySalary, mes, año);
 
   return {
     mesActualLabel:   MESES[mes],
-    mesAnteriorLabel: MESES[mesAnterior],
-    gastadoActual:    metricasActual.totalGastado,
-    gastadoAnterior:  metricasAnterior.totalGastado,
-    cambioPct,
-    ahorroActual:     metricasActual.ahorroProyectado,
-    ahorroAnterior:   metricasAnterior.ahorroProyectado,
+    mesAnteriorLabel: MESES[c.mesAnterior],
+    gastadoActual:    c.actual.gastado,
+    gastadoAnterior:  c.anterior.gastado,
+    cambioPct:        c.cambioGastoPct ?? 0,
+    ahorroActual:     c.actual.ahorro,
+    ahorroAnterior:   c.anterior.ahorro,
+    anteriorSinDatos: !c.anterior.tieneDatos,
   };
 }
 
@@ -203,7 +193,7 @@ export function calcularResumenMensual(
   const metricas = calcularMetricasFinancieras(transactions, categories, monthlySalary, mes, año);
   const calificacion = calcularCalificacion(metricas);
   const topCategorias = calcularTopCategorias(transactions, categories, mes, año, metricas.ingresoEfectivo);
-  const comparativa = calcularComparativa(transactions, categories, monthlySalary, mes, año, metricas);
+  const comparativa = calcularComparativa(transactions, monthlySalary, mes, año);
   const logroDesbloqueado = calcularLogro(calificacion, comparativa);
   const proyeccion = calcularProyeccion(calificacion, metricas, comparativa);
 

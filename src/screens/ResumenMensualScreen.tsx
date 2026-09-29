@@ -258,6 +258,7 @@ const TabResumen: React.FC<{ resumen: ResumenMensual; colors: any; calColor: str
   const { metricas, comparativa, topCategorias } = resumen;
 
   const mejoro = comparativa.cambioPct < 0;
+  const sinAnterior = comparativa.anteriorSinDatos;
 
   return (
     <View style={{ gap: 16 }}>
@@ -267,14 +268,18 @@ const TabResumen: React.FC<{ resumen: ResumenMensual; colors: any; calColor: str
         <View style={r.compareRow}>
           <View style={r.compareCol}>
             <Text style={[r.compareLabel, { color: colors.textTertiary }]}>{comparativa.mesAnteriorLabel}</Text>
-            <Text style={[r.compareAmt, { color: colors.textSecondary }]}>{fmtCOP(comparativa.gastadoAnterior)}</Text>
-          </View>
-          <View style={[r.badge, { backgroundColor: mejoro ? colors.incomeLight : colors.expenseLight }]}>
-            <Icon name={mejoro ? 'trending-down' : 'trending-up'} size={14} color={mejoro ? colors.income : colors.expense} />
-            <Text style={[r.badgeText, { color: mejoro ? colors.income : colors.expense }]}>
-              {mejoro ? '' : '+'}{comparativa.cambioPct}%
+            <Text style={[r.compareAmt, { color: colors.textSecondary }]}>
+              {sinAnterior ? 'Sin registros' : fmtCOP(comparativa.gastadoAnterior)}
             </Text>
           </View>
+          {!sinAnterior && (
+            <View style={[r.badge, { backgroundColor: mejoro ? colors.incomeLight : colors.expenseLight }]}>
+              <Icon name={mejoro ? 'trending-down' : 'trending-up'} size={14} color={mejoro ? colors.income : colors.expense} />
+              <Text style={[r.badgeText, { color: mejoro ? colors.income : colors.expense }]}>
+                {mejoro ? '' : '+'}{comparativa.cambioPct}%
+              </Text>
+            </View>
+          )}
           <View style={r.compareCol}>
             <Text style={[r.compareLabel, { color: colors.textTertiary }]}>{comparativa.mesActualLabel}</Text>
             <Text style={[r.compareAmt, { color: colors.textPrimary, fontWeight: '700' }]}>{fmtCOP(comparativa.gastadoActual)}</Text>
@@ -285,7 +290,9 @@ const TabResumen: React.FC<{ resumen: ResumenMensual; colors: any; calColor: str
         <View style={[r.ahorroRow, { borderTopColor: colors.border }]}>
           <View style={r.ahorroItem}>
             <Text style={[r.ahorroLabel, { color: colors.textTertiary }]}>Ahorro {comparativa.mesAnteriorLabel}</Text>
-            <Text style={[r.ahorroVal, { color: colors.textSecondary }]}>{fmtCOP(comparativa.ahorroAnterior)}</Text>
+            <Text style={[r.ahorroVal, { color: colors.textSecondary }]}>
+              {sinAnterior ? '—' : fmtCOP(comparativa.ahorroAnterior)}
+            </Text>
           </View>
           <View style={r.ahorroItem}>
             <Text style={[r.ahorroLabel, { color: colors.textTertiary }]}>Ahorro {comparativa.mesActualLabel}</Text>

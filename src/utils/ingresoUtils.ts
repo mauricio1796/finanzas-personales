@@ -127,6 +127,37 @@ export function getAhorroRealMes(
   return { tieneDatos, ingreso, gastado, ahorro: ingreso - gastado };
 }
 
+export interface ComparacionAhorro {
+  actual: AhorroMes;
+  anterior: AhorroMes;
+  mesAnterior: number;
+  añoAnterior: number;
+  /** % de cambio del gasto vs el mes anterior. null si el anterior no tiene datos. */
+  cambioGastoPct: number | null;
+}
+
+/**
+ * Compara un mes con el anterior usando solo lo registrado en cada uno.
+ * Antes se reutilizaba `calcularMetricasFinancieras` para el mes pasado, que
+ * le aplicaba los compromisos pendientes de HOY y, sin registros, suponía el
+ * salario completo como ahorro.
+ */
+export function compararAhorroMeses(
+  transactions: Transaction[],
+  monthlySalary: number,
+  mes: number,
+  año: number,
+): ComparacionAhorro {
+  const mesAnterior = mes === 0 ? 11 : mes - 1;
+  const añoAnterior = mes === 0 ? año - 1 : año;
+  const actual   = getAhorroRealMes(transactions, monthlySalary, mes, año);
+  const anterior = getAhorroRealMes(transactions, monthlySalary, mesAnterior, añoAnterior);
+  const cambioGastoPct = anterior.tieneDatos && anterior.gastado > 0
+    ? Math.round(((actual.gastado - anterior.gastado) / anterior.gastado) * 100)
+    : null;
+  return { actual, anterior, mesAnterior, añoAnterior, cambioGastoPct };
+}
+
 export interface PuntoAhorro {
   mes: number;
   año: number;

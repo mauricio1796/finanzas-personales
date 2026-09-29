@@ -8,7 +8,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { getAhorroRealMes, getSerieAhorro } from '../src/utils/ingresoUtils.ts';
+import { getAhorroRealMes, getSerieAhorro, compararAhorroMeses } from '../src/utils/ingresoUtils.ts';
 import type { Transaction } from '../src/types/index.ts';
 
 const SALARIO = 4_000_000;
@@ -70,5 +70,29 @@ describe('getSerieAhorro', () => {
     const s = getSerieAhorro([dic], SALARIO, 3, enero);
     assert.deepEqual(s.map(p => [p.mes, p.año]), [[11, 2026], [0, 2027]]);
     assert.equal(s[1].sinDatos, true);
+  });
+});
+
+describe('compararAhorroMeses', () => {
+  test('mes anterior sin registros → sin datos, sin % y ahorro 0 (no el salario)', () => {
+    const c = compararAhorroMeses([mov(1_000_000, 8)], SALARIO, 8, 2026);
+    assert.equal(c.anterior.tieneDatos, false);
+    assert.equal(c.anterior.ahorro, 0);
+    assert.equal(c.cambioGastoPct, null);
+  });
+
+  test('ambos meses con la misma regla: ahorro y % de gasto comparables', () => {
+    const c = compararAhorroMeses([mov(2_000_000, 7), mov(1_500_000, 8)], SALARIO, 8, 2026);
+    assert.equal(c.anterior.ahorro, 2_000_000);
+    assert.equal(c.actual.ahorro, 2_500_000);
+    assert.equal(c.cambioGastoPct, -25);
+  });
+
+  test('enero compara contra diciembre del año anterior', () => {
+    const dic: Transaction = { ...mov(1_000_000, 0), date: new Date(2025, 11, 10).toISOString() };
+    const c = compararAhorroMeses([dic], SALARIO, 0, 2026);
+    assert.equal(c.mesAnterior, 11);
+    assert.equal(c.añoAnterior, 2025);
+    assert.equal(c.anterior.gastado, 1_000_000);
   });
 });
