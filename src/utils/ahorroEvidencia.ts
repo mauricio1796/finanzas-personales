@@ -39,6 +39,63 @@ export function resolverPuntoPartida(
   };
 }
 
+export interface EvidenciaAhorro {
+  /**
+   * sin_base: aún no hay punto de partida (ni declarado ni un mes completo).
+   * midiendo: hay base pero ningún mes cerrado posterior para comparar.
+   * listo:    hay meses medidos.
+   */
+  estado: 'sin_base' | 'midiendo' | 'listo';
+  base: PuntoPartida | null;
+  /** Σ (ahorro del mes − base) en los meses medidos. Puede ser negativo. */
+  extraAcumulado: number;
+  /** Promedio de ahorro mensual en los meses medidos. */
+  promedioMensual: number;
+  /** promedioMensual − base. */
+  mejoraMensual: number;
+  mesesMedidos: number;
+  /** Meses medidos (para gráficas y desglose). */
+  meses: PuntoAhorro[];
+}
+
+/**
+ * Meses que cuentan para medir el cambio: cerrados, con registros, sin el mes
+ * de arranque (parcial) y, si la base es calculada, posteriores al mes base
+ * (el mes base es la base: compararlo consigo mismo no dice nada).
+ */
+export function mesesMedibles(serie: PuntoAhorro[], base: PuntoPartida): PuntoAhorro[] {
+  const desde = new Date(base.fecha);
+  const claveDesde = desde.getFullYear() * 12 + desde.getMonth();
+  return serie.slice(1).filter(p => {
+    if (p.sinDatos || p.enCurso) return false;
+    const clave = p.año * 12 + p.mes;
+    return base.fuente === 'calculado' ? clave > claveDesde : clave >= claveDesde;
+  });
+}
+
+/** El número que la app muestra: cuánto más (o menos) ahorra desde que usa Finn. */
+export function calcularEvidenciaAhorro(
+  serie: PuntoAhorro[],
+  base: PuntoPartida | null,
+): EvidenciaAhorro {
+  const vacio = { extraAcumulado: 0, promedioMensual: 0, mejoraMensual: 0, mesesMedidos: 0, meses: [] };
+  if (!base) return { estado: 'sin_base', base: null, ...vacio };
+  const meses = mesesMedibles(serie, base);
+  if (meses.length === 0) return { estado: 'midiendo', base, ...vacio };
+
+  const total = meses.reduce((s, p) => s + p.ahorroMes, 0);
+  const promedioMensual = total / meses.length;
+  return {
+    estado:          'listo',
+    base,
+    extraAcumulado:  total - base.ahorroMensual * meses.length,
+    promedioMensual,
+    mejoraMensual:   promedioMensual - base.ahorroMensual,
+    mesesMedidos:    meses.length,
+    meses,
+  };
+}
+
 /** Punto de partida declarado a partir de lo que el usuario escribió. */
 export function puntoPartidaDeclarado(ahorroMensual: number, ahora: Date = new Date()): PuntoPartida {
   return {

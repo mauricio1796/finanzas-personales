@@ -22,6 +22,7 @@ import {
   ResumenMensual,
   LogroDesbloqueado,
 } from '../utils/resumenMensualUtils';
+import type { PuntoPartida } from '../types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const fmtCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
@@ -108,7 +109,7 @@ const TABS: { key: Tab; label: string }[] = [
 export const ResumenMensualScreen: React.FC<Props> = ({ onBack, onNavigate, mesOverride }) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { transactions, categories, profile, awardXp } = useFinance();
+  const { transactions, categories, profile, awardXp, puntoPartida } = useFinance();
 
   const monthlySalary = profile?.monthlySalary ?? 0;
 
@@ -244,7 +245,7 @@ export const ResumenMensualScreen: React.FC<Props> = ({ onBack, onNavigate, mesO
         contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
       >
-        {tabActivo === 'resumen'    && <TabResumen    resumen={resumen} colors={colors} calColor={calColor} />}
+        {tabActivo === 'resumen'    && <TabResumen    resumen={resumen} colors={colors} calColor={calColor} puntoPartida={puntoPartida} />}
         {tabActivo === 'categorias' && <TabCategorias resumen={resumen} colors={colors} calColor={calColor} />}
         {tabActivo === 'proyeccion' && <TabProyeccion resumen={resumen} colors={colors} calColor={calColor} onNavigate={onNavigate} />}
       </Animated.ScrollView>
@@ -254,7 +255,7 @@ export const ResumenMensualScreen: React.FC<Props> = ({ onBack, onNavigate, mesO
 
 // ── Tab: Resumen ──────────────────────────────────────────────────────────────
 
-const TabResumen: React.FC<{ resumen: ResumenMensual; colors: any; calColor: string }> = ({ resumen, colors, calColor }) => {
+const TabResumen: React.FC<{ resumen: ResumenMensual; colors: any; calColor: string; puntoPartida: PuntoPartida | null }> = ({ resumen, colors, calColor, puntoPartida }) => {
   const { metricas, comparativa, topCategorias } = resumen;
 
   const mejoro = comparativa.cambioPct < 0;
@@ -299,6 +300,22 @@ const TabResumen: React.FC<{ resumen: ResumenMensual; colors: any; calColor: str
             <Text style={[r.ahorroVal, { color: calColor }]}>{fmtCOP(comparativa.ahorroActual)}</Text>
           </View>
         </View>
+
+        {/* Frente al punto de partida: el cambio que se atribuye a usar Finn */}
+        {puntoPartida && (() => {
+          const dif = comparativa.ahorroActual - puntoPartida.ahorroMensual;
+          const arriba = dif >= 0;
+          return (
+            <View style={[r.ahorroRow, { borderTopColor: colors.border }]}>
+              <Text style={[r.ahorroLabel, { color: colors.textTertiary, flex: 1 }]}>
+                Vs. tu punto de partida ({fmtCOP(puntoPartida.ahorroMensual)}/mes)
+              </Text>
+              <Text style={[r.ahorroVal, { color: arriba ? colors.income : colors.expense }]}>
+                {arriba ? '+' : '−'}{fmtCOP(Math.abs(dif))}
+              </Text>
+            </View>
+          );
+        })()}
       </View>
 
       {/* Stats row */}

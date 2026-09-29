@@ -34,6 +34,7 @@ import { NotificationsPanel } from '../../components/ui/NotificationsPanel';
 import { useNotificacionesInApp } from '../../hooks/useNotificacionesInApp';
 import { Transaction } from '../../types';
 import { InsightDiarioCard } from '../../features/proactive-alerts/InsightDiarioCard';
+import { AhorroEvidenciaCard } from '../../components/ahorro/AhorroEvidenciaCard';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtCOP = (n: number) =>
@@ -744,6 +745,9 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
             </View>
           ))}
         </View>
+
+        {/* ── Evidencia de ahorro: cuánto más ahorras con Finn ───────── */}
+        <AhorroEvidenciaCard onOpenBot={onOpenBot} />
 
         {/* ── Upsell Premium discreto (solo Free) ───────────────────────── */}
         {!premium.isPremium && (
