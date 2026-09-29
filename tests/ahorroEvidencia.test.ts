@@ -8,8 +8,10 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { getSerieAhorro } from '../src/utils/ingresoUtils.ts';
-import { resolverPuntoPartida, puntoPartidaDeclarado, calcularEvidenciaAhorro } from '../src/utils/ahorroEvidencia.ts';
+import { getSerieAhorro, gastosConsumoPorCategoria } from '../src/utils/ingresoUtils.ts';
+import {
+  resolverPuntoPartida, puntoPartidaDeclarado, calcularEvidenciaAhorro, calcularDesgloseMes,
+} from '../src/utils/ahorroEvidencia.ts';
 import type { Transaction } from '../src/types/index.ts';
 
 const SALARIO = 4_000_000;
@@ -105,5 +107,54 @@ describe('calcularEvidenciaAhorro', () => {
     const ev = calcularEvidenciaAhorro(s, resolverPuntoPartida(undefined, s));
     assert.equal(ev.estado, 'midiendo');
     assert.equal(ev.base?.ahorroMensual, 400_000);
+  });
+});
+
+describe('calcularDesgloseMes', () => {
+  const base = { comprasEvitadas: [], apartado: 0, fraccionMes: 1 };
+
+  test('detecta categorías con gasto menor a su promedio (top 3, sin ruido)', () => {
+    const d = calcularDesgloseMes({
+      ...base,
+      gastoPorCategoria: { Domicilios: 100_000, Mercado: 795_000, Ropa: 0 },
+      previos: [{ Domicilios: 300_000, Mercado: 800_000, Ropa: 150_000 }, { Domicilios: 260_000, Mercado: 800_000, Ropa: 50_000 }],
+    });
+    assert.deepEqual(d.acciones.map(a => [a.titulo, a.monto]), [
+      ['Gastaste menos en Domicilios que tu promedio', 180_000],
+      ['Gastaste menos en Ropa que tu promedio', 100_000],
+    ]);
+    assert.equal(d.gastoEvitado, 280_000);
+  });
+
+  test('sin meses previos no se afirma "gastaste menos"', () => {
+    const d = calcularDesgloseMes({ ...base, gastoPorCategoria: {}, previos: [] });
+    assert.equal(d.acciones.length, 0);
+  });
+
+  test('mes en curso temprano (<80%) no compara: evitaría falsos positivos', () => {
+    const d = calcularDesgloseMes({
+      ...base, fraccionMes: 0.5, gastoPorCategoria: {}, previos: [{ Arriendo: 1_500_000 }],
+    });
+    assert.equal(d.acciones.length, 0);
+  });
+
+  test('compras evitadas suman al gasto evitado; lo apartado va aparte', () => {
+    const d = calcularDesgloseMes({
+      ...base, gastoPorCategoria: {}, previos: [],
+      comprasEvitadas: [{ monto: 250_000 }], apartado: 400_000,
+    });
+    assert.equal(d.gastoEvitado, 250_000);
+    assert.equal(d.apartado, 400_000);
+    assert.deepEqual(d.acciones.map(a => a.tipo), ['compra_evitada', 'apartado']);
+  });
+});
+
+describe('gastosConsumoPorCategoria', () => {
+  test('sin registros → null; excluye movimientos de ahorro', () => {
+    assert.equal(gastosConsumoPorCategoria([], 8, 2026), null);
+    const g = gastosConsumoPorCategoria([
+      gasto(100_000, 8), { ...gasto(500_000, 8), category: 'Ahorro' },
+    ], 8, 2026);
+    assert.deepEqual(g, { Mercado: 100_000 });
   });
 });

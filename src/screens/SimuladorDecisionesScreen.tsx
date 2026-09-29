@@ -16,6 +16,7 @@ import { calcularMetricasFinancieras } from '../utils/ingresoUtils';
 import { simularDecision, ResultadoSimulacion, VeredictoSimulador } from '../utils/simuladorUtils';
 import { getPaletaItem } from '../constants/catalogoCategorias';
 import { THEME } from '../constants/theme';
+import { metaPrincipal } from '../utils/metasUtils';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,10 @@ interface Props {
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export const SimuladorDecisionesScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
-  const { transactions, categories, profile, premium } = useFinance();
+  const { transactions, categories, profile, premium, metas, abonarMeta, registrarCompraEvitada } = useFinance();
+  // "No la compré": el ahorro que produce el simulador, y la opción de apartarlo.
+  const [evitada, setEvitada] = useState<{ monto: number; apartado: boolean } | null>(null);
+  const metaActiva = useMemo(() => metaPrincipal(metas.filter(m => !m.completada)), [metas]);
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const haptics = useHaptics();
@@ -102,6 +106,7 @@ export const SimuladorDecisionesScreen: React.FC<Props> = ({ onBack, onNavigate 
     }
     // Limpiar resultado al cambiar monto
     if (resultado) setResultado(null);
+    setEvitada(null);
   }, [resultado]);
 
   const simular = useCallback(() => {
@@ -123,6 +128,7 @@ export const SimuladorDecisionesScreen: React.FC<Props> = ({ onBack, onNavigate 
 
     const res = simularDecision(montoNum, transactions, categories as any, metricas);
     setResultado(res);
+    setEvitada(null);
 
     setHistorial(prev => [
       { monto: montoNum, veredicto: res.veredicto, label: fmtCOP(montoNum) },
@@ -146,7 +152,22 @@ export const SimuladorDecisionesScreen: React.FC<Props> = ({ onBack, onNavigate 
     setResultado(null);
     setMonto('');
     setMontoFormateado('');
+    setEvitada(null);
   }, []);
+
+  const noLaCompre = () => {
+    if (!resultado) return;
+    haptics.success();
+    registrarCompraEvitada(resultado.monto);
+    setEvitada({ monto: resultado.monto, apartado: false });
+  };
+
+  const apartarEvitada = () => {
+    if (!evitada || !metaActiva) return;
+    haptics.success();
+    abonarMeta(metaActiva.id, evitada.monto);
+    setEvitada({ ...evitada, apartado: true });
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -497,6 +518,35 @@ export const SimuladorDecisionesScreen: React.FC<Props> = ({ onBack, onNavigate 
                   <Text style={[s.finnText, { color: colors.primaryText }]}>{resultado.consejoFinn}</Text>
                 </View>
               </View>
+
+              {/* "No la compré": convierte la simulación en ahorro medible */}
+              {!evitada ? (
+                <TouchableOpacity
+                  testID="simulador-no-la-compre"
+                  onPress={noLaCompre}
+                  style={[s.accionBtn, { backgroundColor: colors.income }]}
+                  activeOpacity={0.85}
+                >
+                  <Text style={s.accionBtnText}>No la compré · {fmtCOP(resultado.monto)} que no gasto</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={[s.finnCard, { backgroundColor: colors.incomeLight, borderColor: colors.income + '40' }]}>
+                  <Icon name="check-circle" size={20} color={colors.income} />
+                  <View style={{ flex: 1, gap: 8 }}>
+                    <Text style={[s.finnText, { color: colors.textPrimary }]}>
+                      {evitada.apartado
+                        ? `Apartaste ${fmtCOP(evitada.monto)} para "${metaActiva?.nombre}". ¡Eso es ahorro de verdad!`
+                        : `¡Bien! Lo sumamos a lo que Finn te ayudó a ahorrar este mes.`}
+                    </Text>
+                    {!evitada.apartado && metaActiva && (
+                      <TouchableOpacity onPress={apartarEvitada} activeOpacity={0.85}
+                        style={[s.accionBtn, { backgroundColor: colors.income, alignSelf: 'flex-start' }]}>
+                        <Text style={s.accionBtnText}>Apartar {fmtCOP(evitada.monto)} para "{metaActiva.nombre}"</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              )}
 
               {/* Acciones post-simulación */}
               <View style={s.accionesRow}>

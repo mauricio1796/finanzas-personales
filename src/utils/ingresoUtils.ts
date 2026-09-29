@@ -178,6 +178,23 @@ export function getAhorroRealMes(
   return { tieneDatos, ingreso, gastado, apartado, ahorro: ingreso - gastado };
 }
 
+/** Gasto de consumo del mes por categoría (sin movimientos de ahorro). null si el mes no tiene registros. */
+export function gastosConsumoPorCategoria(
+  transactions: Transaction[],
+  mes: number,
+  año: number,
+): Record<string, number> | null {
+  const out: Record<string, number> = {};
+  let tieneDatos = false;
+  for (const t of transactions) {
+    const d = new Date(t.date);
+    if (d.getMonth() !== mes || d.getFullYear() !== año) continue;
+    tieneDatos = true;
+    if (esGastoConsumo(t)) out[t.category] = (out[t.category] ?? 0) + t.amount;
+  }
+  return tieneDatos ? out : null;
+}
+
 export interface ComparacionAhorro {
   actual: AhorroMes;
   anterior: AhorroMes;

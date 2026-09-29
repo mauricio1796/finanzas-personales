@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Transaction, Category, User, FinancialProfile, FinancialGoal, UserLevel, Meta, Deuda, GastoRecurrente } from '../../types';
+import type { Transaction, Category, User, FinancialProfile, FinancialGoal, UserLevel, Meta, Deuda, GastoRecurrente, CompraEvitada } from '../../types';
 import type { PremiumState, RetoActivo } from '../../state/FinanceContext';
 
 export interface StorageData {
@@ -28,6 +28,7 @@ class StorageService {
     METAS: '@financy_metas',
     DEUDAS: '@financy_deudas',
     RECURRENTES: '@financy_recurrentes',
+    COMPRAS_EVITADAS: '@financy_compras_evitadas',
     PERMISSIONS_SHOWN: '@financy_permissions_shown',
   };
 
@@ -103,6 +104,9 @@ class StorageService {
   async getDeudas(): Promise<Deuda[] | null> { return this.getData<Deuda[]>(this.KEYS.DEUDAS); }
   async saveRecurrentes(recurrentes: GastoRecurrente[]): Promise<void> { return this.saveData(this.KEYS.RECURRENTES, recurrentes); }
   async getRecurrentes(): Promise<GastoRecurrente[] | null> { return this.getData<GastoRecurrente[]>(this.KEYS.RECURRENTES); }
+  // Compras evitadas (Simulador): solo en el dispositivo; limpiarDispositivo las borra con AsyncStorage.clear().
+  async saveComprasEvitadas(c: CompraEvitada[]): Promise<void> { return this.saveData(this.KEYS.COMPRAS_EVITADAS, c); }
+  async getComprasEvitadas(): Promise<CompraEvitada[] | null> { return this.getData<CompraEvitada[]>(this.KEYS.COMPRAS_EVITADAS); }
 
   // Generic string key/value helpers (usados por features livianas: tips, gamificación local)
   async getValue(key: string): Promise<string | null> {

@@ -33,6 +33,7 @@ import {
   FinancialProfile,
   FinancialGoal,
   PuntoPartida,
+  CompraEvitada,
   UserLevel,
   Achievement,
   OnboardingState,
@@ -144,6 +145,9 @@ interface FinanceContextType {
   abonarMeta: (id: string, monto: number, fecha?: Date) => void;
   /** Baja el saldo de la meta y devuelve al disponible lo que salió de él. */
   retirarDeMeta: (id: string, monto: number) => void;
+  /** Compras que el usuario decidió no hacer (Simulador). Solo en el dispositivo. */
+  comprasEvitadas: CompraEvitada[];
+  registrarCompraEvitada: (monto: number, descripcion?: string) => void;
 
   // Deudas
   deudas: Deuda[];
@@ -202,6 +206,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [metas, setMetas] = useState<Meta[]>([]);
   const [deudas, setDeudas] = useState<Deuda[]>([]);
   const [recurrentes, setRecurrentes] = useState<GastoRecurrente[]>([]);
+  const [comprasEvitadas, setComprasEvitadas] = useState<CompraEvitada[]>([]);
 
   /**
    * `goal` ya no es un estado aparte: es la meta principal de `metas[]`. Así
@@ -253,6 +258,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         storedMetas,
         storedDeudas,
         storedRecurrentes,
+        storedEvitadas,
       ] = await Promise.all([
         storageService.getOnboarded(),
         storageService.getUser(),
@@ -268,6 +274,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         storageService.getMetas(),
         storageService.getDeudas(),
         storageService.getRecurrentes(),
+        storageService.getComprasEvitadas(),
       ]);
 
       if (storedOnboarded) setIsOnboardedState(true);
@@ -320,6 +327,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (storedGoal && hidratacionMetas.migrada) retirarGoalLegado(storedGoal, hidratacionMetas.migrada);
       if (storedDeudas) setDeudas(storedDeudas);
       if (storedRecurrentes) setRecurrentes(storedRecurrentes);
+      if (storedEvitadas) setComprasEvitadas(storedEvitadas);
 
       // storedPaidIds se usa en Estadisticas directamente via storageService (no en este contexto)
       void storedPaidIds;
@@ -377,6 +385,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => { storageService.saveMetas(metas); }, [metas]);
   useEffect(() => { storageService.saveDeudas(deudas); }, [deudas]);
   useEffect(() => { storageService.saveRecurrentes(recurrentes); }, [recurrentes]);
+  useEffect(() => { storageService.saveComprasEvitadas(comprasEvitadas).catch(() => {}); }, [comprasEvitadas]);
 
   // ─── Motor de gamificación: fuente única de verdad para XP / nivel ─────────
   // Deriva el XP desde los datos reales (transacciones, pagos, retos, lecciones,
@@ -943,6 +952,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     registrarRetiroMeta(actual, retiro);
   };
 
+  const registrarCompraEvitada = (monto: number, descripcion?: string) => {
+    if (!(monto > 0)) return;
+    const ahora = new Date();
+    setComprasEvitadas(prev => [
+      { id: `evitada_${ahora.getTime()}`, monto: Math.round(monto), fecha: ahora.toISOString(), ...(descripcion ? { descripcion } : {}) },
+      ...prev,
+    ].slice(0, 200));
+  };
+
   // ─── Deudas ───────────────────────────────────────────────────────────────
   const addDeuda = (deuda: Deuda) => {
     setDeudas(prev => [deuda, ...prev]);
@@ -1013,6 +1031,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setMetas([]);
     setDeudas([]);
     setRecurrentes([]);
+    setComprasEvitadas([]);
   };
 
   const resetAll = async (): Promise<{ ok: boolean; error?: string }> => {
@@ -1057,6 +1076,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     deleteMeta,
     abonarMeta,
     retirarDeMeta,
+    comprasEvitadas,
+    registrarCompraEvitada,
     addDeuda,
     updateDeuda,
     deleteDeuda,

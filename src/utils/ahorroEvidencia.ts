@@ -96,6 +96,74 @@ export function calcularEvidenciaAhorro(
   };
 }
 
+// ── Desglose: qué hizo el usuario con Finn este mes ──────────────────────────
+
+export interface AccionAhorro {
+  tipo: 'gasto_menor' | 'compra_evitada' | 'apartado';
+  titulo: string;
+  monto: number;
+}
+
+export interface DesgloseAhorro {
+  acciones: AccionAhorro[];
+  /** Gasto que dejó de hacer: menos que su promedio + compras evitadas. */
+  gastoEvitado: number;
+  /** Plata neta apartada para metas / ahorro este mes. */
+  apartado: number;
+}
+
+/** Mínimo para contar una baja de gasto como acción (no ruido). */
+const UMBRAL_ABSOLUTO = 10_000;
+const UMBRAL_RELATIVO = 0.1;
+/** Antes del 80% del mes, prorratear gasto "de menos" daría falsos positivos (arriendo el 30…). */
+const FRACCION_MINIMA = 0.8;
+
+/**
+ * Desglose honesto del mes. `gastoPorCategoria` y `previos` salen de
+ * gastosConsumoPorCategoria (motor); `previos` son hasta 3 meses anteriores
+ * CON registros. `fraccionMes` es 1 en un mes cerrado.
+ *
+ * Las acciones no se suman con el apartado: apartar mueve plata que muchas
+ * veces ya viene de gastar menos, y sumarlas contaría dos veces.
+ */
+export function calcularDesgloseMes(input: {
+  gastoPorCategoria: Record<string, number>;
+  previos: Record<string, number>[];
+  fraccionMes: number;
+  comprasEvitadas: { monto: number; descripcion?: string }[];
+  apartado: number;
+}): DesgloseAhorro {
+  const acciones: AccionAhorro[] = [];
+
+  if (input.previos.length > 0 && input.fraccionMes >= FRACCION_MINIMA) {
+    const cats = new Set(input.previos.flatMap(p => Object.keys(p)));
+    const bajas: AccionAhorro[] = [];
+    for (const cat of cats) {
+      const promedio = input.previos.reduce((s, p) => s + (p[cat] ?? 0), 0) / input.previos.length;
+      const esperado = promedio * Math.min(1, input.fraccionMes);
+      const dif = esperado - (input.gastoPorCategoria[cat] ?? 0);
+      if (dif >= Math.max(UMBRAL_ABSOLUTO, esperado * UMBRAL_RELATIVO)) {
+        bajas.push({ tipo: 'gasto_menor', titulo: `Gastaste menos en ${cat} que tu promedio`, monto: Math.round(dif) });
+      }
+    }
+    acciones.push(...bajas.sort((a, b) => b.monto - a.monto).slice(0, 3));
+  }
+
+  for (const c of input.comprasEvitadas) {
+    acciones.push({
+      tipo: 'compra_evitada',
+      titulo: c.descripcion ? `No compraste: ${c.descripcion}` : 'Compra que decidiste no hacer',
+      monto: Math.round(c.monto),
+    });
+  }
+
+  const gastoEvitado = acciones.reduce((s, a) => s + a.monto, 0);
+  const apartado = Math.max(0, Math.round(input.apartado));
+  if (apartado > 0) acciones.push({ tipo: 'apartado', titulo: 'Apartaste para tus metas', monto: apartado });
+
+  return { acciones, gastoEvitado, apartado };
+}
+
 /** Punto de partida declarado a partir de lo que el usuario escribió. */
 export function puntoPartidaDeclarado(ahorroMensual: number, ahora: Date = new Date()): PuntoPartida {
   return {

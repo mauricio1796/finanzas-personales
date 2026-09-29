@@ -1,4 +1,5 @@
 import { Transaction } from '../types';
+import { esGastoConsumo, esIngresoGanado, montoApartado } from '../utils/ingresoUtils';
 
 export interface RetoComunidad {
   id: string; titulo: string; descripcion: string; emoji: string;
@@ -43,9 +44,13 @@ export function calcularProgresoReto(reto: RetoComunidad, transactions: Transact
     return gastos === 0 ? 100 : Math.max(0, 100 - (gastos / 50000 * 100));
   }
   if (reto.metaTipo === 'ahorrar_monto') {
-    const ingresos = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-    const gastos = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    return Math.min(100, (Math.max(0, ingresos - gastos) / (reto.metaMonto ?? 1)) * 100);
+    // Apartar para ahorro NO es gasto (antes restaba justo en el reto de ahorrar),
+    // y un retiro de ahorro no es ingreso. Lo apartado neto también cuenta.
+    const ingresos = txs.filter(esIngresoGanado).reduce((s, t) => s + t.amount, 0);
+    const gastos = txs.filter(esGastoConsumo).reduce((s, t) => s + t.amount, 0);
+    const apartado = txs.reduce((s, t) => s + montoApartado(t), 0);
+    const ahorro = Math.max(ingresos - gastos, apartado);
+    return Math.min(100, (Math.max(0, ahorro) / (reto.metaMonto ?? 1)) * 100);
   }
   if (reto.metaTipo === 'reducir_categoria') {
     const gastosCat = txs.filter(t => t.type === 'expense' && t.category.toLowerCase() === (reto.metaCategoria ?? '').toLowerCase()).reduce((s, t) => s + t.amount, 0);

@@ -26,6 +26,7 @@ import type { PuntoPartida } from '../types';
 import { getAhorroRealMes } from '../utils/ingresoUtils';
 import { sobranteParaApartar } from '../utils/metasUtils';
 import { SobranteMesCard } from '../components/ahorro/SobranteMesCard';
+import { DesgloseAhorroCard } from '../components/ahorro/DesgloseAhorroCard';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const fmtCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
@@ -258,7 +259,10 @@ export const ResumenMensualScreen: React.FC<Props> = ({ onBack, onNavigate, mesO
         showsVerticalScrollIndicator={false}
       >
         {tabActivo === 'resumen' && (
-          <SobranteMesCard mes={mes} año={año} sobrante={sobrante} onIrAMetas={() => onNavigate?.('metas')} />
+          <>
+            <SobranteMesCard mes={mes} año={año} sobrante={sobrante} onIrAMetas={() => onNavigate?.('metas')} />
+            <DesgloseAhorroCard mes={mes} año={año} />
+          </>
         )}
         {tabActivo === 'resumen'    && <TabResumen    resumen={resumen} colors={colors} calColor={calColor} puntoPartida={puntoPartida} />}
         {tabActivo === 'categorias' && <TabCategorias resumen={resumen} colors={colors} calColor={calColor} />}

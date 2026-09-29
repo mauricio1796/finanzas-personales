@@ -15,6 +15,7 @@ import { useFinance } from '../../state';
 import { useTheme } from '../../state/ThemeContext';
 import { Icon } from '../ui/Icon';
 import { calcularEvidenciaAhorro } from '../../utils/ahorroEvidencia';
+import { useDesgloseAhorro } from './useDesgloseAhorro';
 
 const fmt = (n: number) => '$' + Math.round(Math.abs(n)).toLocaleString('es-CO').replace(/,/g, '.');
 const fmtInput = (raw: string) => {
@@ -32,6 +33,10 @@ export function AhorroEvidenciaCard({ onOpenBot }: Props) {
   const [ajustando, setAjustando] = useState(false);
 
   const ev = useMemo(() => calcularEvidenciaAhorro(serieAhorro, puntoPartida), [serieAhorro, puntoPartida]);
+  // Qué hizo el mes pasado (último mes cerrado): la razón concreta detrás del número.
+  const mesPasado = useMemo(() => { const h = new Date(); return new Date(h.getFullYear(), h.getMonth() - 1, 1); }, []);
+  const desglosePasado = useDesgloseAhorro(mesPasado.getMonth(), mesPasado.getFullYear());
+  const topAccion = desglosePasado?.acciones.find(a => a.tipo !== 'apartado');
 
   // Sin perfil (onboarding incompleto) no hay nada que medir.
   if (!profile) return null;
@@ -78,6 +83,12 @@ export function AhorroEvidenciaCard({ onOpenBot }: Props) {
           <Text style={[st.etiqueta, { color: colors.textTertiary }]}>{etiqueta}</Text>
           <Text style={[st.principal, { color: acento }]} numberOfLines={1} adjustsFontSizeToFit>{principal}</Text>
           <Text style={[st.detalle, { color: colors.textSecondary }]}>{detalle}</Text>
+          {desglosePasado && desglosePasado.gastoEvitado > 0 && (
+            <Text style={[st.detalle, { color: colors.income, fontWeight: '600', marginTop: 2 }]} numberOfLines={2}>
+              El mes pasado evitaste {fmt(desglosePasado.gastoEvitado)} de gasto
+              {topAccion ? ` · ${topAccion.titulo.charAt(0).toLowerCase()}${topAccion.titulo.slice(1)}` : ''}
+            </Text>
+          )}
           {ev.estado === 'listo' && !positivo && onOpenBot && (
             <Pressable onPress={pedirPlan} hitSlop={8} style={{ marginTop: 6 }}>
               <Text style={[st.cta, { color: colors.primary }]}>Pedirle un plan a Finn</Text>

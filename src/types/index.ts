@@ -137,6 +137,14 @@ export interface FinancialProfile {
   updatedAt: string;
 }
 
+/** Compra que el usuario decidió NO hacer tras usar el Simulador. */
+export interface CompraEvitada {
+  id: string;
+  monto: number;
+  fecha: string; // ISO
+  descripcion?: string;
+}
+
 /** Línea base de ahorro contra la que se mide el cambio con la app. */
 export interface PuntoPartida {
   /** COP ahorrados al mes antes de Finn (puede ser 0). */
