@@ -106,6 +106,7 @@ function rowToProfile(r: Record<string, any>, userId: string): FinancialProfile 
     ...(r.debt_amount != null ? { debtAmount: r.debt_amount as number } : {}),
     mainFinancialConcern: r.main_financial_concern as string,
     currencyPreference: (r.currency_preference as string) ?? 'COP',
+    ...(r.punto_partida ? { puntoPartida: r.punto_partida as FinancialProfile['puntoPartida'] } : {}),
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
@@ -356,6 +357,14 @@ class SupabaseService {
       },
       { onConflict: 'user_id' }
     );
+    // UPDATE aparte y tolerante: si la migración 20260929_punto_partida_ahorro
+    // aún no está aplicada, el perfil igual se sincroniza.
+    if (profile.puntoPartida !== undefined) {
+      await db.from('financial_profiles')
+        .update({ punto_partida: profile.puntoPartida })
+        .eq('user_id', userId)
+        .then(() => {}, () => {});
+    }
   }
 
   async getFinancialProfile(userId: string): Promise<FinancialProfile | null> {

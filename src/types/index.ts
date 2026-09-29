@@ -131,8 +131,20 @@ export interface FinancialProfile {
   debtAmount?: number;
   mainFinancialConcern: string;
   currencyPreference: string;
+  /** Cuánto ahorraba al mes antes de Finn (solo si lo declaró; null = lo borró). */
+  puntoPartida?: PuntoPartida | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Línea base de ahorro contra la que se mide el cambio con la app. */
+export interface PuntoPartida {
+  /** COP ahorrados al mes antes de Finn (puede ser 0). */
+  ahorroMensual: number;
+  /** declarado: lo dijo el usuario · calculado: su primer mes completo registrado. */
+  fuente: 'declarado' | 'calculado';
+  /** Desde cuándo se mide el cambio (ISO). */
+  fecha: string;
 }
 
 // Objetivo Financiero

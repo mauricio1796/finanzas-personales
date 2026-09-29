@@ -9,6 +9,7 @@ import { useTheme } from '../../state/ThemeContext';
 import { Icon } from '../../components/ui/Icon';
 import { OnboardingShell } from '../../components/onboarding/OnboardingShell';
 import { THEME } from '../../constants/theme';
+import { puntoPartidaDeclarado } from '../../utils/ahorroEvidencia';
 
 interface Props { onNext: () => void; onBack: () => void; }
 
@@ -31,6 +32,16 @@ export const OnboardingSalario: React.FC<Props> = ({ onNext, onBack }) => {
   const [debtFocus,setDebtFocus]= useState(false);
   const [showDebt, setShowDebt] = useState(profile?.hasDebts !== undefined && income.length > 0);
   const [showSavings, setShowSavings] = useState(income.length > 0);
+  // Punto de partida (opcional): cuánto logra ahorrar HOY, antes de usar Finn.
+  const [ahorroHoy, setAhorroHoy] = useState(
+    profile?.puntoPartida?.fuente === 'declarado' && profile.puntoPartida.ahorroMensual > 0
+      ? fmtCOP(String(profile.puntoPartida.ahorroMensual)) : ''
+  );
+  const [ahorroOpcion, setAhorroOpcion] = useState<'monto' | 'nada' | 'nose' | null>(
+    profile?.puntoPartida?.fuente === 'declarado'
+      ? (profile.puntoPartida.ahorroMensual > 0 ? 'monto' : 'nada') : null
+  );
+  const [ahorroFocus, setAhorroFocus] = useState(false);
 
   const bubble1  = useRef(new Animated.Value(0)).current;
   const bubble2  = useRef(new Animated.Value(0)).current;
@@ -100,6 +111,13 @@ export const OnboardingSalario: React.FC<Props> = ({ onNext, onBack }) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const sal  = getSalarioNum();
     const debt = getDeudaNum();
+    const ahorroNum = parseInt(ahorroHoy.replace(/\./g, ''), 10) || 0;
+    // Sin respuesta ("no sé" o vacío) la app lo calcula con su primer mes completo.
+    const puntoPartida =
+      ahorroOpcion === 'nada' ? puntoPartidaDeclarado(0)
+      : ahorroOpcion === 'monto' && ahorroNum > 0 ? puntoPartidaDeclarado(ahorroNum)
+      : ahorroOpcion === 'nose' ? null
+      : profile?.puntoPartida;
     setProfile({
       id: profile?.id ?? Date.now().toString(),
       userId: '1',
@@ -110,6 +128,7 @@ export const OnboardingSalario: React.FC<Props> = ({ onNext, onBack }) => {
       debtAmount: hasDebt ? debt : undefined,
       mainFinancialConcern: profile?.mainFinancialConcern ?? '',
       currencyPreference: 'COP',
+      ...(puntoPartida !== undefined ? { puntoPartida } : {}),
       createdAt: profile?.createdAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -229,6 +248,56 @@ export const OnboardingSalario: React.FC<Props> = ({ onNext, onBack }) => {
                   />
                 </View>
               )}
+
+              {/* Punto de partida del ahorro (opcional) */}
+              {hasDebt !== null && (
+                <View style={{ marginTop: 16 }}>
+                  <View style={[s.finnRow, { marginBottom: 12 }]}>
+                    <View style={[s.finnAvatar, { backgroundColor: colors.primary }]}>
+                      <Text style={s.finnLetter}>F</Text>
+                    </View>
+                    <View style={[s.bubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <Text style={[s.bubbleText, { color: colors.textPrimary }]}>
+                        Y hoy, cuanto logras ahorrar al mes? Asi te muestro cuanto mejoras conmigo
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={s.chipRow}>
+                    {([['nada', 'Nada por ahora'], ['nose', 'No se']] as const).map(([op, label]) => {
+                      const activo = ahorroOpcion === op;
+                      return (
+                        <TouchableOpacity
+                          key={op}
+                          testID={`ahorro-hoy-${op}`}
+                          style={[s.chip, { backgroundColor: activo ? colors.primaryLight : colors.card, borderColor: activo ? colors.primary : colors.border }]}
+                          onPress={() => { Haptics.selectionAsync(); setAhorroOpcion(op); setAhorroHoy(''); }}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[s.chipText, { color: activo ? colors.primary : colors.textSecondary }]}>{label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  <View style={[s.debtInput, { borderColor: ahorroFocus ? colors.primary : colors.border }]}>
+                    <Text style={[s.debtInputPrefix, { color: colors.textTertiary }]}>$</Text>
+                    <TextInput
+                      testID="ahorro-hoy-input"
+                      style={[s.debtInputField, { color: colors.textPrimary }, Platform.OS === 'web' && ({ outline: 'none' } as any)]}
+                      placeholder="Monto que ahorras al mes (opcional)"
+                      placeholderTextColor={colors.textTertiary}
+                      keyboardType={Platform.OS === 'web' ? 'default' : 'numeric'}
+                      value={ahorroHoy}
+                      onChangeText={t => {
+                        const d = t.replace(/\./g, '').replace(/[^0-9]/g, '');
+                        setAhorroHoy(fmtCOP(d));
+                        setAhorroOpcion(d ? 'monto' : null);
+                      }}
+                      onFocus={() => setAhorroFocus(true)}
+                      onBlur={() => setAhorroFocus(false)}
+                    />
+                  </View>
+                </View>
+              )}
             </Animated.View>
           )}
 
@@ -271,6 +340,9 @@ const s = StyleSheet.create({
   debtInput:     { flexDirection: 'row', alignItems: 'center', borderRadius: THEME.radius.md, borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 12, gap: 8, marginTop: 8 },
   debtInputPrefix:{ fontSize: 18, fontWeight: '500' },
   debtInputField: { flex: 1, fontSize: 18, fontWeight: '500' },
+  chipRow:       { flexDirection: 'row', gap: 8 },
+  chip:          { borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
+  chipText:      { fontSize: 13, fontWeight: '600' },
   btn:           { borderRadius: THEME.radius.lg, padding: 16, alignItems: 'center', marginTop: 8 },
   btnText:       { fontSize: 16, fontWeight: '500', color: '#fff' },
 });

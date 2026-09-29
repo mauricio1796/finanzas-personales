@@ -8,7 +8,8 @@ import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesSer
 import { limpiarDispositivo } from '../services/LocalWipeService';
 import { computeGamification, reconcileXp, buildUserLevel, LOGROS, RARITY_STYLE } from '../services/GamificacionService';
 import { emitRewardToast } from '../utils/rewardToastBus';
-import { getIngresoEfectivoMes } from '../utils/ingresoUtils';
+import { calcularMetricasFinancieras, getSerieAhorro, type PuntoAhorro } from '../utils/ingresoUtils';
+import { resolverPuntoPartida, puntoPartidaDeclarado } from '../utils/ahorroEvidencia';
 import { metaPrincipal, goalDesdeMeta, metaDesdeGoal, migrarGoalLegado } from '../utils/metasUtils';
 import { sincronizarPremium } from '../services/PremiumService';
 import { RETOS_DISPONIBLES } from '../services/RetosService';
@@ -26,6 +27,7 @@ import {
   Transaction,
   FinancialProfile,
   FinancialGoal,
+  PuntoPartida,
   UserLevel,
   Achievement,
   OnboardingState,
@@ -83,6 +85,12 @@ interface FinanceContextType {
   updateOnboardingStep: (step: number) => void;
   setCategories: (cats: Category[]) => void;
   setProfile: (profile: FinancialProfile) => void;
+  /** Ahorro real mes a mes, últimos 24 meses (solo lo registrado). */
+  serieAhorro: PuntoAhorro[];
+  /** Línea base vigente (declarada o calculada). null = aún no hay contra qué medir. */
+  puntoPartida: PuntoPartida | null;
+  /** Declara cuánto ahorraba antes de Finn; null vuelve al cálculo automático. */
+  setPuntoPartida: (ahorroMensual: number | null) => void;
   setGoal: (goal: FinancialGoal) => void;
   setUserLevel: (level: UserLevel) => void;
   /** Suma un bono de XP puntual (sobre el XP derivado del motor). Monótono. */
@@ -522,6 +530,24 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  // ─── Evidencia de ahorro ──────────────────────────────────────────────────
+  const serieAhorro = useMemo(
+    () => getSerieAhorro(transactions, profile?.monthlySalary ?? 0, 24),
+    [transactions, profile?.monthlySalary],
+  );
+  const puntoPartida = useMemo(
+    () => resolverPuntoPartida(profile?.puntoPartida, serieAhorro),
+    [profile?.puntoPartida, serieAhorro],
+  );
+  const setPuntoPartida = (ahorroMensual: number | null) => {
+    if (!profile) return;
+    setProfile({
+      ...profile,
+      puntoPartida: ahorroMensual === null ? null : puntoPartidaDeclarado(ahorroMensual),
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
   /**
    * Finn (AgentService) y el bot escriben la meta con este método. Se guarda
    * como meta: actualiza la principal si el id coincide, o crea una nueva.
@@ -945,18 +971,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // ── Saldo disponible (salario + ingresos extra − gastos del mes actual) ──────
   const saldoDisponible = useMemo(() => {
-    const now  = new Date();
-    const mes  = now.getMonth();
-    const año  = now.getFullYear();
-    const ingresoTotal = getIngresoEfectivoMes(transactions, profile?.monthlySalary ?? 0, mes, año);
-    const gastosMes    = transactions
-      .filter(t => {
-        const d = new Date(t.date);
-        return t.type === 'expense' && d.getMonth() === mes && d.getFullYear() === año;
-      })
-      .reduce((s, t) => s + t.amount, 0);
-    // No cortamos en 0: si hay déficit se muestra negativo para que el usuario lo vea
-    return ingresoTotal - gastosMes;
+    const now = new Date();
+    // Mismo motor que el resto de la app: lo apartado en "Ahorro" sale del
+    // disponible sin importar si se registró como gasto o como ingreso.
+    // (Sin categorías: el disponible no depende de compromisos pendientes.)
+    // No se corta en 0: si hay déficit se muestra negativo para que el usuario lo vea.
+    return calcularMetricasFinancieras(
+      transactions, [], profile?.monthlySalary ?? 0, now.getMonth(), now.getFullYear(),
+    ).balanceDisponible;
   }, [transactions, profile?.monthlySalary]);
 
   const value: FinanceContextType = {
@@ -1001,6 +1023,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateOnboardingStep,
     setCategories,
     setProfile,
+    serieAhorro,
+    puntoPartida,
+    setPuntoPartida,
     setGoal,
     setUserLevel,
     awardXp,
