@@ -245,7 +245,7 @@ export function AlertasPreferencesScreen({ onBack }: Props) {
             />
             <ToggleRow
               label="Rachas de ahorro"
-              sublabel="Celebra cuando llevas días consecutivos sin gastos"
+              sublabel="Celebra cuando cierras meses seguidos ahorrando"
               value={prefs.alertas_ahorro}
               onChange={v => actualizarPref('alertas_ahorro', v)}
               disabled={!prefs.alertas_activas}
@@ -299,7 +299,7 @@ export function AlertasPreferencesScreen({ onBack }: Props) {
           <View style={[st.infoBox, { backgroundColor: accentColor + '10', borderColor: accentColor + '30' }]}>
             <Icon name="info" size={14} color={accentColor} />
             <Text style={[st.infoText, { color: colors.textSecondary }]}>
-              Finn analiza tus finanzas al abrir la app y te avisa solo cuando detecta algo relevante. Las alertas positivas (rachas de ahorro) aparecen máximo una vez por semana.
+              Finn analiza tus finanzas al abrir la app y te avisa solo cuando detecta algo relevante. Las rachas de ahorro se celebran al cerrar cada mes, como máximo una vez al mes.
             </Text>
           </View>
         </ScrollView>

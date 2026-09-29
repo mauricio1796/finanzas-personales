@@ -14,7 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { useFinance } from '../../state';
 import { useTheme } from '../../state/ThemeContext';
 import { Icon } from '../ui/Icon';
-import { calcularEvidenciaAhorro } from '../../utils/ahorroEvidencia';
+import { calcularEvidenciaAhorro, rachaMesesAhorrando } from '../../utils/ahorroEvidencia';
 import { useDesgloseAhorro } from './useDesgloseAhorro';
 
 const fmt = (n: number) => '$' + Math.round(Math.abs(n)).toLocaleString('es-CO').replace(/,/g, '.');
@@ -37,6 +37,7 @@ export function AhorroEvidenciaCard({ onOpenBot }: Props) {
   const mesPasado = useMemo(() => { const h = new Date(); return new Date(h.getFullYear(), h.getMonth() - 1, 1); }, []);
   const desglosePasado = useDesgloseAhorro(mesPasado.getMonth(), mesPasado.getFullYear());
   const topAccion = desglosePasado?.acciones.find(a => a.tipo !== 'apartado');
+  const racha = useMemo(() => rachaMesesAhorrando(serieAhorro), [serieAhorro]);
 
   // Sin perfil (onboarding incompleto) no hay nada que medir.
   if (!profile) return null;
@@ -80,7 +81,15 @@ export function AhorroEvidenciaCard({ onOpenBot }: Props) {
           <Icon name={ev.estado === 'listo' && !positivo ? 'trending-down' : 'trending-up'} size={18} color={acento} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={[st.etiqueta, { color: colors.textTertiary }]}>{etiqueta}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={[st.etiqueta, { color: colors.textTertiary, flexShrink: 1 }]}>{etiqueta}</Text>
+            {racha >= 2 && (
+              <View testID="racha-ahorro-chip" style={[st.racha, { backgroundColor: colors.incomeLight }]}>
+                <Icon name="zap" size={10} color={colors.income} />
+                <Text style={[st.rachaText, { color: colors.income }]}>{racha} meses seguidos</Text>
+              </View>
+            )}
+          </View>
           <Text style={[st.principal, { color: acento }]} numberOfLines={1} adjustsFontSizeToFit>{principal}</Text>
           <Text style={[st.detalle, { color: colors.textSecondary }]}>{detalle}</Text>
           {desglosePasado && desglosePasado.gastoEvitado > 0 && (
@@ -188,6 +197,8 @@ const st = StyleSheet.create({
   principal: { fontSize: 22, fontWeight: '800' },
   detalle:   { fontSize: 12, lineHeight: 17 },
   cta:       { fontSize: 12.5, fontWeight: '700' },
+  racha:     { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 100, paddingHorizontal: 7, paddingVertical: 2 },
+  rachaText: { fontSize: 10, fontWeight: '700' },
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 24 },
   sheet:     { borderRadius: 20, padding: 20, gap: 12 },
   sheetTitle:{ fontSize: 17, fontWeight: '700' },

@@ -129,6 +129,24 @@ export function calcularHitos(serie: PuntoAhorro[], base: PuntoPartida | null): 
   ];
 }
 
+// ── Racha real ────────────────────────────────────────────────────────────────
+
+/**
+ * Meses cerrados SEGUIDOS (hasta el último cerrado) con ahorro positivo.
+ * Reemplaza la "racha" de días sin gastos, que premiaba no registrar.
+ * El mes de arranque (parcial) y el mes en curso no cuentan.
+ */
+export function rachaMesesAhorrando(serie: PuntoAhorro[]): number {
+  const cerrados = serie.slice(1).filter(p => !p.enCurso);
+  let racha = 0;
+  for (let i = cerrados.length - 1; i >= 0; i--) {
+    const p = cerrados[i];
+    if (p.sinDatos || p.ahorroMes <= 0) break;
+    racha++;
+  }
+  return racha;
+}
+
 // ── Desglose: qué hizo el usuario con Finn este mes ──────────────────────────
 
 export interface AccionAhorro {

@@ -6,6 +6,8 @@
 
 import type { Transaction, Category } from '../../types';
 import type { AlertaCandidato, DetectorParams, TipoAlerta } from './types';
+import { getSerieAhorro } from '../../utils/ingresoUtils';
+import { rachaMesesAhorrando } from '../../utils/ahorroEvidencia';
 
 // ── Helpers de fecha ──────────────────────────────────────────────────────────
 
@@ -243,35 +245,30 @@ function detectarRitmoInsostenible(
 
 // ── Regla 7: Racha de ahorro positiva ────────────────────────────────────────
 
+/**
+ * Racha REAL: meses cerrados seguidos con ahorro positivo. Antes contaba días
+ * sin gastos, lo que premiaba dejar de registrar. Se celebra solo en la primera
+ * semana del mes (justo al cerrar el anterior); AlertasService además limita
+ * la racha a una por semana, así que llega como mucho una vez al mes.
+ */
 function detectarRachaAhorro(
   transactions: Transaction[],
+  salary: number,
   now: Date,
 ): AlertaCandidato[] {
-  // Días consecutivos recientes sin gastos
-  let racha = 0;
-  for (let i = 1; i <= 7; i++) {
-    const dia = new Date(now);
-    dia.setDate(now.getDate() - i);
-    const tieneGasto = transactions.some(t => {
-      if ((t as any).deleted_at || t.type !== 'expense') return false;
-      const d = parseDate(t.date);
-      return d.getDate() === dia.getDate() &&
-             d.getMonth() === dia.getMonth() &&
-             d.getFullYear() === dia.getFullYear();
-    });
-    if (!tieneGasto) racha++;
-    else break;
-  }
-
-  if (racha >= 3) {
-    return [{
-      tipo:          'racha_ahorro',
-      referencia_id: 'global',
-      mensaje:       `¡Llevas ${racha} días seguidos sin gastos! Mantén ese ritmo de ahorro.`,
-      esPremium:     false,
-    }];
-  }
-  return [];
+  if (now.getDate() > 7) return [];
+  const serie = getSerieAhorro(
+    transactions.filter(t => !(t as any).deleted_at), salary, 13, now,
+  );
+  const racha = rachaMesesAhorrando(serie);
+  if (racha < 2) return [];
+  const ultimo = serie.filter(p => !p.enCurso).pop();
+  return [{
+    tipo:          'racha_ahorro',
+    referencia_id: `meses_${racha}`,
+    mensaje:       `¡Llevas ${racha} meses seguidos ahorrando! Cerraste el mes con ${fmt(ultimo?.ahorroMes ?? 0)} a favor.`,
+    esPremium:     false,
+  }];
 }
 
 // ── Regla 8: Meta de ahorro al 85%+ ──────────────────────────────────────────
@@ -374,7 +371,7 @@ export function detectarAlertas(params: DetectorParams): AlertaCandidato[] {
   }
 
   if (prefs.alertas_ahorro) {
-    result.push(...detectarRachaAhorro(transactions, now));
+    result.push(...detectarRachaAhorro(transactions, salary, now));
   }
 
   if (prefs.alertas_metas) {

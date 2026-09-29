@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { getSerieAhorro, gastosConsumoPorCategoria } from '../src/utils/ingresoUtils.ts';
 import {
   resolverPuntoPartida, puntoPartidaDeclarado, calcularEvidenciaAhorro, calcularDesgloseMes, calcularHitos,
+  rachaMesesAhorrando,
 } from '../src/utils/ahorroEvidencia.ts';
 import type { Transaction } from '../src/types/index.ts';
 
@@ -179,5 +180,21 @@ describe('calcularHitos', () => {
   test('un mes sin registros corta la racha', () => {
     const s = serie([gasto(100_000, 2, 28), gasto(3_000_000, 3), gasto(3_000_000, 4), gasto(3_000_000, 6)]);
     assert.equal(hito(calcularHitos(s, null), 'tres_seguidos'), false);
+  });
+});
+
+describe('rachaMesesAhorrando', () => {
+  test('cuenta meses cerrados seguidos en positivo hasta el último cerrado', () => {
+    const s = serie([gasto(100_000, 3, 28), gasto(5_000_000, 4), gasto(3_000_000, 5), gasto(3_000_000, 6), gasto(3_000_000, 7)]);
+    assert.equal(rachaMesesAhorrando(s), 3); // jun, jul, ago (may fue negativo)
+  });
+
+  test('no registrar NO suma racha (antes premiaba días sin gastos)', () => {
+    const s = serie([gasto(100_000, 3, 28), gasto(3_000_000, 4), gasto(3_000_000, 5)]); // jul y ago sin datos
+    assert.equal(rachaMesesAhorrando(s), 0);
+  });
+
+  test('el mes de arranque y el mes en curso no cuentan', () => {
+    assert.equal(rachaMesesAhorrando(serie([gasto(100_000, 7, 20), gasto(100_000, 8)])), 0);
   });
 });
