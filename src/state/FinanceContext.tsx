@@ -9,6 +9,7 @@ import { limpiarDispositivo } from '../services/LocalWipeService';
 import { computeGamification, reconcileXp, buildUserLevel, LOGROS, RARITY_STYLE } from '../services/GamificacionService';
 import { emitRewardToast } from '../utils/rewardToastBus';
 import { getIngresoEfectivoMes } from '../utils/ingresoUtils';
+import { metaPrincipal, goalDesdeMeta, metaDesdeGoal, migrarGoalLegado } from '../utils/metasUtils';
 import { sincronizarPremium } from '../services/PremiumService';
 import { RETOS_DISPONIBLES } from '../services/RetosService';
 import { LECCIONES } from '../services/AcademiaService';
@@ -174,7 +175,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategoriesState] = useState<Category[]>([]);
   const [profile, setProfileState] = useState<FinancialProfile | null>(null);
-  const [goal, setGoalState] = useState<FinancialGoal | null>(null);
   const [userLevel, setUserLevelState] = useState<UserLevel | null>(null);
   const [achievements] = useState<Achievement[]>([]);
   const [isOnboarded, setIsOnboardedState] = useState(false);
@@ -185,6 +185,27 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [metas, setMetas] = useState<Meta[]>([]);
   const [deudas, setDeudas] = useState<Deuda[]>([]);
   const [recurrentes, setRecurrentes] = useState<GastoRecurrente[]>([]);
+
+  /**
+   * `goal` ya no es un estado aparte: es la meta principal de `metas[]`. Así
+   * Finn, alertas, PDF, notificaciones y gamificación ven la misma meta que la
+   * pantalla Metas (antes eran dos sistemas que nunca se cruzaban).
+   */
+  const goal = useMemo<FinancialGoal | null>(() => {
+    const principal = metaPrincipal(metas);
+    return principal ? goalDesdeMeta(principal, user?.id ?? 'local') : null;
+  }, [metas, user?.id]);
+
+  /** Tras migrar el goal legado a una meta, lo desactiva para no re-migrarlo. */
+  const retirarGoalLegado = (legado: FinancialGoal, meta: Meta) => {
+    const inactivo = { ...legado, isActive: false };
+    storageService.saveGoal(inactivo).catch(() => {});
+    const uid = legado.userId && legado.userId !== 'local' ? legado.userId : null;
+    if (uid) {
+      syncQueue.enqueue('migrar meta', () => supabaseService.upsertMeta(uid, meta));
+      syncQueue.enqueue('retirar meta legado', () => supabaseService.upsertGoal(uid, inactivo));
+    }
+  };
 
   // Phase 3
   const [leccionesCompletadas, setLeccionesCompletadas] = useState<string[]>([]);
@@ -264,7 +285,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       }
       if (storedProfile) setProfileState(storedProfile);
-      if (storedGoal) setGoalState(storedGoal);
       if (storedLevel) setUserLevelState(storedLevel);
       if (storedLecciones) setLeccionesCompletadas(storedLecciones);
       if (storedRetoActivo) setRetoActivo(storedRetoActivo);
@@ -277,7 +297,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       sincronizarPremium()
         .then(setPremiumState)
         .catch(() => setPremiumState(DEFAULT_PREMIUM));
-      if (storedMetas) setMetas(storedMetas);
+      // La meta guardada antes de unificar (FinancialGoal) pasa a `metas[]` una vez.
+      const hidratacionMetas = migrarGoalLegado(storedMetas ?? [], storedGoal);
+      if (storedMetas || hidratacionMetas.migrada) setMetas(hidratacionMetas.metas);
+      if (storedGoal && hidratacionMetas.migrada) retirarGoalLegado(storedGoal, hidratacionMetas.migrada);
       if (storedDeudas) setDeudas(storedDeudas);
       if (storedRecurrentes) setRecurrentes(storedRecurrentes);
 
@@ -314,7 +337,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // NO en estos effects, para evitar syncs completos en cada cambio.
   useEffect(() => { storageService.saveTransactions(transactions); }, [transactions]);
   useEffect(() => { if (profile) storageService.saveProfile(profile); }, [profile]);
-  useEffect(() => { if (goal) storageService.saveGoal(goal); }, [goal]);
   useEffect(() => { if (userLevel) storageService.saveUserLevel(userLevel); }, [userLevel]);
   useEffect(() => {
     if (!categories.length) return;
@@ -414,7 +436,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (data.transactions !== undefined) setTransactions(data.transactions);
     if (data.categories !== undefined) setCategoriesState(data.categories);
     if (data.profile !== undefined) setProfileState(data.profile);
-    if (data.goal !== undefined) setGoalState(data.goal);
     if (data.userLevel !== undefined) setUserLevelState(data.userLevel);
     if (data.leccionesCompletadas !== undefined) setLeccionesCompletadas(data.leccionesCompletadas);
     if (data.retosCompletados !== undefined) setRetosCompletados(data.retosCompletados);
@@ -425,7 +446,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     void data.premium;
     if (data.isOnboarded !== undefined) setIsOnboardedState(data.isOnboarded);
     if (data.paidTxIds !== undefined) await storageService.savePaidTxIds(data.paidTxIds);
-    if (data.metas !== undefined) setMetas(data.metas);
+    if (data.metas !== undefined || data.goal) {
+      const base = data.metas ?? metas;
+      const { metas: conMigrada, migrada } = migrarGoalLegado(base, data.goal);
+      if (data.metas !== undefined || migrada) setMetas(conMigrada);
+      if (data.goal && migrada) retirarGoalLegado(data.goal, migrada);
+    }
     if (data.deudas !== undefined) setDeudas(data.deudas);
     if (data.recurrentes !== undefined) setRecurrentes(data.recurrentes);
   };
@@ -461,7 +487,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       await Promise.all([
         profile ? storageService.saveProfile(profile) : Promise.resolve(),
         storageService.saveCategories(categories),
-        goal ? storageService.saveGoal(goal) : Promise.resolve(),
       ]);
 
       // Solo tras confirmar la persistencia de los datos se marca completado.
@@ -497,12 +522,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  /**
+   * Finn (AgentService) y el bot escriben la meta con este método. Se guarda
+   * como meta: actualiza la principal si el id coincide, o crea una nueva.
+   */
   const setGoal = (g: FinancialGoal) => {
-    setGoalState(g);
-    if (user) {
-      const uid = user.id;
-      syncQueue.enqueue('actualizar meta', () => supabaseService.upsertGoal(uid, g));
-    }
+    const existente = metas.find(m => m.id === g.id);
+    const meta = metaDesdeGoal(g, existente);
+    if (!meta) return;
+    if (existente) updateMeta(existente.id, meta);
+    else addMeta(meta);
   };
 
   const setUserLevel = (l: UserLevel) => {
@@ -889,7 +918,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setTransactions([]);
     setCategoriesState([]);
     setProfileState(null);
-    setGoalState(null);
     setUserLevelState(null);
     setIsOnboardedState(false);
     setOnboardingState(DEFAULT_ONBOARDING);

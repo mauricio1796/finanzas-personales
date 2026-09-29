@@ -276,7 +276,22 @@ function detectarRachaAhorro(
 
 // ── Regla 8: Meta de ahorro al 85%+ ──────────────────────────────────────────
 
-function detectarMetaCerca(goal: DetectorParams['goal']): AlertaCandidato[] {
+function detectarMetaCerca(goal: DetectorParams['goal'], metas?: DetectorParams['metas']): AlertaCandidato[] {
+  // Todas las metas activas de la pantalla Metas, no solo la principal.
+  if (metas) {
+    return metas
+      .filter(m => !m.completada && m.montoObjetivo > 0)
+      .filter(m => {
+        const pct = m.montoActual / m.montoObjetivo;
+        return pct >= 0.85 && pct < 1.0;
+      })
+      .map(m => ({
+        tipo:          'meta_cerca' as const,
+        referencia_id: m.id,
+        mensaje:       `Estás al ${Math.round((m.montoActual / m.montoObjetivo) * 100)}% de tu meta "${m.nombre}". Solo te faltan ${fmt(m.montoObjetivo - m.montoActual)} para lograrlo.`,
+        esPremium:     false,
+      }));
+  }
   if (!goal || !goal.targetAmount || goal.targetAmount <= 0) return [];
   const pct = (goal.currentAmount ?? 0) / goal.targetAmount;
   if (pct >= 0.85 && pct < 1.0) {
@@ -334,7 +349,7 @@ function generarInsightDiario(
 // ── Función principal: detectar todas las alertas ────────────────────────────
 
 export function detectarAlertas(params: DetectorParams): AlertaCandidato[] {
-  const { transactions, categories, profile, goal, isPremium, prefs } = params;
+  const { transactions, categories, profile, goal, metas, isPremium, prefs } = params;
   if (!prefs.alertas_activas) return [];
 
   const now    = new Date();
@@ -363,7 +378,7 @@ export function detectarAlertas(params: DetectorParams): AlertaCandidato[] {
   }
 
   if (prefs.alertas_metas) {
-    result.push(...detectarMetaCerca(goal));
+    result.push(...detectarMetaCerca(goal, metas));
   }
 
   if (prefs.insight_diario_activo && isPremium) {

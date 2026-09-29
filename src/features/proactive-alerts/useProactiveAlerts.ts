@@ -35,7 +35,7 @@ interface UseProactiveAlertsResult {
 }
 
 export function useProactiveAlerts(): UseProactiveAlertsResult {
-  const { user, transactions, categories, profile, goal, premium, isLoading } = useFinance();
+  const { user, transactions, categories, profile, goal, metas, premium, isLoading } = useFinance();
 
   const [alertasHoy,  setAlertasHoy]  = useState<FinnAlerta[]>([]);
   const [prefs,       setPrefs]       = useState<AlertPreferences>(DEFAULT_PREFS);
@@ -75,6 +75,7 @@ export function useProactiveAlerts(): UseProactiveAlertsResult {
         categories,
         profile,
         goal,
+        metas,
         isPremium: premium?.isPremium ?? false,
         prefs:     userPrefs,
       });
@@ -90,7 +91,7 @@ export function useProactiveAlerts(): UseProactiveAlertsResult {
     } finally {
       setIsRunning(false);
     }
-  }, [userId, isLoading, transactions, categories, profile, goal, premium]);
+  }, [userId, isLoading, transactions, categories, profile, goal, metas, premium]);
 
   useEffect(() => {
     if (!isLoading && userId && transactions.length >= 0) {

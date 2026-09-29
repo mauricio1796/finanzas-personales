@@ -714,7 +714,12 @@ class SupabaseService {
     transactions: Transaction[];
     categories: Category[];
     profile: FinancialProfile | null;
-    goal: FinancialGoal | null;
+    /**
+     * Ignorado: `goal` ahora se deriva de `metas` (metasUtils) y las metas se
+     * suben abajo. Subirlo a `financial_goals` lo haría re-migrar como meta
+     * duplicada en otro dispositivo. La tabla queda solo como legado.
+     */
+    goal?: FinancialGoal | null;
     userLevel: UserLevel | null;
     leccionesCompletadas: string[];
     retosCompletados: string[];
@@ -733,7 +738,6 @@ class SupabaseService {
         this.bulkInsertTransactions(userId, data.transactions),
         this.syncAllCategories(userId, data.categories),
         data.profile ? this.upsertFinancialProfile(userId, data.profile) : Promise.resolve(),
-        data.goal ? this.upsertGoal(userId, data.goal) : Promise.resolve(),
         data.userLevel ? this.upsertUserLevel(userId, data.userLevel) : Promise.resolve(),
         this.upsertUserData(userId, {
           name: data.name,

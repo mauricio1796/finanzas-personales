@@ -1,4 +1,4 @@
-import type { Transaction, Category, FinancialProfile, FinancialGoal } from '../../types';
+import type { Transaction, Category, FinancialProfile, FinancialGoal, Meta } from '../../types';
 
 // ── Tipos de alerta ───────────────────────────────────────────────────────────
 
@@ -64,6 +64,8 @@ export interface DetectorParams {
   categories:   Category[];
   profile:      FinancialProfile | null;
   goal:         FinancialGoal | null;
+  /** Metas de ahorro (fuente de verdad). Si se pasan, reemplazan a `goal`. */
+  metas?:       Meta[];
   isPremium:    boolean;
   prefs:        AlertPreferences;
 }
