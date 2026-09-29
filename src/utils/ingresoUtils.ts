@@ -20,11 +20,31 @@ export const TIPOS_INGRESO: IngresoConfig[] = [
 
 // ── Movimientos de ahorro ──────────────────────────────────────────────────────
 
+/** Categorías que usa la app al abonar / retirar de una meta. */
+export const CATEGORIA_AHORRO = 'Ahorro';
+export const CATEGORIA_RETIRO_AHORRO = 'Retiro de ahorro';
+
+const normalizar = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+
 /** "Ahorro", "Ahorros", "Ahorro emergencia"… (sin tildes ni mayúsculas). */
 export function esCategoriaAhorro(nombre: string | undefined | null): boolean {
-  if (!nombre) return false;
-  const n = nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
-  return n.startsWith('ahorro');
+  return !!nombre && normalizar(nombre).startsWith('ahorro');
+}
+
+/** Plata que vuelve del ahorro (o de una meta) al disponible. */
+export function esCategoriaRetiroAhorro(nombre: string | undefined | null): boolean {
+  return !!nombre && normalizar(nombre).startsWith('retiro de ahorro');
+}
+
+/**
+ * Cuánto mueve un movimiento hacia (+) o desde (−) el bolsillo de ahorro.
+ * Apartar o retirar no es consumo: el ahorro del mes (ingreso − consumo) no
+ * cambia; solo cambia cuánto queda disponible para gastar.
+ */
+export function montoApartado(t: Pick<Transaction, 'category' | 'amount'>): number {
+  if (esCategoriaRetiroAhorro(t.category)) return -t.amount;
+  if (esCategoriaAhorro(t.category)) return t.amount;
+  return 0;
 }
 
 /**
@@ -36,7 +56,7 @@ export function esCategoriaAhorro(nombre: string | undefined | null): boolean {
  * "Ahorro $200.000" quiso decir que guardó, lo elija en gastos o en ingresos.
  */
 export function esMovimientoAhorro(t: Pick<Transaction, 'category'>): boolean {
-  return esCategoriaAhorro(t.category);
+  return esCategoriaAhorro(t.category) || esCategoriaRetiroAhorro(t.category);
 }
 
 /** Gasto de consumo: todo `expense` salvo lo apartado para ahorro. */
@@ -122,7 +142,7 @@ export interface AhorroMes {
   ingreso: number;
   /** Gasto de consumo (sin lo apartado para ahorro). */
   gastado: number;
-  /** Lo registrado en la categoría Ahorro. Ya está incluido en `ahorro`. */
+  /** Neto movido al ahorro (Ahorro − Retiro de ahorro). Ya está incluido en `ahorro`. */
   apartado: number;
   /** ingreso − gastado, con signo: un mes en rojo resta. */
   ahorro: number;
@@ -149,7 +169,7 @@ export function getAhorroRealMes(
     const d = new Date(t.date);
     if (d.getMonth() !== mes || d.getFullYear() !== año) continue;
     tieneDatos = true;
-    if (esMovimientoAhorro(t)) apartado += t.amount;
+    if (esMovimientoAhorro(t)) apartado += montoApartado(t);
     else if (t.type === 'income') ingresos += t.amount;
     else if (t.type === 'expense') gastado += t.amount;
   }
@@ -241,7 +261,7 @@ export interface MetricasFinancieras {
   esIngresoReal: boolean;
   /** Gasto de consumo del mes. No incluye lo apartado para ahorro. */
   totalGastado: number;
-  /** Lo registrado en la categoría Ahorro este mes: ahorro, no gasto. */
+  /** Neto movido al ahorro este mes (Ahorro − Retiro de ahorro): no es gasto. */
   totalApartado: number;
   totalPendiente: number;
   /**
@@ -288,7 +308,7 @@ export function calcularMetricasFinancieras(
       return d.getMonth() === mes && d.getFullYear() === año;
     })
     .forEach(t => {
-      if (esMovimientoAhorro(t)) totalApartado += t.amount;
+      if (esMovimientoAhorro(t)) totalApartado += montoApartado(t);
       else if (t.type === 'expense') gastosPorCat[t.category] = (gastosPorCat[t.category] || 0) + t.amount;
     });
 

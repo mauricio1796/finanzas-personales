@@ -11,6 +11,7 @@ import { PremiumBadge } from '../components/ui/PremiumBadge';
 import { ConfettiBurst } from '../components/ui/ConfettiBurst';
 import type { Meta } from '../types';
 import { THEME } from '../constants/theme';
+import { montoVinculadoMeta } from '../utils/metasUtils';
 
 const METAS_GRATIS = 1;
 const XP_POR_META = 150;
@@ -119,21 +120,24 @@ const MetaForm: React.FC<MetaFormProps> = ({ visible, initial, onClose, onSave }
 
 interface AbonoModalProps {
   meta: Meta | null;
+  /** abono: aparta plata del disponible · retiro: la devuelve al disponible. */
+  modo?: 'abono' | 'retiro';
   onClose: () => void;
   onAbono: (monto: number) => void;
 }
 
-const AbonoModal: React.FC<AbonoModalProps> = ({ meta, onClose, onAbono }) => {
+const AbonoModal: React.FC<AbonoModalProps> = ({ meta, modo = 'abono', onClose, onAbono }) => {
   const { colors } = useTheme();
   const [monto, setMonto] = useState('');
   if (!meta) return null;
 
-  const sugerido = sugerenciaSemanal(meta);
+  const esRetiro = modo === 'retiro';
+  const sugerido = esRetiro ? null : sugerenciaSemanal(meta);
 
   const handleAbono = () => {
     const m = parseInt(monto.replace(/\./g,''), 10);
     if (!m || m <= 0) return;
-    onAbono(m);
+    onAbono(esRetiro ? Math.min(m, meta.montoActual) : m);
     setMonto('');
     onClose();
   };
@@ -144,9 +148,16 @@ const AbonoModal: React.FC<AbonoModalProps> = ({ meta, onClose, onAbono }) => {
         <Pressable style={st.overlay} onPress={onClose}>
           <Pressable style={[st.abonoCard, { backgroundColor: colors.card }]} onPress={() => {}}>
             <Text style={{ fontSize: 32, textAlign: 'center', marginBottom: 8 }}>{meta.emoji}</Text>
-            <Text style={[st.abonoTitle, { color: colors.textPrimary }]}>Abonar a "{meta.nombre}"</Text>
+            <Text style={[st.abonoTitle, { color: colors.textPrimary }]}>
+              {esRetiro ? `Retirar de "${meta.nombre}"` : `Abonar a "${meta.nombre}"`}
+            </Text>
             <Text style={[st.abonoSub, { color: colors.textTertiary }]}>
               {fmt(meta.montoActual)} de {fmt(meta.montoObjetivo)}
+            </Text>
+            <Text style={[st.abonoSub, { color: colors.textTertiary, marginTop: 4 }]}>
+              {esRetiro
+                ? 'La plata vuelve a tu disponible del mes.'
+                : 'Sale de tu disponible del mes y queda apartada: no cuenta como gasto.'}
             </Text>
             {sugerido && (
               <TouchableOpacity onPress={() => setMonto(sugerido.monto.toLocaleString('es-CO').replace(/,/g, '.'))} style={[st.sugerenciaChip, { backgroundColor: meta.color + '18' }]}>
@@ -157,11 +168,11 @@ const AbonoModal: React.FC<AbonoModalProps> = ({ meta, onClose, onAbono }) => {
               </TouchableOpacity>
             )}
             <TextInput style={[st.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.textPrimary, marginTop: 16 }]}
-              placeholder="Monto a abonar" placeholderTextColor={colors.textTertiary}
+              placeholder={esRetiro ? 'Monto a retirar' : 'Monto a abonar'} placeholderTextColor={colors.textTertiary}
               keyboardType="numeric" value={monto}
               onChangeText={t => { const d = t.replace(/\./g,'').replace(/\D/g,''); const n = parseInt(d,10); setMonto(isNaN(n)?'':n.toLocaleString('es-CO').replace(/,/g,'.')); }} />
             <TouchableOpacity style={[st.saveBtn, { backgroundColor: meta.color }]} onPress={handleAbono}>
-              <Text style={st.saveBtnText}>Abonar</Text>
+              <Text style={st.saveBtnText}>{esRetiro ? 'Retirar' : 'Abonar'}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -175,10 +186,11 @@ interface MetasScreenProps { onBack: () => void; onPremiumPress?: () => void; }
 export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress }) => {
   const insets                                        = useSafeAreaInsets();
   const { colors }                                    = useTheme();
-  const { metas, addMeta, updateMeta, deleteMeta, abonarMeta, premium } = useFinance();
+  const { metas, addMeta, updateMeta, deleteMeta, abonarMeta, retirarDeMeta, premium, transactions } = useFinance();
   const [showForm, setShowForm]                       = useState(false);
   const [metaEnEdicion, setMetaEnEdicion]              = useState<Meta | null>(null);
   const [abonoTarget, setAbonoTarget]                  = useState<Meta | null>(null);
+  const [retiroTarget, setRetiroTarget]                = useState<Meta | null>(null);
   const [celebrar, setCelebrar]                        = useState(false);
 
   const activasCount   = metas.filter(m => !m.completada).length;
@@ -211,6 +223,22 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress
   };
 
   const handleEliminar = (meta: Meta) => {
+    // Solo vuelve al disponible lo que salió de él (abonos con movimiento).
+    const devolvible = Math.min(meta.montoActual, montoVinculadoMeta(transactions, meta.id));
+    if (devolvible > 0) {
+      Alert.alert(
+        `¿Eliminar "${meta.nombre}"?`,
+        meta.completada
+          ? `Tiene ${fmt(devolvible)} apartados. Si ya los usaste, elimínala sin devolver.`
+          : `Tienes ${fmt(devolvible)} apartados en esta meta. ¿Los devolvemos a tu disponible?`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Eliminar sin devolver', style: 'destructive', onPress: () => deleteMeta(meta.id) },
+          { text: 'Devolver y eliminar', onPress: () => deleteMeta(meta.id, { devolver: true }) },
+        ],
+      );
+      return;
+    }
     Alert.alert(
       `¿Eliminar "${meta.nombre}"?`,
       meta.montoActual > 0
@@ -226,7 +254,7 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress
   const handleAbono = (monto: number) => {
     if (!abonoTarget) return;
     const seCompleta = !abonoTarget.completada &&
-      Math.min(abonoTarget.montoActual + monto, abonoTarget.montoObjetivo) >= abonoTarget.montoObjetivo;
+      abonoTarget.montoActual + monto >= abonoTarget.montoObjetivo;
 
     abonarMeta(abonoTarget.id, monto);
 
@@ -301,9 +329,17 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress
                   </View>
                   <View style={st.cardBottom}>
                     <Text style={[st.pctText, { color: meta.color }]}>{Math.round(pct * 100)}%</Text>
-                    <TouchableOpacity onPress={() => setAbonoTarget(meta)} style={[st.abonoBtn, { backgroundColor: meta.color }]}>
-                      <Text style={st.abonoBtnText}>+ Abonar</Text>
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {meta.montoActual > 0 && (
+                        <TouchableOpacity testID={`meta-retirar-${meta.id}`} onPress={() => setRetiroTarget(meta)}
+                          style={[st.abonoBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: meta.color }]}>
+                          <Text style={[st.abonoBtnText, { color: meta.color }]}>Retirar</Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity onPress={() => setAbonoTarget(meta)} style={[st.abonoBtn, { backgroundColor: meta.color }]}>
+                        <Text style={st.abonoBtnText}>+ Abonar</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   {sugerido && (
                     <Text style={[st.sugerenciaInline, { color: colors.textTertiary }]}>
@@ -347,6 +383,13 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={[st.cardNombre, { color: colors.textPrimary }]}>{meta.nombre} ✓</Text>
                     <Text style={[st.cardMonto, { color: colors.income }]}>{fmt(meta.montoObjetivo)} alcanzado</Text>
+                    {meta.montoActual > 0 && (
+                      <TouchableOpacity onPress={() => setRetiroTarget(meta)} hitSlop={6} style={{ marginTop: 4 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: meta.color }}>
+                          Usar / retirar {fmt(meta.montoActual)}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                   <TouchableOpacity onPress={() => handleEliminar(meta)} style={st.deleteBtn} hitSlop={6}>
                     <Icon name="trash-2" size={16} color={colors.textTertiary} />
@@ -365,6 +408,12 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress
         onSave={handleSave}
       />
       <AbonoModal meta={abonoTarget} onClose={() => setAbonoTarget(null)} onAbono={handleAbono} />
+      <AbonoModal
+        meta={retiroTarget}
+        modo="retiro"
+        onClose={() => setRetiroTarget(null)}
+        onAbono={monto => { if (retiroTarget) retirarDeMeta(retiroTarget.id, monto); }}
+      />
 
       <ConfettiBurst active={celebrar} />
     </View>

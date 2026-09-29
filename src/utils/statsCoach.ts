@@ -137,10 +137,12 @@ function txDelMes(transactions: Transaction[], mes: number, año: number): Trans
   });
 }
 
-// Mismo criterio que esMovimientoAhorro (ingresoUtils): lo apartado en "Ahorro"
-// no es gasto ni ingreso.
-const esAhorro = (t: Transaction) =>
-  (t.category ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().startsWith('ahorro');
+// Mismo criterio que esMovimientoAhorro (ingresoUtils): apartar ("Ahorro") o
+// retirar ("Retiro de ahorro") no es gasto ni ingreso.
+const esAhorro = (t: Transaction) => {
+  const n = (t.category ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  return n.startsWith('ahorro') || n.startsWith('retiro de ahorro');
+};
 const esGasto   = (t: Transaction) => t.type === 'expense' && !esAhorro(t);
 const esIngreso = (t: Transaction) => t.type === 'income' && !esAhorro(t);
 

@@ -8,9 +8,14 @@ import { reprogramarTodasLasNotificaciones } from '../services/NotificacionesSer
 import { limpiarDispositivo } from '../services/LocalWipeService';
 import { computeGamification, reconcileXp, buildUserLevel, LOGROS, RARITY_STYLE } from '../services/GamificacionService';
 import { emitRewardToast } from '../utils/rewardToastBus';
-import { calcularMetricasFinancieras, getSerieAhorro, type PuntoAhorro } from '../utils/ingresoUtils';
+import {
+  calcularMetricasFinancieras, getSerieAhorro, CATEGORIA_AHORRO, CATEGORIA_RETIRO_AHORRO, type PuntoAhorro,
+} from '../utils/ingresoUtils';
 import { resolverPuntoPartida, puntoPartidaDeclarado } from '../utils/ahorroEvidencia';
-import { metaPrincipal, goalDesdeMeta, metaDesdeGoal, migrarGoalLegado } from '../utils/metasUtils';
+import {
+  metaPrincipal, goalDesdeMeta, metaDesdeGoal, migrarGoalLegado,
+  idAbonoMeta, idRetiroMeta, montoVinculadoMeta,
+} from '../utils/metasUtils';
 import { sincronizarPremium } from '../services/PremiumService';
 import { RETOS_DISPONIBLES } from '../services/RetosService';
 import { LECCIONES } from '../services/AcademiaService';
@@ -133,8 +138,12 @@ interface FinanceContextType {
   metas: Meta[];
   addMeta: (meta: Meta) => void;
   updateMeta: (id: string, update: Partial<Meta>) => void;
-  deleteMeta: (id: string) => void;
-  abonarMeta: (id: string, monto: number) => void;
+  /** `devolver`: la plata apartada en la meta vuelve al disponible. */
+  deleteMeta: (id: string, opciones?: { devolver?: boolean }) => void;
+  /** Aparta plata de verdad (movimiento "Ahorro"). `fecha` para un mes ya cerrado. */
+  abonarMeta: (id: string, monto: number, fecha?: Date) => void;
+  /** Baja el saldo de la meta y devuelve al disponible lo que salió de él. */
+  retirarDeMeta: (id: string, monto: number) => void;
 
   // Deudas
   deudas: Deuda[];
@@ -860,28 +869,78 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (user) syncQueue.enqueue('actualizar meta', () => supabaseService.upsertMeta(user.id, updated));
       return updated;
     }));
-  const deleteMeta = (id: string) => {
+  /** Devuelve al disponible (movimiento "Retiro de ahorro") plata de una meta. */
+  const registrarRetiroMeta = (meta: Meta, monto: number) => {
+    const devolver = Math.min(monto, montoVinculadoMeta(transactions, meta.id));
+    if (devolver <= 0) return;
+    const ts = Date.now();
+    addTransaction({
+      id: idRetiroMeta(meta.id, ts), amount: devolver, category: CATEGORIA_RETIRO_AHORRO,
+      type: 'income', date: new Date(ts).toISOString(), description: `Retiro de la meta "${meta.nombre}"`,
+    });
+  };
+
+  /**
+   * Eliminar una meta activa devuelve al disponible lo que salió de él
+   * (`devolver`). Una meta completada normalmente ya se usó, así que la
+   * pantalla pregunta antes de devolver.
+   */
+  const deleteMeta = (id: string, opciones?: { devolver?: boolean }) => {
+    const meta = metas.find(m => m.id === id);
+    if (meta && opciones?.devolver) registrarRetiroMeta(meta, meta.montoActual);
     setMetas(prev => prev.filter(m => m.id !== id));
     if (user) syncQueue.enqueue('eliminar meta', () => supabaseService.deleteMeta(id, user.id));
   };
-  const abonarMeta = (id: string, monto: number) => {
+
+  /**
+   * Abonar = apartar plata de verdad: crea un movimiento "Ahorro" que sale del
+   * disponible (no es gasto: el ahorro del mes no baja). `fecha` permite apartar
+   * el sobrante de un mes ya cerrado con fecha de ese mes.
+   */
+  const abonarMeta = (id: string, monto: number, fecha?: Date) => {
     // Snapshot previo (fuera del updater) para decidir la recompensa una sola vez,
     // sin side-effects dentro del reducer de setMetas.
     const actual = metas.find(m => m.id === id);
-    const seCompletaAhora = !!actual && !actual.completada &&
-      Math.min(actual.montoActual + monto, actual.montoObjetivo) >= actual.montoObjetivo;
+    if (!actual || !(monto > 0)) return;
+    const seCompletaAhora = !actual.completada && actual.montoActual + monto >= actual.montoObjetivo;
+    const cuando = fecha ?? new Date();
 
     setMetas(prev => prev.map(m => {
       if (m.id !== id) return m;
-      const nuevo = Math.min(m.montoActual + monto, m.montoObjetivo);
-      const aportes = [...(m.aportes ?? []), { monto, fecha: new Date().toISOString() }];
-      const updated = { ...m, montoActual: nuevo, completada: nuevo >= m.montoObjetivo, aportes };
+      // Sin tope: lo abonado de más no se pierde (antes se recortaba al objetivo).
+      const nuevo = m.montoActual + monto;
+      const aportes = [...(m.aportes ?? []), { monto, fecha: cuando.toISOString() }];
+      const updated = { ...m, montoActual: nuevo, completada: m.completada || nuevo >= m.montoObjetivo, aportes };
       if (user) syncQueue.enqueue('abonar meta', () => supabaseService.upsertMeta(user.id, updated));
       return updated;
     }));
+    addTransaction({
+      id: idAbonoMeta(id, Date.now()), amount: monto, category: CATEGORIA_AHORRO,
+      type: 'expense', date: cuando.toISOString(), description: `Abono a la meta "${actual.nombre}"`,
+    });
 
     // Recompensa por completar una meta (solo la primera vez que cruza el objetivo)
     if (seCompletaAhora) awardXp(150);
+  };
+
+  /**
+   * Retirar de una meta: baja su saldo y devuelve al disponible lo que salió de
+   * él. Una meta completada sigue completada (usar la plata es el propósito, y
+   * así no se puede re-cobrar el XP de completarla).
+   */
+  const retirarDeMeta = (id: string, monto: number) => {
+    const actual = metas.find(m => m.id === id);
+    if (!actual) return;
+    const retiro = Math.min(monto, actual.montoActual);
+    if (!(retiro > 0)) return;
+    setMetas(prev => prev.map(m => {
+      if (m.id !== id) return m;
+      const aportes = [...(m.aportes ?? []), { monto: -retiro, fecha: new Date().toISOString() }];
+      const updated = { ...m, montoActual: m.montoActual - retiro, aportes };
+      if (user) syncQueue.enqueue('retirar de meta', () => supabaseService.upsertMeta(user.id, updated));
+      return updated;
+    }));
+    registrarRetiroMeta(actual, retiro);
   };
 
   // ─── Deudas ───────────────────────────────────────────────────────────────
@@ -997,6 +1056,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateMeta,
     deleteMeta,
     abonarMeta,
+    retirarDeMeta,
     addDeuda,
     updateDeuda,
     deleteDeuda,

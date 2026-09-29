@@ -150,3 +150,29 @@ describe('movimientos de ahorro (categoría "Ahorro")', () => {
     assert.equal(a.totalGastosMes, 1_000_000);
   });
 });
+
+describe('retiro de ahorro (plata que vuelve de una meta)', () => {
+  const mv = (amount: number, category: string, type: 'expense' | 'income'): Transaction =>
+    ({ ...mov(amount, 8, type), category });
+
+  test('retirar devuelve al disponible y NO cambia el ahorro del mes', () => {
+    const txs = [mov(1_000_000, 8), mv(500_000, 'Ahorro', 'expense'), mv(200_000, 'Retiro de ahorro', 'income')];
+    const r = getAhorroRealMes(txs, SALARIO, 8, 2026);
+    assert.equal(r.apartado, 300_000);
+    assert.equal(r.ingreso, SALARIO);
+    assert.equal(r.ahorro, 3_000_000);
+    const m = calcularMetricasFinancieras(txs, [], SALARIO, 8, 2026);
+    assert.equal(m.totalApartado, 300_000);
+    assert.equal(m.balanceDisponible, 2_700_000);
+    assert.equal(m.ahorroProyectado, 3_000_000);
+  });
+
+  test('Finn en Estadísticas no cuenta el retiro como ingreso', () => {
+    const a = analizarEstadisticas({
+      transactions: [mv(200_000, 'Retiro de ahorro', 'income')], categories: [],
+      metricas: calcularMetricasFinancieras([], [], SALARIO, 8, 2026),
+      mes: 8, año: 2026, barData: [], areaData: [], hoy: HOY,
+    });
+    assert.equal(a.totalIngresosMes, 0);
+  });
+});

@@ -10,6 +10,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   metaPrincipal, goalDesdeMeta, metaDesdeGoal, migrarGoalLegado, metasCercaDeCumplirse,
+  idAbonoMeta, idRetiroMeta, montoVinculadoMeta, sobranteParaApartar,
 } from '../src/utils/metasUtils.ts';
 import type { Meta, FinancialGoal } from '../src/types/index.ts';
 
@@ -113,5 +114,33 @@ describe('metasCercaDeCumplirse', () => {
     ]);
     assert.deepEqual(r.map(x => x.meta.id), ['a', 'd']);
     assert.equal(r[0].restante, 100_000);
+  });
+});
+
+describe('dinero de las metas', () => {
+  const tx = (id: string, amount: number) => ({ id, amount });
+
+  test('vinculado = abonos con movimiento − retiros con movimiento', () => {
+    const txs = [
+      tx(idAbonoMeta('m1', 1), 300_000), tx(idAbonoMeta('m1', 2), 200_000),
+      tx(idRetiroMeta('m1', 3), 100_000), tx(idAbonoMeta('m2', 4), 999_000), tx('otra', 50_000),
+    ];
+    assert.equal(montoVinculadoMeta(txs, 'm1'), 400_000);
+  });
+
+  test('ids con guion bajo no se cruzan entre metas (goal_g1 vs goal_g10)', () => {
+    const txs = [tx(idAbonoMeta('goal_g10', 1), 700_000)];
+    assert.equal(montoVinculadoMeta(txs, 'goal_g1'), 0);
+  });
+
+  test('abonos viejos sin movimiento no se "devuelven" (vinculado 0)', () => {
+    assert.equal(montoVinculadoMeta([], 'm1'), 0);
+  });
+
+  test('sobrante: mes en curso descuenta pendientes; mes cerrado no', () => {
+    const m = { balanceDisponible: 800_000, balanceFinal: 300_000 };
+    assert.equal(sobranteParaApartar(m, true), 300_000);
+    assert.equal(sobranteParaApartar(m, false), 800_000);
+    assert.equal(sobranteParaApartar({ balanceDisponible: -5, balanceFinal: -9 }, false), 0);
   });
 });

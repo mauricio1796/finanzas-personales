@@ -23,6 +23,9 @@ import {
   LogroDesbloqueado,
 } from '../utils/resumenMensualUtils';
 import type { PuntoPartida } from '../types';
+import { getAhorroRealMes } from '../utils/ingresoUtils';
+import { sobranteParaApartar } from '../utils/metasUtils';
+import { SobranteMesCard } from '../components/ahorro/SobranteMesCard';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const fmtCOP = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
@@ -123,6 +126,15 @@ export const ResumenMensualScreen: React.FC<Props> = ({ onBack, onNavigate, mesO
     // (mismo número de elementos), así que el resumen mostraba datos obsoletos.
     [transactions, categories, monthlySalary, mes, año],
   );
+
+  // Sobrante del mes que se puede apartar a una meta (solo si el mes tiene registros:
+  // un mes vacío no "sobró" el salario completo).
+  const sobrante = useMemo(() => {
+    if (!getAhorroRealMes(transactions, monthlySalary, mes, año).tieneDatos) return 0;
+    const enCurso = ahora.getMonth() === mes && ahora.getFullYear() === año;
+    return sobranteParaApartar(resumen.metricas, enCurso);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, monthlySalary, mes, año, resumen]);
 
   const calColor = calificacionColor(resumen.calificacion);
   const { panResponder: swipePR, translateX: swipeX } = useSwipeBack(onBack);
@@ -245,6 +257,9 @@ export const ResumenMensualScreen: React.FC<Props> = ({ onBack, onNavigate, mesO
         contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
       >
+        {tabActivo === 'resumen' && (
+          <SobranteMesCard mes={mes} año={año} sobrante={sobrante} onIrAMetas={() => onNavigate?.('metas')} />
+        )}
         {tabActivo === 'resumen'    && <TabResumen    resumen={resumen} colors={colors} calColor={calColor} puntoPartida={puntoPartida} />}
         {tabActivo === 'categorias' && <TabCategorias resumen={resumen} colors={colors} calColor={calColor} />}
         {tabActivo === 'proyeccion' && <TabProyeccion resumen={resumen} colors={colors} calColor={calColor} onNavigate={onNavigate} />}

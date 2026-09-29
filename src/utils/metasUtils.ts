@@ -10,7 +10,7 @@
  * Módulo puro (solo imports de tipos): cubierto por tests/metas.test.ts.
  */
 
-import type { Meta, FinancialGoal } from '../types';
+import type { Meta, FinancialGoal, Transaction } from '../types';
 
 const PREFIJO_LEGADO = 'goal_';
 const EMOJI_DEFECTO = '🎯';
@@ -100,6 +100,43 @@ export function migrarGoalLegado(
   // Ya migrado, o es la vista derivada de una meta existente (mismo id).
   if (!meta || metas.some(m => m.id === meta.id || m.id === goal.id)) return { metas, migrada: null };
   return { metas: [meta, ...metas], migrada: meta };
+}
+
+// ── Dinero de las metas ──────────────────────────────────────────────────────
+//
+// Abonar crea un movimiento "Ahorro" (sale del disponible) y retirar uno
+// "Retiro de ahorro" (vuelve). El vínculo meta ↔ movimiento va en el id de la
+// transacción, que SÍ se sincroniza (los `aportes` de la meta son solo locales).
+
+export const idAbonoMeta  = (metaId: string, ts: number) => `meta_abono_${metaId}_${ts}`;
+export const idRetiroMeta = (metaId: string, ts: number) => `meta_retiro_${metaId}_${ts}`;
+
+/**
+ * Cuánto dinero de esta meta salió realmente del disponible (abonos con
+ * movimiento menos retiros con movimiento). Los abonos hechos antes de conectar
+ * las metas al dinero nunca se descontaron, así que no se "devuelven".
+ */
+export function montoVinculadoMeta(transactions: Pick<Transaction, 'id' | 'amount'>[], metaId: string): number {
+  const abono = `meta_abono_${metaId}_`;
+  const retiro = `meta_retiro_${metaId}_`;
+  let total = 0;
+  for (const t of transactions) {
+    if (t.id.startsWith(abono)) total += t.amount;
+    else if (t.id.startsWith(retiro)) total -= t.amount;
+  }
+  return Math.max(0, total);
+}
+
+/**
+ * Sobrante del mes que se puede apartar a una meta: lo que queda disponible
+ * (ya descontado lo apartado). En el mes en curso también se descuentan los
+ * compromisos pendientes; un mes cerrado ya no tiene pendientes.
+ */
+export function sobranteParaApartar(
+  m: { balanceDisponible: number; balanceFinal: number },
+  esMesEnCurso: boolean,
+): number {
+  return Math.max(0, Math.floor(esMesEnCurso ? m.balanceFinal : m.balanceDisponible));
 }
 
 /** Metas activas al `umbral` o más de su objetivo (sin completar). */
