@@ -11,7 +11,8 @@ import { PremiumBadge } from '../components/ui/PremiumBadge';
 import { ConfettiBurst } from '../components/ui/ConfettiBurst';
 import type { Meta } from '../types';
 import { THEME } from '../constants/theme';
-import { montoVinculadoMeta } from '../utils/metasUtils';
+import { montoVinculadoMeta, sugerirFondoEmergencia } from '../utils/metasUtils';
+import { getAhorroRealMes, esCategoriaAhorro } from '../utils/ingresoUtils';
 
 const METAS_GRATIS = 1;
 const XP_POR_META = 150;
@@ -186,7 +187,10 @@ interface MetasScreenProps { onBack: () => void; onPremiumPress?: () => void; }
 export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress }) => {
   const insets                                        = useSafeAreaInsets();
   const { colors }                                    = useTheme();
-  const { metas, addMeta, updateMeta, deleteMeta, abonarMeta, retirarDeMeta, premium, transactions } = useFinance();
+  const {
+    metas, addMeta, updateMeta, deleteMeta, abonarMeta, retirarDeMeta, premium, transactions,
+    serieAhorro, categories, profile,
+  } = useFinance();
   const [showForm, setShowForm]                       = useState(false);
   const [metaEnEdicion, setMetaEnEdicion]              = useState<Meta | null>(null);
   const [abonoTarget, setAbonoTarget]                  = useState<Meta | null>(null);
@@ -195,6 +199,35 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress
 
   const activasCount   = metas.filter(m => !m.completada).length;
   const alcanzoLimite  = !premium.isPremium && activasCount >= METAS_GRATIS;
+
+  // Fondo de emergencia sugerido: 3–6 meses de gasto real (meses cerrados y
+  // completos); sin historial todavía, con el presupuesto mensual.
+  const sugerenciaFondo = React.useMemo(() => {
+    const salario = profile?.monthlySalary ?? 0;
+    const gastos = serieAhorro.slice(1)
+      .filter(p => !p.sinDatos && !p.enCurso)
+      .slice(-3)
+      .map(p => getAhorroRealMes(transactions, salario, p.mes, p.año).gastado);
+    const presupuesto = categories
+      .filter(c => c.isSelected && c.tipo !== 'ingreso' && !esCategoriaAhorro(c.name))
+      .reduce((s, c) => s + (c.budget ?? 0), 0);
+    return sugerirFondoEmergencia(metas, gastos, presupuesto);
+  }, [metas, serieAhorro, transactions, categories, profile?.monthlySalary]);
+
+  const crearFondoEmergencia = () => {
+    if (!sugerenciaFondo) return;
+    if (alcanzoLimite) { onPremiumPress?.(); return; }
+    addMeta({
+      id: Date.now().toString(),
+      nombre: 'Fondo de emergencia',
+      montoObjetivo: sugerenciaFondo.minimo,
+      montoActual: 0,
+      emoji: '🛟',
+      color: '#14B8A6',
+      completada: false,
+      creadaEn: new Date().toISOString(),
+    });
+  };
 
   const handlePressAdd = () => {
     if (alcanzoLimite) { onPremiumPress?.(); return; }
@@ -284,6 +317,30 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+        {sugerenciaFondo && (
+          <View testID="sugerencia-fondo-emergencia" style={[st.fondoCard, { backgroundColor: colors.card, borderColor: '#14B8A6' + '55' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Text style={{ fontSize: 26 }}>🛟</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[st.cardNombre, { color: colors.textPrimary }]}>Tu fondo de emergencia</Text>
+                <Text style={[st.cardFecha, { color: colors.textTertiary, marginTop: 2 }]}>
+                  {sugerenciaFondo.fuente === 'historial'
+                    ? `Gastas unos ${fmt(sugerenciaFondo.gastoMensual)} al mes`
+                    : `Tu presupuesto es de ${fmt(sugerenciaFondo.gastoMensual)} al mes`}
+                </Text>
+              </View>
+            </View>
+            <Text style={[st.fondoTexto, { color: colors.textSecondary }]}>
+              Lo primero antes que cualquier otra meta: {fmt(sugerenciaFondo.minimo)} cubren 3 meses de tus gastos si pierdes tu ingreso o surge un imprevisto. Lo ideal son 6 meses ({fmt(sugerenciaFondo.ideal)}).
+            </Text>
+            <TouchableOpacity onPress={crearFondoEmergencia} style={[st.abonoBtn, { backgroundColor: '#14B8A6', alignSelf: 'flex-start' }]}>
+              <Text style={st.abonoBtnText}>
+                {alcanzoLimite ? 'Crear con Premium' : `Crear meta de ${fmt(sugerenciaFondo.minimo)}`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {metas.length === 0 && (
           <View style={st.empty}>
             <Text style={{ fontSize: 48 }}>🎯</Text>
@@ -421,6 +478,8 @@ export const MetasScreen: React.FC<MetasScreenProps> = ({ onBack, onPremiumPress
 };
 
 const st = StyleSheet.create({
+  fondoCard:  { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 18, gap: 10 },
+  fondoTexto: { fontSize: 13, lineHeight: 19 },
   upsellCard: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     borderRadius: 18, borderWidth: 1,

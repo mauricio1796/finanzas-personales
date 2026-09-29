@@ -10,7 +10,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   metaPrincipal, goalDesdeMeta, metaDesdeGoal, migrarGoalLegado, metasCercaDeCumplirse,
-  idAbonoMeta, idRetiroMeta, montoVinculadoMeta, sobranteParaApartar,
+  idAbonoMeta, idRetiroMeta, montoVinculadoMeta, sobranteParaApartar, sugerirFondoEmergencia,
 } from '../src/utils/metasUtils.ts';
 import type { Meta, FinancialGoal } from '../src/types/index.ts';
 
@@ -142,5 +142,29 @@ describe('dinero de las metas', () => {
     assert.equal(sobranteParaApartar(m, true), 300_000);
     assert.equal(sobranteParaApartar(m, false), 800_000);
     assert.equal(sobranteParaApartar({ balanceDisponible: -5, balanceFinal: -9 }, false), 0);
+  });
+});
+
+describe('sugerirFondoEmergencia', () => {
+  test('3 y 6 meses del gasto real promedio, redondeado a $10.000', () => {
+    const s = sugerirFondoEmergencia([], [2_000_000, 2_200_000, 2_401_000], 0);
+    assert.equal(s?.fuente, 'historial');
+    assert.equal(s?.gastoMensual, 2_200_333);
+    assert.equal(s?.minimo, 6_610_000);
+    assert.equal(s?.ideal, 13_210_000);
+  });
+
+  test('sin meses cerrados usa el presupuesto', () => {
+    const s = sugerirFondoEmergencia([], [], 1_500_000);
+    assert.equal(s?.fuente, 'presupuesto');
+    assert.equal(s?.minimo, 4_500_000);
+  });
+
+  test('no sugiere si ya tiene una meta de emergencia (tildes/mayúsculas)', () => {
+    assert.equal(sugerirFondoEmergencia([{ nombre: 'Fondo de EMERGENCIAS' }], [1_000_000], 0), null);
+  });
+
+  test('sin datos para estimar → null', () => {
+    assert.equal(sugerirFondoEmergencia([], [], 0), null);
   });
 });

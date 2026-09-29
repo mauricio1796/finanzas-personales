@@ -139,6 +139,52 @@ export function sobranteParaApartar(
   return Math.max(0, Math.floor(esMesEnCurso ? m.balanceFinal : m.balanceDisponible));
 }
 
+// ── Fondo de emergencia sugerido ─────────────────────────────────────────────
+
+const sinTildes = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/** ¿Ya tiene una meta de emergencia? ("Fondo de emergencia", "emergencias"…) */
+export const esMetaEmergencia = (m: Pick<Meta, 'nombre'>) => sinTildes(m.nombre).includes('emergencia');
+
+export interface SugerenciaFondo {
+  /** Gasto de consumo mensual de referencia. */
+  gastoMensual: number;
+  /** 3 meses de gastos (redondeado hacia arriba a $10.000). */
+  minimo: number;
+  /** 6 meses de gastos. */
+  ideal: number;
+  /** historial: meses cerrados reales · presupuesto: aún no hay meses cerrados. */
+  fuente: 'historial' | 'presupuesto';
+}
+
+const redondear10k = (n: number) => Math.ceil(n / 10_000) * 10_000;
+
+/**
+ * Sugerencia de fondo de emergencia: 3 a 6 meses de gastos. `gastosMensuales`
+ * son los gastos de consumo de meses cerrados y completos (sin el de arranque);
+ * sin ellos se usa el presupuesto mensual. null si ya existe una meta de
+ * emergencia o no hay con qué estimar.
+ */
+export function sugerirFondoEmergencia(
+  metas: Pick<Meta, 'nombre'>[],
+  gastosMensuales: number[],
+  presupuestoMensual: number,
+): SugerenciaFondo | null {
+  if (metas.some(esMetaEmergencia)) return null;
+  const validos = gastosMensuales.filter(g => g > 0);
+  const fuente: SugerenciaFondo['fuente'] = validos.length > 0 ? 'historial' : 'presupuesto';
+  const gastoMensual = validos.length > 0
+    ? validos.reduce((s, g) => s + g, 0) / validos.length
+    : presupuestoMensual;
+  if (!(gastoMensual > 0)) return null;
+  return {
+    gastoMensual: Math.round(gastoMensual),
+    minimo:       redondear10k(gastoMensual * 3),
+    ideal:        redondear10k(gastoMensual * 6),
+    fuente,
+  };
+}
+
 /** Metas activas al `umbral` o más de su objetivo (sin completar). */
 export function metasCercaDeCumplirse(metas: Meta[], umbral = 0.85): { meta: Meta; pct: number; restante: number }[] {
   return metas
