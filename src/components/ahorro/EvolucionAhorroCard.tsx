@@ -6,13 +6,16 @@
  * no cuentan para hitos ni para el número principal.
  */
 
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import Svg, { Rect, Line, Text as SvgText } from 'react-native-svg';
 import { useFinance } from '../../state';
 import { useTheme } from '../../state/ThemeContext';
 import { Icon } from '../ui/Icon';
-import { calcularHitos } from '../../utils/ahorroEvidencia';
+import {
+  calcularHitos, calcularEvidenciaAhorro, rachaMesesAhorrando, textoCompartirLogro,
+} from '../../utils/ahorroEvidencia';
+import { CompartirLogroModal } from './CompartirLogroModal';
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const fmtShort = (n: number) => {
@@ -35,6 +38,9 @@ export function EvolucionAhorroCard({ width }: Props) {
   const { serieAhorro, puntoPartida } = useFinance();
 
   const hitos = useMemo(() => calcularHitos(serieAhorro, puntoPartida), [serieAhorro, puntoPartida]);
+  const evidencia = useMemo(() => calcularEvidenciaAhorro(serieAhorro, puntoPartida), [serieAhorro, puntoPartida]);
+  const racha = useMemo(() => rachaMesesAhorrando(serieAhorro), [serieAhorro]);
+  const [hitoCompartir, setHitoCompartir] = useState<string | null>(null);
   const puntos = useMemo(() => {
     const inicio = Math.max(0, serieAhorro.length - MAX_MESES);
     return serieAhorro.slice(inicio).map((p, i) => ({ ...p, arranque: inicio + i === 0 }));
@@ -91,12 +97,24 @@ export function EvolucionAhorroCard({ width }: Props) {
 
       <View style={st.hitos}>
         {hitos.map(h => (
-          <View key={h.id} style={[st.hito, { backgroundColor: h.alcanzado ? colors.incomeLight : colors.cardSecondary ?? colors.background }]}>
+          <Pressable
+            key={h.id}
+            disabled={!h.alcanzado}
+            onPress={() => setHitoCompartir(h.titulo)}
+            style={[st.hito, { backgroundColor: h.alcanzado ? colors.incomeLight : colors.cardSecondary ?? colors.background }]}
+          >
             <Icon name={h.alcanzado ? 'award' : 'lock'} size={12} color={h.alcanzado ? colors.income : colors.textTertiary} />
             <Text style={[st.hitoText, { color: h.alcanzado ? colors.income : colors.textTertiary }]}>{h.titulo}</Text>
-          </View>
+            {h.alcanzado && <Icon name="share-2" size={10} color={colors.income} />}
+          </Pressable>
         ))}
       </View>
+
+      <CompartirLogroModal
+        visible={hitoCompartir !== null}
+        onClose={() => setHitoCompartir(null)}
+        texto={hitoCompartir ? textoCompartirLogro({ evidencia: evidencia, racha, hito: hitoCompartir }) : null}
+      />
     </View>
   );
 }

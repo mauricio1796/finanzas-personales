@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { getSerieAhorro, gastosConsumoPorCategoria } from '../src/utils/ingresoUtils.ts';
 import {
   resolverPuntoPartida, puntoPartidaDeclarado, calcularEvidenciaAhorro, calcularDesgloseMes, calcularHitos,
-  rachaMesesAhorrando, mensajeCierreMes,
+  rachaMesesAhorrando, mensajeCierreMes, textoCompartirLogro,
 } from '../src/utils/ahorroEvidencia.ts';
 import type { Transaction } from '../src/types/index.ts';
 
@@ -226,5 +226,31 @@ describe('mensajeCierreMes', () => {
     const m = mensajeCierreMes({ nombreMes: 'septiembre', ahorroMes: 700_000, base: 500_000, cerrado: false });
     assert.equal(m.titulo, 'Mañana cierra el mes');
     assert.match(m.cuerpo, /^Vas ahorrando \$700\.000, \$200\.000 más que tu punto de partida/);
+  });
+});
+
+describe('textoCompartirLogro', () => {
+  const base = puntoPartidaDeclarado(500_000, HOY);
+
+  test('comparte % de mejora, racha e hito — NUNCA montos', () => {
+    const t = textoCompartirLogro({
+      evidencia: { estado: 'listo', mejoraMensual: 250_000, base }, racha: 3, hito: 'Primer millón ahorrado',
+    })!;
+    assert.match(t, /Ahorro un 50% más al mes/);
+    assert.match(t, /3 meses seguidos/);
+    assert.match(t, /Primer millón ahorrado/);
+    assert.doesNotMatch(t, /\$\s?\d/); // ningún monto en pesos
+  });
+
+  test('base declarada en 0: mensaje sin porcentaje infinito', () => {
+    const t = textoCompartirLogro({
+      evidencia: { estado: 'listo', mejoraMensual: 300_000, base: puntoPartidaDeclarado(0, HOY) }, racha: 0,
+    })!;
+    assert.match(t, /Antes no ahorraba nada/);
+  });
+
+  test('sin logro real → null (no hay botón de compartir)', () => {
+    assert.equal(textoCompartirLogro({ evidencia: { estado: 'listo', mejoraMensual: -10, base }, racha: 1 }), null);
+    assert.equal(textoCompartirLogro({ evidencia: { estado: 'sin_base', mejoraMensual: 0, base: null }, racha: 0 }), null);
   });
 });

@@ -173,6 +173,33 @@ export function mensajeCierreMes(p: {
   };
 }
 
+// ── Compartir el logro ───────────────────────────────────────────────────────
+
+/**
+ * Texto para compartir el progreso. Privacidad por diseño: NUNCA incluye
+ * montos (ni ingreso, ni ahorro en pesos), solo porcentajes, meses e hitos.
+ * null si no hay un logro real que compartir.
+ */
+export function textoCompartirLogro(p: {
+  evidencia: Pick<EvidenciaAhorro, 'estado' | 'mejoraMensual' | 'base'>;
+  racha: number;
+  hito?: string;
+}): string | null {
+  const lineas: string[] = [];
+  if (p.hito) lineas.push(`🏆 ${p.hito}`);
+
+  const ev = p.evidencia;
+  if (ev.estado === 'listo' && ev.base && ev.mejoraMensual > 0) {
+    lineas.push(ev.base.ahorroMensual > 0
+      ? `📈 Ahorro un ${Math.round((ev.mejoraMensual / ev.base.ahorroMensual) * 100)}% más al mes desde que uso Finn`
+      : '📈 Antes no ahorraba nada; ahora ahorro cada mes con Finn');
+  }
+  if (p.racha >= 2) lineas.push(`🔥 ${p.racha} meses seguidos ahorrando`);
+
+  if (lineas.length === 0) return null;
+  return [...lineas, '', '📱 FinancyAI — Finn, mi coach de finanzas personales'].join('\n');
+}
+
 // ── Racha real ────────────────────────────────────────────────────────────────
 
 /**

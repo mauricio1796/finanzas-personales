@@ -14,7 +14,8 @@ import * as Haptics from 'expo-haptics';
 import { useFinance } from '../../state';
 import { useTheme } from '../../state/ThemeContext';
 import { Icon } from '../ui/Icon';
-import { calcularEvidenciaAhorro, rachaMesesAhorrando } from '../../utils/ahorroEvidencia';
+import { calcularEvidenciaAhorro, rachaMesesAhorrando, textoCompartirLogro } from '../../utils/ahorroEvidencia';
+import { CompartirLogroModal } from './CompartirLogroModal';
 import { useDesgloseAhorro } from './useDesgloseAhorro';
 
 const fmt = (n: number) => '$' + Math.round(Math.abs(n)).toLocaleString('es-CO').replace(/,/g, '.');
@@ -38,6 +39,8 @@ export function AhorroEvidenciaCard({ onOpenBot }: Props) {
   const desglosePasado = useDesgloseAhorro(mesPasado.getMonth(), mesPasado.getFullYear());
   const topAccion = desglosePasado?.acciones.find(a => a.tipo !== 'apartado');
   const racha = useMemo(() => rachaMesesAhorrando(serieAhorro), [serieAhorro]);
+  const [compartiendo, setCompartiendo] = useState(false);
+  const textoCompartir = useMemo(() => textoCompartirLogro({ evidencia: ev, racha }), [ev, racha]);
 
   // Sin perfil (onboarding incompleto) no hay nada que medir.
   if (!profile) return null;
@@ -103,6 +106,13 @@ export function AhorroEvidenciaCard({ onOpenBot }: Props) {
               <Text style={[st.cta, { color: colors.primary }]}>Pedirle un plan a Finn</Text>
             </Pressable>
           )}
+          {textoCompartir && (
+            <Pressable testID="compartir-progreso" onPress={() => setCompartiendo(true)} hitSlop={8}
+              style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Icon name="share-2" size={12} color={colors.primary} />
+              <Text style={[st.cta, { color: colors.primary }]}>Compartir mi progreso</Text>
+            </Pressable>
+          )}
         </View>
         <Icon name="sliders" size={15} color={colors.textTertiary} />
       </Pressable>
@@ -114,6 +124,7 @@ export function AhorroEvidenciaCard({ onOpenBot }: Props) {
         calculado={ev.base?.fuente === 'calculado' ? ev.base.ahorroMensual : null}
         onGuardar={monto => { setPuntoPartida(monto); setAjustando(false); }}
       />
+      <CompartirLogroModal visible={compartiendo} onClose={() => setCompartiendo(false)} texto={textoCompartir} />
     </>
   );
 }
