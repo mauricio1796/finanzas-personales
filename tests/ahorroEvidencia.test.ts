@@ -10,7 +10,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { getSerieAhorro, gastosConsumoPorCategoria } from '../src/utils/ingresoUtils.ts';
 import {
-  resolverPuntoPartida, puntoPartidaDeclarado, calcularEvidenciaAhorro, calcularDesgloseMes,
+  resolverPuntoPartida, puntoPartidaDeclarado, calcularEvidenciaAhorro, calcularDesgloseMes, calcularHitos,
 } from '../src/utils/ahorroEvidencia.ts';
 import type { Transaction } from '../src/types/index.ts';
 
@@ -156,5 +156,28 @@ describe('gastosConsumoPorCategoria', () => {
       gasto(100_000, 8), { ...gasto(500_000, 8), category: 'Ahorro' },
     ], 8, 2026);
     assert.deepEqual(g, { Mercado: 100_000 });
+  });
+});
+
+describe('calcularHitos', () => {
+  const hito = (hs: ReturnType<typeof calcularHitos>, id: string) => hs.find(h => h.id === id)!.alcanzado;
+
+  test('usuario nuevo: ningún hito (el mes de arranque no cuenta)', () => {
+    const hs = calcularHitos(serie([gasto(100_000, 8, 2)]), null);
+    assert.ok(hs.every(h => !h.alcanzado));
+  });
+
+  test('3 meses seguidos positivos y primer millón con meses cerrados', () => {
+    const s = serie([gasto(100_000, 4, 28), gasto(3_600_000, 5), gasto(3_500_000, 6), gasto(3_400_000, 7)]);
+    const hs = calcularHitos(s, resolverPuntoPartida(undefined, s));
+    assert.equal(hito(hs, 'mes_positivo'), true);
+    assert.equal(hito(hs, 'tres_seguidos'), true);
+    assert.equal(hito(hs, 'primer_millon'), true);   // 400k + 500k + 600k
+    assert.equal(hito(hs, 'supera_base'), true);     // jul/ago > base de junio (400k)
+  });
+
+  test('un mes sin registros corta la racha', () => {
+    const s = serie([gasto(100_000, 2, 28), gasto(3_000_000, 3), gasto(3_000_000, 4), gasto(3_000_000, 6)]);
+    assert.equal(hito(calcularHitos(s, null), 'tres_seguidos'), false);
   });
 });

@@ -96,6 +96,39 @@ export function calcularEvidenciaAhorro(
   };
 }
 
+// ── Hitos ─────────────────────────────────────────────────────────────────────
+
+export interface HitoAhorro {
+  id: 'mes_positivo' | 'supera_base' | 'tres_seguidos' | 'primer_millon';
+  titulo: string;
+  alcanzado: boolean;
+}
+
+/**
+ * Hitos de ahorro, solo con meses cerrados y sin el mes de arranque (parcial):
+ * un hito nunca se "gana" con datos incompletos.
+ */
+export function calcularHitos(serie: PuntoAhorro[], base: PuntoPartida | null): HitoAhorro[] {
+  const cerrados = serie.slice(1).filter(p => !p.enCurso);
+  const conDatos = cerrados.filter(p => !p.sinDatos);
+
+  let racha = 0;
+  let mejorRacha = 0;
+  for (const p of cerrados) {
+    racha = !p.sinDatos && p.ahorroMes > 0 ? racha + 1 : 0;
+    mejorRacha = Math.max(mejorRacha, racha);
+  }
+  const total = conDatos.reduce((s, p) => s + p.ahorroMes, 0);
+  const superaBase = !!base && mesesMedibles(serie, base).some(p => p.ahorroMes > base.ahorroMensual);
+
+  return [
+    { id: 'mes_positivo',  titulo: 'Primer mes en positivo',        alcanzado: conDatos.some(p => p.ahorroMes > 0) },
+    { id: 'supera_base',   titulo: 'Superaste tu punto de partida', alcanzado: superaBase },
+    { id: 'tres_seguidos', titulo: '3 meses seguidos ahorrando',    alcanzado: mejorRacha >= 3 },
+    { id: 'primer_millon', titulo: 'Primer millón ahorrado',        alcanzado: total >= 1_000_000 },
+  ];
+}
+
 // ── Desglose: qué hizo el usuario con Finn este mes ──────────────────────────
 
 export interface AccionAhorro {

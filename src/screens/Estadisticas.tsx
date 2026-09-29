@@ -30,14 +30,18 @@ import {
 import {
   FinnPulseCard, FinnChartButton, FinnStatsSheet, type FinnStatsRequest,
 } from '../components/stats/FinnStatsCoach';
+import { EvolucionAhorroCard } from '../components/ahorro/EvolucionAhorroCard';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmtCOP = (n: number) =>
   '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
 const fmtShort = (n: number) => {
-  if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1) + 'M';
-  if (n >= 1_000)     return '$' + Math.round(n / 1_000) + 'k';
-  return '$' + Math.round(n);
+  // El ahorro acumulado puede ser negativo (meses en rojo): signo antes del $.
+  const s = n < 0 ? '−' : '';
+  const a = Math.abs(n);
+  if (a >= 1_000_000) return s + '$' + (a / 1_000_000).toFixed(1) + 'M';
+  if (a >= 1_000)     return s + '$' + Math.round(a / 1_000) + 'k';
+  return s + '$' + Math.round(a);
 };
 function capitalize(s: string) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
@@ -588,6 +592,9 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
             </>
           )}
         </View>
+
+        {/* Ahorro mes a mes vs punto de partida + hitos */}
+        <EvolucionAhorroCard width={CHART_W} />
       </View>
     );
   };
