@@ -261,7 +261,7 @@ export const ResumenMensualScreen: React.FC<Props> = ({ onBack, onNavigate, mesO
         {tabActivo === 'resumen' && (
           <>
             <SobranteMesCard mes={mes} año={año} sobrante={sobrante} onIrAMetas={() => onNavigate?.('metas')} />
-            <DesgloseAhorroCard mes={mes} año={año} />
+            <DesgloseAhorroCard mes={mes} año={año} onPremium={() => onNavigate?.('premium')} />
           </>
         )}
         {tabActivo === 'resumen'    && <TabResumen    resumen={resumen} colors={colors} calColor={calColor} puntoPartida={puntoPartida} />}

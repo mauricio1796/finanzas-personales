@@ -594,7 +594,7 @@ export const EstadisticasScreen: React.FC<Props> = ({ onBack, onNavigate }) => {
         </View>
 
         {/* Ahorro mes a mes vs punto de partida + hitos */}
-        <EvolucionAhorroCard width={CHART_W} />
+        <EvolucionAhorroCard width={CHART_W} onPremium={() => onNavigate?.('premium')} />
       </View>
     );
   };

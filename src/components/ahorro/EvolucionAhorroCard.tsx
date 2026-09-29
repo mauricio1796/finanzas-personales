@@ -16,6 +16,7 @@ import {
   calcularHitos, calcularEvidenciaAhorro, rachaMesesAhorrando, textoCompartirLogro,
 } from '../../utils/ahorroEvidencia';
 import { CompartirLogroModal } from './CompartirLogroModal';
+import { PremiumTeaser } from './PremiumTeaser';
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const fmtShort = (n: number) => {
@@ -31,11 +32,15 @@ const PAD_T = 14;
 const PAD_B = 22;
 const MAX_MESES = 6;
 
-interface Props { width: number; }
+interface Props {
+  width: number;
+  /** Navega a Premium (la evolución con hitos es Premium). */
+  onPremium?: () => void;
+}
 
-export function EvolucionAhorroCard({ width }: Props) {
+export function EvolucionAhorroCard({ width, onPremium }: Props) {
   const { colors } = useTheme();
-  const { serieAhorro, puntoPartida } = useFinance();
+  const { serieAhorro, puntoPartida, premium } = useFinance();
 
   const hitos = useMemo(() => calcularHitos(serieAhorro, puntoPartida), [serieAhorro, puntoPartida]);
   const evidencia = useMemo(() => calcularEvidenciaAhorro(serieAhorro, puntoPartida), [serieAhorro, puntoPartida]);
@@ -47,6 +52,19 @@ export function EvolucionAhorroCard({ width }: Props) {
   }, [serieAhorro]);
 
   if (puntos.length === 0) return null;
+
+  // Free: cuántos hitos lleva (verdadero); la gráfica y el detalle son Premium.
+  if (!premium.isPremium) {
+    const logrados = hitos.filter(h => h.alcanzado).length;
+    return (
+      <PremiumTeaser
+        testID="evolucion-ahorro-teaser"
+        titulo="Tu ahorro mes a mes"
+        texto={`Llevas ${logrados} de ${hitos.length} hitos de ahorro. Mira tu evolución frente a tu punto de partida con Premium.`}
+        onUpgrade={onPremium}
+      />
+    );
+  }
 
   const base = puntoPartida?.ahorroMensual ?? null;
   const valores = [...puntos.map(p => p.ahorroMes), base ?? 0, 0];

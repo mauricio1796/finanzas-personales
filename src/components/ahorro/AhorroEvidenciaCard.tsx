@@ -30,7 +30,7 @@ interface Props {
 
 export function AhorroEvidenciaCard({ onOpenBot }: Props) {
   const { colors, isDark } = useTheme();
-  const { serieAhorro, puntoPartida, setPuntoPartida, profile } = useFinance();
+  const { serieAhorro, puntoPartida, setPuntoPartida, profile, premium } = useFinance();
   const [ajustando, setAjustando] = useState(false);
 
   const ev = useMemo(() => calcularEvidenciaAhorro(serieAhorro, puntoPartida), [serieAhorro, puntoPartida]);
@@ -98,7 +98,7 @@ export function AhorroEvidenciaCard({ onOpenBot }: Props) {
           {desglosePasado && desglosePasado.gastoEvitado > 0 && (
             <Text style={[st.detalle, { color: colors.income, fontWeight: '600', marginTop: 2 }]} numberOfLines={2}>
               El mes pasado evitaste {fmt(desglosePasado.gastoEvitado)} de gasto
-              {topAccion ? ` · ${topAccion.titulo.charAt(0).toLowerCase()}${topAccion.titulo.slice(1)}` : ''}
+              {topAccion && premium.isPremium ? ` · ${topAccion.titulo.charAt(0).toLowerCase()}${topAccion.titulo.slice(1)}` : ''}
             </Text>
           )}
           {ev.estado === 'listo' && !positivo && onOpenBot && (

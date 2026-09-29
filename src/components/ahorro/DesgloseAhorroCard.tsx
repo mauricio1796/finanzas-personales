@@ -9,6 +9,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../../state/ThemeContext';
 import { Icon } from '../ui/Icon';
 import { useDesgloseAhorro } from './useDesgloseAhorro';
+import { PremiumTeaser } from './PremiumTeaser';
+import { useFinance } from '../../state';
 import type { AccionAhorro } from '../../utils/ahorroEvidencia';
 
 const fmt = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
@@ -22,12 +24,28 @@ const ICONO: Record<AccionAhorro['tipo'], string> = {
 interface Props {
   mes: number;
   año: number;
+  /** Navega a Premium (el desglose detallado es Premium). */
+  onPremium?: () => void;
 }
 
-export function DesgloseAhorroCard({ mes, año }: Props) {
+export function DesgloseAhorroCard({ mes, año, onPremium }: Props) {
   const { colors } = useTheme();
+  const { premium } = useFinance();
   const desglose = useDesgloseAhorro(mes, año);
   if (!desglose || desglose.acciones.length === 0) return null;
+
+  // Free: el total y cuántas decisiones hay (verdadero); el detalle es Premium.
+  if (!premium.isPremium) {
+    const n = desglose.acciones.length;
+    return (
+      <PremiumTeaser
+        testID="desglose-ahorro-teaser"
+        titulo={desglose.gastoEvitado > 0 ? `Evitaste ${fmt(desglose.gastoEvitado)} de gasto` : 'Tu desglose de ahorro'}
+        texto={`Finn encontró ${n} ${n === 1 ? 'decisión' : 'decisiones'} que explican tu ahorro este mes. Mira cuáles con Premium.`}
+        onUpgrade={onPremium}
+      />
+    );
+  }
 
   return (
     <View testID="desglose-ahorro-card" style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
