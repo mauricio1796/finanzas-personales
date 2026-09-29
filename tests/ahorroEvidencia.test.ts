@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { getSerieAhorro, gastosConsumoPorCategoria } from '../src/utils/ingresoUtils.ts';
 import {
   resolverPuntoPartida, puntoPartidaDeclarado, calcularEvidenciaAhorro, calcularDesgloseMes, calcularHitos,
-  rachaMesesAhorrando,
+  rachaMesesAhorrando, mensajeCierreMes,
 } from '../src/utils/ahorroEvidencia.ts';
 import type { Transaction } from '../src/types/index.ts';
 
@@ -196,5 +196,35 @@ describe('rachaMesesAhorrando', () => {
 
   test('el mes de arranque y el mes en curso no cuentan', () => {
     assert.equal(rachaMesesAhorrando(serie([gasto(100_000, 7, 20), gasto(100_000, 8)])), 0);
+  });
+});
+
+describe('mensajeCierreMes', () => {
+  test('mes cerrado por encima de la base: cifra y % frente al punto de partida', () => {
+    const m = mensajeCierreMes({ nombreMes: 'Agosto', ahorroMes: 900_000, base: 600_000, cerrado: true });
+    assert.equal(m.titulo, 'Cerraste Agosto ahorrando $900.000');
+    assert.match(m.cuerpo, /\$300\.000 más que tu punto de partida \(\+50%\)/);
+  });
+
+  test('mes cerrado por debajo de la base: lo dice sin maquillar', () => {
+    const m = mensajeCierreMes({ nombreMes: 'Agosto', ahorroMes: 200_000, base: 600_000, cerrado: true });
+    assert.match(m.cuerpo, /\$400\.000 por debajo/);
+  });
+
+  test('mes en rojo', () => {
+    const m = mensajeCierreMes({ nombreMes: 'Agosto', ahorroMes: -150_000, base: null, cerrado: true });
+    assert.equal(m.titulo, 'Agosto cerró en rojo');
+    assert.match(m.cuerpo, /\$150\.000/);
+  });
+
+  test('sin punto de partida no inventa la comparación', () => {
+    const m = mensajeCierreMes({ nombreMes: 'Agosto', ahorroMes: 500_000, base: null, cerrado: true });
+    assert.doesNotMatch(m.cuerpo, /punto de partida/);
+  });
+
+  test('penúltimo día: "vas ahorrando" con la cifra en curso', () => {
+    const m = mensajeCierreMes({ nombreMes: 'septiembre', ahorroMes: 700_000, base: 500_000, cerrado: false });
+    assert.equal(m.titulo, 'Mañana cierra el mes');
+    assert.match(m.cuerpo, /^Vas ahorrando \$700\.000, \$200\.000 más que tu punto de partida/);
   });
 });

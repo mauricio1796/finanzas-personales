@@ -12,11 +12,11 @@ import {
   inicializarNotificaciones,
   onPermisoNotificacionesConcedido,
 } from '../services/NotificacionesService';
-import { calcularMetricasFinancieras } from '../utils/ingresoUtils';
+import { calcularMetricasFinancieras, esMovimientoAhorro } from '../utils/ingresoUtils';
 import { calcularRachaActual } from '../services/GamificacionService';
 
 export function useNotificacionesManager() {
-  const { transactions, categories, profile, goal, user } = useFinance();
+  const { transactions, categories, profile, goal, user, serieAhorro, puntoPartida } = useFinance();
   if (Platform.OS === 'web') return; // notificaciones push no disponibles en web
 
   const prevTxLen       = useRef(transactions.length);
@@ -24,8 +24,10 @@ export function useNotificacionesManager() {
   const appState        = useRef(AppState.currentState);
 
   // Siempre lee el estado más reciente (el permiso puede concederse más tarde).
-  const latest = useRef({ transactions, categories, profile, goal, user });
-  latest.current = { transactions, categories, profile, goal, user };
+  const latest = useRef({ transactions, categories, profile, goal, user, serieAhorro, puntoPartida });
+  latest.current = { transactions, categories, profile, goal, user, serieAhorro, puntoPartida };
+  // Cierre de mes con el ahorro real vs el punto de partida.
+  const ahorroNotif = () => ({ serie: latest.current.serieAhorro, base: latest.current.puntoPartida });
 
   // ── Inicializar al montar y cuando el usuario concede el permiso ─────────
   useEffect(() => {
@@ -44,7 +46,7 @@ export function useNotificacionesManager() {
       const salary     = profile?.monthlySalary ?? 0;
       const racha      = calcularRachaActual(transactions);
 
-      await reprogramarTodasLasNotificaciones(categories, transactions, salary, racha);
+      await reprogramarTodasLasNotificaciones(categories, transactions, salary, racha, ahorroNotif());
 
       const now = new Date();
       await verificarPresupuestosLimite(
@@ -55,7 +57,7 @@ export function useNotificacionesManager() {
         const metricas = calcularMetricasFinancieras(
           transactions, categories, salary, now.getMonth(), now.getFullYear(),
         );
-        await verificarMetaAlcanzada(metricas, goal.targetAmount ?? 0, metricas.ahorroProyectado);
+        await verificarMetaAlcanzada(metricas, goal.targetAmount ?? 0, goal.currentAmount, goal.id);
       }
     };
 
@@ -91,11 +93,12 @@ export function useNotificacionesManager() {
       ).catch(() => {});
     }
 
-    if (nuevaTx.type === 'income' && goal && (goal.targetAmount ?? 0) > 0) {
+    // Abonar a una meta crea un movimiento "Ahorro": ese es el momento de revisar.
+    if ((nuevaTx.type === 'income' || esMovimientoAhorro(nuevaTx)) && goal && (goal.targetAmount ?? 0) > 0) {
       const metricas = calcularMetricasFinancieras(
         transactions, categories, salary, now.getMonth(), now.getFullYear(),
       );
-      verificarMetaAlcanzada(metricas, goal.targetAmount ?? 0, metricas.ahorroProyectado).catch(() => {});
+      verificarMetaAlcanzada(metricas, goal.targetAmount ?? 0, goal.currentAmount, goal.id).catch(() => {});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactions.length]);
@@ -120,7 +123,7 @@ export function useNotificacionesManager() {
 
     const salary = profile?.monthlySalary ?? 0;
     const racha  = calcularRachaActual(transactions);
-    reprogramarTodasLasNotificaciones(categories, transactions, salary, racha).catch(() => {});
+    reprogramarTodasLasNotificaciones(categories, transactions, salary, racha, ahorroNotif()).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories]);
 
@@ -131,7 +134,7 @@ export function useNotificacionesManager() {
         const racha  = calcularRachaActual(transactions);
         const salary = profile?.monthlySalary ?? 0;
         reprogramarTodasLasNotificaciones(
-          categories, transactions, salary, racha,
+          categories, transactions, salary, racha, ahorroNotif(),
         ).catch(() => {});
       }
       appState.current = nextState;

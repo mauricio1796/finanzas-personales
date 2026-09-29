@@ -2,7 +2,9 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { Transaction, Category } from '../types';
-import { MetricasFinancieras } from '../utils/ingresoUtils';
+import type { PuntoPartida } from '../types';
+import { MetricasFinancieras, type PuntoAhorro } from '../utils/ingresoUtils';
+import { mensajeCierreMes } from '../utils/ahorroEvidencia';
 
 /**
  * Notificaciones locales de Finn.
@@ -474,7 +476,20 @@ export async function programarResumenSemanal(): Promise<void> {
 
 // ── 5. Cierre de mes ──────────────────────────────────────────────────────────
 
-export async function programarCierreMes(): Promise<void> {
+/** Datos de ahorro para que el cierre de mes hable del resultado real. */
+export interface ContextoAhorroNotif {
+  serie: PuntoAhorro[];
+  base: PuntoPartida | null;
+}
+
+const NOMBRES_MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+/**
+ * Penúltimo día del mes a las 8pm. Con `ahorro`, el texto dice cuánto va
+ * ahorrando frente al punto de partida (se recalcula en cada reprogramación:
+ * al abrir la app y al cambiar movimientos o categorías).
+ */
+export async function programarCierreMes(ahorro?: ContextoAhorroNotif): Promise<void> {
   await cancelarPorTipo('cierre_mes');
 
   const now       = new Date();
@@ -482,12 +497,50 @@ export async function programarCierreMes(): Promise<void> {
   const penultimo = new Date(now.getFullYear(), now.getMonth(), ultimoDia - 1, 20, 0, 0);
   if (penultimo <= now) return;
 
+  const actual = ahorro?.serie.find(p => p.enCurso && !p.sinDatos);
+  const texto = actual
+    ? mensajeCierreMes({
+        nombreMes: NOMBRES_MES[actual.mes], ahorroMes: actual.ahorroMes,
+        base: ahorro!.base?.ahorroMensual ?? null, cerrado: false,
+      })
+    : {
+        titulo: 'Mañana cierra el mes',
+        cuerpo: 'Revisa tu resumen mensual antes de que termine y arranca el próximo con todo claro.',
+      };
+
   await notificar('cierre_mes', {
-    titulo: 'Mañana cierra el mes',
-    cuerpo: 'Revisa tu resumen mensual antes de que termine y arranca el próximo con todo claro.',
+    ...texto,
     screen: 'resumenMensual',
     disparo: { tipo: 'fecha', fecha: penultimo },
   });
+}
+
+/**
+ * Resultado REAL del mes que acaba de cerrar, una sola vez, en la primera
+ * semana del mes nuevo. No se envía por el mes de arranque (incompleto) ni por
+ * un mes sin registros.
+ */
+export async function notificarResultadoMesCerrado(ahorro: ContextoAhorroNotif): Promise<void> {
+  const now = new Date();
+  if (now.getDate() > 7) return;
+  const anterior = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const idx = ahorro.serie.findIndex(p => p.mes === anterior.getMonth() && p.año === anterior.getFullYear());
+  if (idx <= 0) return; // no está, o es el mes de arranque
+  const p = ahorro.serie[idx];
+  if (p.sinDatos) return;
+
+  const key = `@notif_cierre_resultado_${p.mes}_${p.año}`;
+  if (await AsyncStorage.getItem(key)) return;
+
+  const nombre = NOMBRES_MES[p.mes];
+  const texto = mensajeCierreMes({
+    nombreMes: nombre.charAt(0).toUpperCase() + nombre.slice(1),
+    ahorroMes: p.ahorroMes,
+    base: ahorro.base?.ahorroMensual ?? null,
+    cerrado: true,
+  });
+  const id = await notificar('cierre_mes', { ...texto, screen: 'resumenMensual' });
+  if (id) await AsyncStorage.setItem(key, 'true');
 }
 
 // ── 6. Racha en riesgo ────────────────────────────────────────────────────────
@@ -516,14 +569,20 @@ export async function verificarRachaEnRiesgo(
 
 // ── 7. Meta de ahorro alcanzada ───────────────────────────────────────────────
 
+/**
+ * `montoMeta` es lo que la meta tiene de verdad (sus abonos). Antes se pasaba
+ * el ahorro PROYECTADO del mes, así que avisaba "¡Alcanzaste tu meta!" con la
+ * meta vacía apenas un mes proyectaba ahorrar más que el objetivo.
+ */
 export async function verificarMetaAlcanzada(
   _metricas: MetricasFinancieras,
   goalAmount: number,
-  ahorroAcumulado: number,
+  montoMeta: number,
+  metaId?: string,
 ): Promise<void> {
-  if (goalAmount <= 0 || ahorroAcumulado < goalAmount) return;
+  if (goalAmount <= 0 || montoMeta < goalAmount) return;
 
-  const key = `@notif_meta_${Math.round(goalAmount)}`;
+  const key = `@notif_meta_${metaId ?? ''}_${Math.round(goalAmount)}`;
   if (await AsyncStorage.getItem(key)) return;
 
   const id = await notificar('meta_alcanzada', {
@@ -628,6 +687,7 @@ export async function reprogramarTodasLasNotificaciones(
   transactions?: Transaction[],
   monthlySalary?: number,
   rachaActual?: number,
+  ahorro?: ContextoAhorroNotif,
 ): Promise<void> {
   try {
     const granted = await configurarNotificaciones();
@@ -637,8 +697,9 @@ export async function reprogramarTodasLasNotificaciones(
       programarPagosProximos(categories),
       programarPagosVencidos(categories),
       programarResumenSemanal(),
-      programarCierreMes(),
+      programarCierreMes(ahorro),
     ];
+    if (ahorro) tareas.push(notificarResultadoMesCerrado(ahorro));
     if (transactions !== undefined) {
       tareas.push(programarDiaSinGastar(transactions));
     }

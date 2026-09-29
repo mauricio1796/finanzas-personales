@@ -129,6 +129,50 @@ export function calcularHitos(serie: PuntoAhorro[], base: PuntoPartida | null): 
   ];
 }
 
+// ── Mensajes de cierre de mes ────────────────────────────────────────────────
+
+const fmtCOP = (n: number) => '$' + Math.round(Math.abs(n)).toLocaleString('es-CO').replace(/,/g, '.');
+
+/**
+ * Texto de la notificación de cierre de mes.
+ *   cerrado=false → penúltimo día: "vas ahorrando…" (cifra aún en curso).
+ *   cerrado=true  → primeros días del mes nuevo: resultado real del mes.
+ * Contra el punto de partida solo si existe; nunca inventa la comparación.
+ */
+export function mensajeCierreMes(p: {
+  nombreMes: string;
+  ahorroMes: number;
+  base: number | null;
+  cerrado: boolean;
+}): { titulo: string; cuerpo: string } {
+  const dif = p.base !== null ? p.ahorroMes - p.base : null;
+  const vsBase = dif === null ? ''
+    : dif >= 0
+      ? `, ${fmtCOP(dif)} más que tu punto de partida${p.base! > 0 ? ` (+${Math.round((dif / p.base!) * 100)}%)` : ''}`
+      : `, ${fmtCOP(dif)} por debajo de tu punto de partida`;
+
+  if (!p.cerrado) {
+    return {
+      titulo: 'Mañana cierra el mes',
+      cuerpo: p.ahorroMes > 0
+        ? `Vas ahorrando ${fmtCOP(p.ahorroMes)}${vsBase}. Aparta lo que sobró para tu meta antes de que empiece el nuevo mes.`
+        : `Este mes vas ${fmtCOP(p.ahorroMes)} en rojo. Revisa tu resumen para arrancar el próximo con todo claro.`,
+    };
+  }
+  if (p.ahorroMes <= 0) {
+    return {
+      titulo: `${p.nombreMes} cerró en rojo`,
+      cuerpo: `Gastaste ${fmtCOP(p.ahorroMes)} más de lo que ingresó. Veamos juntos qué ajustar este mes.`,
+    };
+  }
+  return {
+    titulo: `Cerraste ${p.nombreMes} ahorrando ${fmtCOP(p.ahorroMes)}`,
+    cuerpo: dif !== null && dif < 0
+      ? `Quedaste ${fmtCOP(dif)} por debajo de tu punto de partida. Mira tu resumen y ajustemos este mes.`
+      : `¡Bien hecho${vsBase ? '! Eso es' + vsBase.slice(1) : ''}! Mira tu resumen y aparta lo que sobró para tu meta.`,
+  };
+}
+
 // ── Racha real ────────────────────────────────────────────────────────────────
 
 /**
