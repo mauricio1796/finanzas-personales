@@ -18,6 +18,32 @@ export const TIPOS_INGRESO: IngresoConfig[] = [
   { tipo: 'inversion', label: 'Inversión', icono: 'trending-up', descripcion: 'Rendimientos, dividendos' },
 ];
 
+// ── Movimientos de ahorro ──────────────────────────────────────────────────────
+
+/** "Ahorro", "Ahorros", "Ahorro emergencia"… (sin tildes ni mayúsculas). */
+export function esCategoriaAhorro(nombre: string | undefined | null): boolean {
+  if (!nombre) return false;
+  const n = nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  return n.startsWith('ahorro');
+}
+
+/**
+ * Apartar plata para ahorrar no es consumo ni ingreso: es ahorro. Antes un
+ * movimiento en "Ahorro" como gasto BAJABA el ahorro del mes, y como ingreso
+ * (el catálogo la lista entre los ingresos) inflaba el ingreso.
+ *
+ * Se cuenta como apartado sea cual sea su `type`: el usuario que registra
+ * "Ahorro $200.000" quiso decir que guardó, lo elija en gastos o en ingresos.
+ */
+export function esMovimientoAhorro(t: Pick<Transaction, 'category'>): boolean {
+  return esCategoriaAhorro(t.category);
+}
+
+/** Gasto de consumo: todo `expense` salvo lo apartado para ahorro. */
+export const esGastoConsumo = (t: Transaction) => t.type === 'expense' && !esMovimientoAhorro(t);
+/** Ingreso real: todo `income` salvo lo apartado para ahorro. */
+export const esIngresoGanado = (t: Transaction) => t.type === 'income' && !esMovimientoAhorro(t);
+
 // ── Ingreso efectivo del mes ───────────────────────────────────────────────────
 
 /**
@@ -33,7 +59,7 @@ export function getIngresoEfectivoMes(
   const extraIncome = transactions
     .filter(t => {
       const d = new Date(t.date);
-      return t.type === 'income' && d.getMonth() === mes && d.getFullYear() === año;
+      return esIngresoGanado(t) && d.getMonth() === mes && d.getFullYear() === año;
     })
     .reduce((s, t) => s + t.amount, 0);
 
@@ -52,7 +78,7 @@ export function getIngresosExtraMes(
   return transactions
     .filter(t => {
       const d = new Date(t.date);
-      return t.type === 'income' && d.getMonth() === mes && d.getFullYear() === año;
+      return esIngresoGanado(t) && d.getMonth() === mes && d.getFullYear() === año;
     })
     .reduce((s, t) => s + t.amount, 0);
 }
@@ -67,7 +93,7 @@ export function esIngresoReal(
 ): boolean {
   return transactions.some(t => {
     const d = new Date(t.date);
-    return t.type === 'income' && d.getMonth() === mes && d.getFullYear() === año;
+    return esIngresoGanado(t) && d.getMonth() === mes && d.getFullYear() === año;
   });
 }
 
@@ -82,7 +108,7 @@ export function getDesgloseMes(
   return transactions
     .filter(t => {
       const d = new Date(t.date);
-      return t.type === 'income' && d.getMonth() === mes && d.getFullYear() === año;
+      return esIngresoGanado(t) && d.getMonth() === mes && d.getFullYear() === año;
     })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
@@ -94,7 +120,10 @@ export interface AhorroMes {
   tieneDatos: boolean;
   /** Salario base + ingresos registrados (misma convención que el motor). */
   ingreso: number;
+  /** Gasto de consumo (sin lo apartado para ahorro). */
   gastado: number;
+  /** Lo registrado en la categoría Ahorro. Ya está incluido en `ahorro`. */
+  apartado: number;
   /** ingreso − gastado, con signo: un mes en rojo resta. */
   ahorro: number;
 }
@@ -114,17 +143,19 @@ export function getAhorroRealMes(
 ): AhorroMes {
   let ingresos = 0;
   let gastado = 0;
+  let apartado = 0;
   let tieneDatos = false;
   for (const t of transactions) {
     const d = new Date(t.date);
     if (d.getMonth() !== mes || d.getFullYear() !== año) continue;
     tieneDatos = true;
-    if (t.type === 'income') ingresos += t.amount;
+    if (esMovimientoAhorro(t)) apartado += t.amount;
+    else if (t.type === 'income') ingresos += t.amount;
     else if (t.type === 'expense') gastado += t.amount;
   }
-  if (!tieneDatos) return { tieneDatos: false, ingreso: 0, gastado: 0, ahorro: 0 };
+  if (!tieneDatos) return { tieneDatos: false, ingreso: 0, gastado: 0, apartado: 0, ahorro: 0 };
   const ingreso = monthlySalary + ingresos;
-  return { tieneDatos, ingreso, gastado, ahorro: ingreso - gastado };
+  return { tieneDatos, ingreso, gastado, apartado, ahorro: ingreso - gastado };
 }
 
 export interface ComparacionAhorro {
@@ -208,13 +239,16 @@ export function getSerieAhorro(
 export interface MetricasFinancieras {
   ingresoEfectivo: number;
   esIngresoReal: boolean;
+  /** Gasto de consumo del mes. No incluye lo apartado para ahorro. */
   totalGastado: number;
+  /** Lo registrado en la categoría Ahorro este mes: ahorro, no gasto. */
+  totalApartado: number;
   totalPendiente: number;
   /**
    * Ingreso del mes menos lo ya gastado. Valor REAL con signo: si es negativo,
    * el usuario gastó más de lo que ingresó (BUG-01). Antes se truncaba a 0 con
    * `Math.max`, lo que ocultaba precisamente la situación más crítica que la
-   * app debería advertir.
+   * app debería advertir. Lo apartado para ahorro ya no está disponible.
    */
   balanceDisponible: number;
   /** Disponible menos los compromisos pendientes. También con signo real. */
@@ -223,11 +257,11 @@ export interface MetricasFinancieras {
   porcentajePendiente: number;
   porcentajeLibre: number;
   /**
-   * Ahorro proyectado: `balanceFinal` acotado a 0, porque un ahorro negativo no
-   * existe — eso es un déficit, y se consulta en `balanceFinal` / `enDeficit`.
+   * Ahorro proyectado: lo que sobra más lo ya apartado, acotado a 0, porque un
+   * ahorro negativo no existe — eso es un déficit (`balanceFinal` / `enDeficit`).
    */
   ahorroProyectado: number;
-  /** true si los gastos del mes ya superan el ingreso disponible. */
+  /** true si los gastos de consumo del mes ya superan el ingreso. */
   enDeficit: boolean;
   /** Magnitud del déficit (positiva). 0 si no hay déficit. */
   montoDeficit: number;
@@ -247,26 +281,32 @@ export function calcularMetricasFinancieras(
 
   // Gastos del mes por categoría (para no double-contar presupuestos sin diaPago)
   const gastosPorCat: Record<string, number> = {};
+  let totalApartado = 0;
   transactions
     .filter(t => {
       const d = new Date(t.date);
-      return t.type === 'expense' && d.getMonth() === mes && d.getFullYear() === año;
+      return d.getMonth() === mes && d.getFullYear() === año;
     })
     .forEach(t => {
-      gastosPorCat[t.category] = (gastosPorCat[t.category] || 0) + t.amount;
+      if (esMovimientoAhorro(t)) totalApartado += t.amount;
+      else if (t.type === 'expense') gastosPorCat[t.category] = (gastosPorCat[t.category] || 0) + t.amount;
     });
 
   const totalGastado = Object.values(gastosPorCat).reduce((s, v) => s + v, 0);
 
+  // Un presupuesto de "Ahorro" no es un compromiso de gasto: no se descuenta.
+  const esCompromiso = (c: any) =>
+    c.isSelected && !c.pagado && c.tipo === 'gasto' && (c.budget ?? 0) > 0 && !esCategoriaAhorro(c.name);
+
   // Compromisos CON diaPago: se descuenta el presupuesto completo si no está pagado
   const compromisosDiaPago = categories
-    .filter((c: any) => c.isSelected && c.diaPago && !c.pagado && c.tipo === 'gasto' && (c.budget ?? 0) > 0)
+    .filter((c: any) => esCompromiso(c) && c.diaPago)
     .reduce((s: number, c: any) => s + c.budget, 0);
 
   // Presupuestos SIN diaPago (ej. categorías agregadas desde Finn IA):
   // se descuenta solo lo que falta gastar (budget - gastado en esa categoría)
   const presupuestosSinDia = categories
-    .filter((c: any) => c.isSelected && !c.diaPago && !c.pagado && c.tipo === 'gasto' && (c.budget ?? 0) > 0)
+    .filter((c: any) => esCompromiso(c) && !c.diaPago)
     .reduce((s: number, c: any) => {
       const gastado = gastosPorCat[c.name] ?? 0;
       return s + Math.max(0, (c.budget as number) - gastado);
@@ -276,8 +316,9 @@ export function calcularMetricasFinancieras(
 
   // BUG-01: valores reales con signo. Truncarlos a 0 ocultaba el déficit, que
   // es justamente la señal que el semáforo financiero y Finn deben ver.
-  const balanceDisponible = ingresoEfectivo - totalGastado;
-  const balanceFinal = ingresoEfectivo - totalGastado - totalPendiente;
+  const saldoConsumo = ingresoEfectivo - totalGastado;
+  const balanceDisponible = saldoConsumo - totalApartado;
+  const balanceFinal = balanceDisponible - totalPendiente;
 
   const pctGastado   = ingresoEfectivo > 0 ? Math.min(100, Math.round((totalGastado   / ingresoEfectivo) * 100)) : 0;
   const pctPendiente = ingresoEfectivo > 0 ? Math.min(100 - pctGastado, Math.round((totalPendiente / ingresoEfectivo) * 100)) : 0;
@@ -294,16 +335,18 @@ export function calcularMetricasFinancieras(
     ingresoEfectivo,
     esIngresoReal:  ingresoRealBool,
     totalGastado,
+    totalApartado,
     totalPendiente,
     balanceDisponible,
     balanceFinal,
     porcentajeGastado:    pctGastado,
     porcentajePendiente:  pctPendiente,
     porcentajeLibre:      pctLibre,
-    // El ahorro no puede ser negativo: si balanceFinal lo es, no hay ahorro.
-    ahorroProyectado:     Math.max(0, balanceFinal),
-    enDeficit:            balanceDisponible < 0,
-    montoDeficit:         balanceDisponible < 0 ? Math.abs(balanceDisponible) : 0,
+    // Lo apartado ya es ahorro; el ahorro total no puede ser negativo.
+    ahorroProyectado:     Math.max(0, balanceFinal + totalApartado),
+    // Déficit = el consumo superó el ingreso. Apartar para ahorrar no es déficit.
+    enDeficit:            saldoConsumo < 0,
+    montoDeficit:         saldoConsumo < 0 ? Math.abs(saldoConsumo) : 0,
     diasRestantesMes:     diasRestantes,
     // Sin saldo proyectado no hay presupuesto diario que recomendar.
     gastoPromedioRecomendadoDia:
@@ -339,7 +382,7 @@ export function buildContextoIA(
   transactions
     .filter(t => {
       const d = new Date(t.date);
-      return t.type === 'expense' && d.getMonth() === mes && d.getFullYear() === año;
+      return esGastoConsumo(t) && d.getMonth() === mes && d.getFullYear() === año;
     })
     .forEach(t => { gastosPorCat[t.category] = (gastosPorCat[t.category] || 0) + t.amount; });
 

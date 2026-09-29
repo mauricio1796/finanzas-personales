@@ -1,4 +1,5 @@
 import { Transaction, Category, UserLevel } from '../types';
+import { esGastoConsumo, esIngresoGanado } from '../utils/ingresoUtils';
 
 const XP_PER_LEVEL = 1000;
 
@@ -91,12 +92,12 @@ export function computeWeeklyMetrics(
   const prevTxs  = filterByWeek(transactions, p1s, p1e);
   const prev2Txs = filterByWeek(transactions, p2s, p2e);
 
-  const expenses  = weekTxs.filter(t => t.type === 'expense');
-  const incomes   = weekTxs.filter(t => t.type === 'income');
-  const pExpenses = prevTxs.filter(t => t.type === 'expense');
-  const pIncomes  = prevTxs.filter(t => t.type === 'income');
-  const p2Exp     = prev2Txs.filter(t => t.type === 'expense');
-  const p2Inc     = prev2Txs.filter(t => t.type === 'income');
+  const expenses  = weekTxs.filter(esGastoConsumo);
+  const incomes   = weekTxs.filter(esIngresoGanado);
+  const pExpenses = prevTxs.filter(esGastoConsumo);
+  const pIncomes  = prevTxs.filter(esIngresoGanado);
+  const p2Exp     = prev2Txs.filter(esGastoConsumo);
+  const p2Inc     = prev2Txs.filter(esIngresoGanado);
 
   const sum = (arr: Transaction[]) => arr.reduce((s, t) => s + t.amount, 0);
 

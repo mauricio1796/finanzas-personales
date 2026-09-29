@@ -20,7 +20,7 @@ const tx = (amount: number, category: string, date: string, type: 'expense' | 'i
 
 function metricas(over: Partial<MetricasFinancieras> = {}): MetricasFinancieras {
   return {
-    ingresoEfectivo: 4_000_000, esIngresoReal: false, totalGastado: 0, totalPendiente: 0,
+    ingresoEfectivo: 4_000_000, esIngresoReal: false, totalGastado: 0, totalApartado: 0, totalPendiente: 0,
     balanceDisponible: 4_000_000, balanceFinal: 4_000_000, porcentajeGastado: 0,
     porcentajePendiente: 0, porcentajeLibre: 100, ahorroProyectado: 4_000_000,
     enDeficit: false, montoDeficit: 0, diasRestantesMes: 0, gastoPromedioRecomendadoDia: 100_000,

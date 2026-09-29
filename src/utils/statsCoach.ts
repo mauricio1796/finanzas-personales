@@ -137,12 +137,19 @@ function txDelMes(transactions: Transaction[], mes: number, año: number): Trans
   });
 }
 
+// Mismo criterio que esMovimientoAhorro (ingresoUtils): lo apartado en "Ahorro"
+// no es gasto ni ingreso.
+const esAhorro = (t: Transaction) =>
+  (t.category ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().startsWith('ahorro');
+const esGasto   = (t: Transaction) => t.type === 'expense' && !esAhorro(t);
+const esIngreso = (t: Transaction) => t.type === 'income' && !esAhorro(t);
+
 const totalGastos = (txs: Transaction[]) =>
-  txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  txs.filter(esGasto).reduce((s, t) => s + t.amount, 0);
 
 function gastosPorCategoria(txs: Transaction[]): Record<string, number> {
   const out: Record<string, number> = {};
-  txs.filter(t => t.type === 'expense').forEach(t => { out[t.category] = (out[t.category] ?? 0) + t.amount; });
+  txs.filter(esGasto).forEach(t => { out[t.category] = (out[t.category] ?? 0) + t.amount; });
   return out;
 }
 
@@ -156,9 +163,9 @@ export function analizarEstadisticas(e: EntradaStats): AnalisisStats {
   const hoy = e.hoy ?? new Date();
   const { mes, año, metricas } = e;
   const txs = txDelMes(e.transactions, mes, año);
-  const gastos = txs.filter(t => t.type === 'expense');
+  const gastos = txs.filter(esGasto);
   const totalGastosMes = totalGastos(txs);
-  const totalIngresosMes = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const totalIngresosMes = txs.filter(esIngreso).reduce((s, t) => s + t.amount, 0);
 
   const diasMes = new Date(año, mes + 1, 0).getDate();
   const esMesActual = hoy.getMonth() === mes && hoy.getFullYear() === año;
@@ -252,7 +259,7 @@ function proyectarCierre(
   const historico: number[] = [];
   for (let k = 1; k <= 3; k++) {
     const d = new Date(e.año, e.mes - k, 1);
-    const txs = txDelMes(e.transactions, d.getMonth(), d.getFullYear()).filter(t => t.type === 'expense');
+    const txs = txDelMes(e.transactions, d.getMonth(), d.getFullYear()).filter(esGasto);
     if (txs.length === 0) continue;
     historico.push(txs.filter(t => !fijas.has(t.category)).reduce((s, t) => s + t.amount, 0));
   }

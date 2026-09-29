@@ -8,7 +8,10 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { getAhorroRealMes, getSerieAhorro, compararAhorroMeses } from '../src/utils/ingresoUtils.ts';
+import {
+  getAhorroRealMes, getSerieAhorro, compararAhorroMeses, calcularMetricasFinancieras, esCategoriaAhorro,
+} from '../src/utils/ingresoUtils.ts';
+import { analizarEstadisticas } from '../src/utils/statsCoach.ts';
 import type { Transaction } from '../src/types/index.ts';
 
 const SALARIO = 4_000_000;
@@ -94,5 +97,56 @@ describe('compararAhorroMeses', () => {
     assert.equal(c.mesAnterior, 11);
     assert.equal(c.añoAnterior, 2025);
     assert.equal(c.anterior.gastado, 1_000_000);
+  });
+});
+
+describe('movimientos de ahorro (categoría "Ahorro")', () => {
+  const ahorro = (amount: number, type: 'expense' | 'income' = 'expense'): Transaction =>
+    ({ ...mov(amount, 8, type), category: 'Ahorro' });
+
+  test('reconoce variantes del nombre', () => {
+    assert.ok(esCategoriaAhorro('Ahorro'));
+    assert.ok(esCategoriaAhorro('ahorros'));
+    assert.ok(esCategoriaAhorro(' Ahorro emergencia'));
+    assert.ok(!esCategoriaAhorro('Alimentación'));
+    assert.ok(!esCategoriaAhorro(undefined));
+  });
+
+  test('apartar como gasto NO baja el ahorro del mes', () => {
+    const r = getAhorroRealMes([mov(1_000_000, 8), ahorro(500_000)], SALARIO, 8, 2026);
+    assert.equal(r.gastado, 1_000_000);
+    assert.equal(r.apartado, 500_000);
+    assert.equal(r.ahorro, 3_000_000);
+  });
+
+  test('apartar registrado como ingreso NO infla el ingreso', () => {
+    const r = getAhorroRealMes([ahorro(500_000, 'income')], SALARIO, 8, 2026);
+    assert.equal(r.ingreso, SALARIO);
+    assert.equal(r.apartado, 500_000);
+  });
+
+  test('motor: lo apartado sale del disponible pero suma al ahorro y no es déficit', () => {
+    const m = calcularMetricasFinancieras([mov(3_800_000, 8), ahorro(500_000)], [], SALARIO, 8, 2026);
+    assert.equal(m.totalGastado, 3_800_000);
+    assert.equal(m.totalApartado, 500_000);
+    assert.equal(m.balanceDisponible, -300_000);
+    assert.equal(m.enDeficit, false);
+    assert.equal(m.ahorroProyectado, 200_000);
+  });
+
+  test('motor: un presupuesto de Ahorro no es un compromiso pendiente', () => {
+    const cats = [{ name: 'Ahorro', tipo: 'gasto', budget: 800_000, isSelected: true, diaPago: 15, pagado: false }];
+    const m = calcularMetricasFinancieras([mov(1_000_000, 8)], cats, SALARIO, 8, 2026);
+    assert.equal(m.totalPendiente, 0);
+    assert.equal(m.ahorroProyectado, 3_000_000);
+  });
+
+  test('Finn en Estadísticas no cuenta lo apartado como gasto', () => {
+    const a = analizarEstadisticas({
+      transactions: [mov(1_000_000, 8), ahorro(500_000)], categories: [],
+      metricas: calcularMetricasFinancieras([], [], SALARIO, 8, 2026),
+      mes: 8, año: 2026, barData: [], areaData: [], hoy: HOY,
+    });
+    assert.equal(a.totalGastosMes, 1_000_000);
   });
 });

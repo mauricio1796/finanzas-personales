@@ -1,5 +1,5 @@
 import { Transaction, Category } from '../types';
-import { getSerieAhorro } from './ingresoUtils';
+import { esGastoConsumo, esIngresoGanado, getSerieAhorro } from './ingresoUtils';
 
 // ── Helpers de fecha ───────────────────────────────────────────────────────────
 
@@ -42,16 +42,16 @@ export function txDelRango(
 // ── Cálculos de totales ────────────────────────────────────────────────────────
 
 export function totalGastos(txs: Transaction[]): number {
-  return txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  return txs.filter(esGastoConsumo).reduce((s, t) => s + t.amount, 0);
 }
 
 export function totalIngresos(txs: Transaction[]): number {
-  return txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  return txs.filter(esIngresoGanado).reduce((s, t) => s + t.amount, 0);
 }
 
 export function gastosPorCategoria(txs: Transaction[]): Record<string, number> {
   return txs
-    .filter(t => t.type === 'expense')
+    .filter(esGastoConsumo)
     .reduce((acc, t) => {
       acc[t.category] = (acc[t.category] || 0) + t.amount;
       return acc;
@@ -145,7 +145,7 @@ export function getHeatmapData(
   const primerDia = new Date(año, mes, 1);
   const offsetInicio = primerDia.getDay();
   txDelMes(transactions, mes, año)
-    .filter(t => t.type === 'expense')
+    .filter(esGastoConsumo)
     .forEach(t => {
       const d = new Date(t.date);
       const diaDelMes = d.getDate() - 1;
@@ -326,7 +326,7 @@ export function getResumenMetricas(
   const promedioDiario = gastos / (diasEnMes || 1);
 
   const gastosPorDia: Record<string, number> = {};
-  txs.filter(t => t.type === 'expense').forEach(t => {
+  txs.filter(esGastoConsumo).forEach(t => {
     const key = new Date(t.date).toLocaleDateString('es-CO', { weekday: 'long' });
     gastosPorDia[key] = (gastosPorDia[key] || 0) + t.amount;
   });
