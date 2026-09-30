@@ -30,6 +30,7 @@ import {
   getCategoriasFiltro,
   getIconoTx,
 } from '../utils/historialUtils';
+import { etiquetaMedio } from '../utils/mediosPago';
 import { type Transaction } from '../types';
 import { THEME } from '../constants/theme';
 import { claseMovimiento, type ClaseMovimiento } from '../utils/ingresoUtils';
@@ -89,6 +90,7 @@ const EstadoVacioHistorial: React.FC<EmptyProps> = ({ filtros, onLimpiar, colors
     filtros.tipo !== 'todos' ||
     filtros.periodo !== 'mes' ||
     filtros.categoria !== null ||
+    !!filtros.medio ||
     filtros.busqueda !== '';
   return (
     <View style={ev.root}>
@@ -138,6 +140,7 @@ const FILTROS_DEFAULT: FiltrosActivos = {
   periodo:   'mes',
   categoria: null,
   busqueda:  '',
+  medio:     null,
 };
 
 // ── Pantalla principal ────────────────────────────────────────────────────────
@@ -148,7 +151,7 @@ interface Props {
 }
 
 export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
-  const { transactions, deleteTransaction } = useFinance();
+  const { transactions, deleteTransaction, mediosPago } = useFinance();
   const { colors, isDark } = useTheme();
   const insets       = useSafeAreaInsets();
   const haptics      = useHaptics();
@@ -185,6 +188,12 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
     [txFiltradas],
   );
 
+  // Medios con al menos un movimiento (incluye archivados: su historial sigue ahí).
+  const mediosDisponibles = useMemo(
+    () => mediosPago.filter(m => transactions.some(t => t.paymentMethodId === m.id)),
+    [mediosPago, transactions],
+  );
+
   const categoriasDisponibles = useMemo(
     () => getCategoriasFiltro(transactions),
     [transactions],
@@ -195,6 +204,7 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
     if (filtros.tipo !== 'todos')      n++;
     if (filtros.periodo !== 'mes')     n++;
     if (filtros.categoria !== null)    n++;
+    if (filtros.medio)                 n++;
     if (filtros.orden !== 'reciente')  n++;
     return n;
   }, [filtros]);
@@ -576,6 +586,57 @@ export const HistorialScreen: React.FC<Props> = ({ onBack }) => {
                     >
                       <Text style={[s.pillSmTxt, { color: activo ? '#fff' : colors.textSecondary }]}>
                         {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Medio de pago */}
+          {mediosDisponibles.length > 0 && (
+            <View style={s.filtroGrupo}>
+              <Text style={[s.filtroLabel, { color: colors.textTertiary }]}>MEDIO DE PAGO</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={s.filtroHScroll}
+                contentContainerStyle={s.filtroHScrollContent}
+              >
+                <TouchableOpacity
+                  onPress={() => { haptics.selection(); setFiltros(p => ({ ...p, medio: null })); }}
+                  style={[
+                    s.pillSm,
+                    {
+                      backgroundColor: !filtros.medio ? colors.primary : colors.cardSecondary,
+                      borderColor:     !filtros.medio ? colors.primary : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[s.pillSmTxt, { color: !filtros.medio ? '#fff' : colors.textSecondary }]}>
+                    Todos
+                  </Text>
+                </TouchableOpacity>
+                {mediosDisponibles.map(m => {
+                  const activo = filtros.medio === m.id;
+                  return (
+                    <TouchableOpacity
+                      key={m.id}
+                      onPress={() => {
+                        haptics.selection();
+                        setFiltros(p => ({ ...p, medio: p.medio === m.id ? null : m.id }));
+                      }}
+                      style={[
+                        s.pillSm,
+                        {
+                          backgroundColor: activo ? colors.primary : colors.cardSecondary,
+                          borderColor:     activo ? colors.primary : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[s.pillSmTxt, { color: activo ? '#fff' : colors.textSecondary }]}>
+                        {etiquetaMedio(m)}
                       </Text>
                     </TouchableOpacity>
                   );

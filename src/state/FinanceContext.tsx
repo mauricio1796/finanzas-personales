@@ -25,6 +25,11 @@ import {
   renombrarCategoriaEnTransacciones,
   encontrarCategoriaDeTx,
 } from '../utils/categoryResolver';
+import { aplicarPredeterminado, mediosActivos, tieneMovimientos } from '../utils/mediosPago';
+import {
+  aprenderRegla, construirTransaccion,
+  type CapturaPendiente, type ReglaComercio, type ResultadoLote,
+} from '../utils/capturaMotor';
 import {
   User,
   Category,
@@ -41,7 +46,30 @@ import {
   Deuda,
   PagoDeuda,
   GastoRecurrente,
+  MedioPago,
 } from '../types';
+
+/** Datos opcionales de un gasto: subcategoría, medio de pago y origen. */
+export interface ExtrasTransaccion {
+  subcategory?: string;
+  paymentMethodId?: string;
+  source?: Transaction['source'];
+  merchant?: string;
+}
+
+/** Cómo confirma el usuario un movimiento de la bandeja. */
+export interface ConfirmacionCaptura {
+  /** Categoría de gasto del usuario, o una de ingreso (id de OPCIONES_INGRESO). */
+  categoria: { id?: string; name: string };
+  medioId?: string | null;
+  esIngreso?: boolean;
+}
+
+/** Máximo de avisos descartados que se recuerdan (los más recientes). */
+const MAX_HUELLAS_IGNORADAS = 500;
+
+/** Resultado de quitar un medio: con movimientos se archiva para no perder el historial. */
+export type ResultadoEliminarMedio = 'eliminado' | 'archivado';
 
 // ─── Phase 3 types ───────────────────────────────────────────────────────────
 export interface PremiumState {
@@ -105,7 +133,7 @@ interface FinanceContextType {
   deleteTransaction: (id: string) => void;
   updateTransaction: (id: string, update: Partial<Transaction>) => void;
   addIncome: (amount: number, category: string, date: Date, description?: string, subcategory?: string) => void;
-  addExpense: (amount: number, category: string, date: Date, description?: string, subcategory?: string) => void;
+  addExpense: (amount: number, category: string, date: Date, description?: string, subcategory?: string, extras?: ExtrasTransaccion) => void;
   updateUserSalary: (salary: number) => void;
   /** Reiniciar app: borra en el servidor y, solo si lo logra, en el dispositivo. */
   resetAll: () => Promise<{ ok: boolean; error?: string }>;
@@ -155,6 +183,28 @@ interface FinanceContextType {
   updateDeuda: (id: string, update: Partial<Deuda>) => void;
   deleteDeuda: (id: string) => void;
   pagarDeuda: (id: string, pago: PagoDeuda) => void;
+
+  // Medios de pago (Billetera)
+  mediosPago: MedioPago[];
+  addMedioPago: (m: MedioPago) => void;
+  updateMedioPago: (id: string, update: Partial<MedioPago>) => void;
+  /** Sin movimientos se elimina; con movimientos se archiva (el historial lo conserva). */
+  eliminarMedioPago: (id: string) => ResultadoEliminarMedio;
+  setMedioPredeterminado: (id: string) => void;
+
+  // Captura automática (Premium)
+  capturasPendientes: CapturaPendiente[];
+  reglasComercio: ReglaComercio[];
+  huellasIgnoradas: string[];
+  /** Nombres con los que los bancos identifican al usuario (avisos de inicio de sesión). */
+  titularesBanco: string[];
+  /** Guarda lo que produjo el motor: transacciones nuevas, bandeja y enriquecimientos. */
+  aplicarLoteCaptura: (lote: ResultadoLote) => void;
+  /** Registra un movimiento de la bandeja y aprende la categoría del comercio. */
+  confirmarCaptura: (pendienteId: string, confirmacion: ConfirmacionCaptura) => void;
+  /** Descarta un movimiento de la bandeja; si vuelve a llegar, no se muestra. */
+  ignorarCaptura: (pendienteId: string) => void;
+  actualizarCaptura: (pendienteId: string, update: Partial<CapturaPendiente>) => void;
 
   // Gastos Recurrentes
   recurrentes: GastoRecurrente[];
@@ -207,6 +257,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [deudas, setDeudas] = useState<Deuda[]>([]);
   const [recurrentes, setRecurrentes] = useState<GastoRecurrente[]>([]);
   const [comprasEvitadas, setComprasEvitadas] = useState<CompraEvitada[]>([]);
+  const [mediosPago, setMediosPago] = useState<MedioPago[]>([]);
+  const [capturasPendientes, setCapturasPendientes] = useState<CapturaPendiente[]>([]);
+  const [reglasComercio, setReglasComercio] = useState<ReglaComercio[]>([]);
+  const [huellasIgnoradas, setHuellasIgnoradas] = useState<string[]>([]);
+  const [titularesBanco, setTitularesBanco] = useState<string[]>([]);
 
   /**
    * `goal` ya no es un estado aparte: es la meta principal de `metas[]`. Así
@@ -259,6 +314,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         storedDeudas,
         storedRecurrentes,
         storedEvitadas,
+        storedMedios,
+        storedPendientes,
+        storedReglas,
+        storedIgnoradas,
+        storedTitulares,
       ] = await Promise.all([
         storageService.getOnboarded(),
         storageService.getUser(),
@@ -275,6 +335,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         storageService.getDeudas(),
         storageService.getRecurrentes(),
         storageService.getComprasEvitadas(),
+        storageService.getMediosPago(),
+        storageService.getCapturasPendientes(),
+        storageService.getReglasComercio(),
+        storageService.getHuellasIgnoradas(),
+        storageService.getTitularesBanco(),
       ]);
 
       if (storedOnboarded) setIsOnboardedState(true);
@@ -328,6 +393,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (storedDeudas) setDeudas(storedDeudas);
       if (storedRecurrentes) setRecurrentes(storedRecurrentes);
       if (storedEvitadas) setComprasEvitadas(storedEvitadas);
+      if (storedMedios) setMediosPago(storedMedios);
+      if (storedPendientes) setCapturasPendientes(storedPendientes);
+      if (storedReglas) setReglasComercio(storedReglas);
+      if (storedIgnoradas) setHuellasIgnoradas(storedIgnoradas);
+      if (storedTitulares) setTitularesBanco(storedTitulares);
 
       // storedPaidIds se usa en Estadisticas directamente via storageService (no en este contexto)
       void storedPaidIds;
@@ -386,6 +456,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => { storageService.saveDeudas(deudas); }, [deudas]);
   useEffect(() => { storageService.saveRecurrentes(recurrentes); }, [recurrentes]);
   useEffect(() => { storageService.saveComprasEvitadas(comprasEvitadas).catch(() => {}); }, [comprasEvitadas]);
+  useEffect(() => { storageService.saveMediosPago(mediosPago).catch(() => {}); }, [mediosPago]);
+  useEffect(() => { storageService.saveCapturasPendientes(capturasPendientes).catch(() => {}); }, [capturasPendientes]);
+  useEffect(() => { storageService.saveReglasComercio(reglasComercio).catch(() => {}); }, [reglasComercio]);
+  useEffect(() => { storageService.saveHuellasIgnoradas(huellasIgnoradas).catch(() => {}); }, [huellasIgnoradas]);
+  useEffect(() => { storageService.saveTitularesBanco(titularesBanco).catch(() => {}); }, [titularesBanco]);
 
   // ─── Motor de gamificación: fuente única de verdad para XP / nivel ─────────
   // Deriva el XP desde los datos reales (transacciones, pagos, retos, lecciones,
@@ -481,6 +556,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (data.deudas !== undefined) setDeudas(data.deudas);
     if (data.recurrentes !== undefined) setRecurrentes(data.recurrentes);
     if (data.comprasEvitadas !== undefined) setComprasEvitadas(data.comprasEvitadas);
+    if (data.mediosPago !== undefined) setMediosPago(data.mediosPago);
+    if (data.reglasComercio !== undefined) setReglasComercio(data.reglasComercio);
   };
 
   // ─── Core methods ─────────────────────────────────────────────────────────
@@ -650,7 +727,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
-  const addExpense = (amount: number, category: string, date: Date, description?: string, subcategory?: string) => {
+  const addExpense = (
+    amount: number, category: string, date: Date, description?: string, subcategory?: string,
+    extras?: ExtrasTransaccion,
+  ) => {
+    const sub = subcategory ?? extras?.subcategory;
     addTransaction({
       id: Date.now().toString(),
       amount,
@@ -658,7 +739,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       type: 'expense',
       date: date.toISOString(),
       ...(description?.trim() ? { description: description.trim() } : {}),
-      ...(subcategory ? { subcategory } : {}),
+      ...(sub ? { subcategory: sub } : {}),
+      ...(extras?.paymentMethodId ? { paymentMethodId: extras.paymentMethodId } : {}),
+      ...(extras?.source ? { source: extras.source } : {}),
+      ...(extras?.merchant ? { merchant: extras.merchant } : {}),
     });
   };
 
@@ -997,6 +1081,119 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return updated;
     }));
 
+  // ─── Medios de pago (Billetera) ───────────────────────────────────────────
+  const sincronizarMedio = (m: MedioPago, descripcion: string) => {
+    if (!user) return;
+    const uid = user.id;
+    syncQueue.enqueue(descripcion, () => supabaseService.upsertMedioPago(uid, m));
+  };
+
+  const addMedioPago = (m: MedioPago) => {
+    // Un solo predeterminado: si el nuevo lo es, los demás dejan de serlo.
+    const cambios = m.predeterminado ? aplicarPredeterminado(mediosPago, m.id).filter(x => x.id !== m.id) : [];
+    setMediosPago(prev => [
+      ...prev.map(x => cambios.find(c => c.id === x.id) ?? x),
+      m,
+    ]);
+    sincronizarMedio(m, 'agregar medio de pago');
+    cambios.forEach(c => sincronizarMedio(c, 'actualizar medio predeterminado'));
+  };
+
+  const updateMedioPago = (id: string, update: Partial<MedioPago>) => {
+    const actual = mediosPago.find(m => m.id === id);
+    if (!actual) return;
+    const updated = { ...actual, ...update };
+    setMediosPago(prev => prev.map(m => (m.id === id ? updated : m)));
+    sincronizarMedio(updated, 'actualizar medio de pago');
+  };
+
+  const setMedioPredeterminado = (id: string) => {
+    const cambios = aplicarPredeterminado(mediosPago, id);
+    if (cambios.length === 0) return;
+    setMediosPago(prev => prev.map(m => cambios.find(c => c.id === m.id) ?? m));
+    cambios.forEach(c => sincronizarMedio(c, 'actualizar medio predeterminado'));
+  };
+
+  const eliminarMedioPago = (id: string): ResultadoEliminarMedio => {
+    const actual = mediosPago.find(m => m.id === id);
+    const archivar = tieneMovimientos(id, transactions);
+    // Si era el predeterminado, el siguiente activo toma su lugar.
+    const sucesor = actual?.predeterminado
+      ? mediosActivos(mediosPago).find(m => m.id !== id)
+      : undefined;
+
+    setMediosPago(prev => {
+      const resto = archivar
+        ? prev.map(m => (m.id === id ? { ...m, archivado: true, predeterminado: false } : m))
+        : prev.filter(m => m.id !== id);
+      return sucesor ? resto.map(m => (m.id === sucesor.id ? { ...m, predeterminado: true } : m)) : resto;
+    });
+
+    if (user) {
+      const uid = user.id;
+      if (archivar && actual) {
+        sincronizarMedio({ ...actual, archivado: true, predeterminado: false }, 'archivar medio de pago');
+      } else {
+        syncQueue.enqueue('eliminar medio de pago', () => supabaseService.deleteMedioPago(id, uid));
+      }
+      if (sucesor) sincronizarMedio({ ...sucesor, predeterminado: true }, 'actualizar medio predeterminado');
+    }
+    return archivar ? 'archivado' : 'eliminado';
+  };
+
+  // ─── Captura automática ───────────────────────────────────────────────────
+  const aplicarLoteCaptura = (lote: ResultadoLote) => {
+    lote.registrar.forEach(tx => addTransaction(tx));
+    lote.enriquecer.forEach(({ id, update }) => updateTransaction(id, update));
+    setCapturasPendientes(lote.pendientes);
+    if (lote.titulares.length > 0) {
+      setTitularesBanco(prev => [...new Set([...prev, ...lote.titulares])].slice(0, 10));
+    }
+  };
+
+  const guardarRegla = (comercio: string | undefined, cat: { id?: string; name: string }) => {
+    if (!comercio || !cat.id) return;
+    const categoriaId = cat.id;
+    setReglasComercio(prev => {
+      const next = aprenderRegla(prev, comercio, { id: categoriaId, name: cat.name });
+      const regla = next.find(r => !prev.includes(r));
+      if (regla && user) {
+        const uid = user.id;
+        syncQueue.enqueue('aprender categoría de comercio', () => supabaseService.upsertReglaComercio(uid, regla));
+      }
+      return next;
+    });
+  };
+
+  const confirmarCaptura = (pendienteId: string, c: ConfirmacionCaptura) => {
+    const p = capturasPendientes.find(x => x.id === pendienteId);
+    if (!p) return;
+    const tx = construirTransaccion(p.movimiento, {
+      id: `cap_${Date.now()}`,
+      categoria: c.categoria,
+      medioId: c.medioId === undefined ? p.medioId : c.medioId,
+      huella: p.huella,
+      origen: p.origen,
+      ...(c.esIngreso !== undefined ? { esIngreso: c.esIngreso } : {}),
+    });
+    addTransaction(tx);
+    setCapturasPendientes(prev => prev.filter(x => x.id !== pendienteId));
+    // Solo compras y pagos enseñan: una transferencia a una persona no dice
+    // nada sobre la próxima.
+    const m = p.movimiento;
+    if ((m.tipo === 'compra' || m.tipo === 'pago') && !c.esIngreso) guardarRegla(m.comercio, c.categoria);
+  };
+
+  const ignorarCaptura = (pendienteId: string) => {
+    const p = capturasPendientes.find(x => x.id === pendienteId);
+    if (!p) return;
+    setCapturasPendientes(prev => prev.filter(x => x.id !== pendienteId));
+    setHuellasIgnoradas(prev => [p.huella, ...prev.filter(h => h !== p.huella)].slice(0, MAX_HUELLAS_IGNORADAS));
+  };
+
+  const actualizarCaptura = (pendienteId: string, update: Partial<CapturaPendiente>) =>
+    setCapturasPendientes(prev => prev.map(x => (x.id === pendienteId ? { ...x, ...update } : x)));
+
   // ─── Gastos Recurrentes ───────────────────────────────────────────────────
   const addRecurrente = (r: GastoRecurrente) => {
     setRecurrentes(prev => [r, ...prev]);
@@ -1038,6 +1235,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setDeudas([]);
     setRecurrentes([]);
     setComprasEvitadas([]);
+    setMediosPago([]);
+    setCapturasPendientes([]);
+    setReglasComercio([]);
+    setHuellasIgnoradas([]);
+    setTitularesBanco([]);
   };
 
   const resetAll = async (): Promise<{ ok: boolean; error?: string }> => {
@@ -1092,6 +1294,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateRecurrente,
     deleteRecurrente,
     toggleRecurrente,
+    mediosPago,
+    addMedioPago,
+    updateMedioPago,
+    eliminarMedioPago,
+    setMedioPredeterminado,
+    capturasPendientes,
+    reglasComercio,
+    huellasIgnoradas,
+    titularesBanco,
+    aplicarLoteCaptura,
+    confirmarCaptura,
+    ignorarCaptura,
+    actualizarCaptura,
     profile,
     goal,
     userLevel,

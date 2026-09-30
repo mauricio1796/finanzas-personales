@@ -1,6 +1,6 @@
 {
   "name": "finanzas-personales",
-  "main": "expo-router/entry",
+  "main": "index.js",
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
@@ -22,6 +22,7 @@
     "expo-asset": "~57.0.16",
     "expo-audio": "~57.0.4",
     "expo-blur": "~57.0.2",
+    "expo-clipboard": "~57.0.2",
     "expo-constants": "~57.0.17",
     "expo-crypto": "~57.0.3",
     "expo-file-system": "~57.0.6",

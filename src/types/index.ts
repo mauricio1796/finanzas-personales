@@ -45,6 +45,48 @@ export interface Transaction {
   type: 'income' | 'expense';
   description?: string;
   subcategory?: string; // subcategory ID (optional)
+  /** Medio de pago con el que se hizo (MedioPago.id). */
+  paymentMethodId?: string;
+  /** De dónde salió el registro. Sin valor = manual (transacciones antiguas). */
+  source?: OrigenTransaccion;
+  /** Comercio detectado (captura automática o recibo). */
+  merchant?: string;
+  /** Huella de la compra para no registrarla dos veces si llega por varios canales. */
+  dedupeHash?: string;
+}
+
+export type OrigenTransaccion =
+  | 'manual'
+  | 'recibo'
+  | 'notificacion'
+  | 'correo'
+  | 'atajo'
+  | 'texto'
+  | 'open_finance';
+
+// ─── Medios de pago (Billetera) ──────────────────────────────────────────────
+// Nunca se guarda el número completo de la tarjeta, el CVV ni claves: solo
+// alias, franquicia y los últimos 4 dígitos (fuera del alcance de PCI DSS).
+export type TipoMedioPago = 'credito' | 'debito' | 'billetera' | 'cuenta' | 'efectivo';
+export type Franquicia = 'visa' | 'mastercard' | 'amex' | 'diners' | 'otra';
+
+export interface MedioPago {
+  id: string;
+  tipo: TipoMedioPago;
+  /** Id del catálogo de entidades (utils/mediosPago). */
+  entidad: string;
+  alias: string;
+  ultimos4?: string;
+  franquicia?: Franquicia;
+  color: string;
+  /** Solo crédito. */
+  cupo?: number;
+  diaCorte?: number;
+  diaPago?: number;
+  predeterminado: boolean;
+  /** Archivado: ya no se ofrece al registrar, pero el historial lo conserva. */
+  archivado: boolean;
+  creadoEn: string;
 }
 
 // Auth Types

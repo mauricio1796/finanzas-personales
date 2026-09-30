@@ -46,6 +46,7 @@ import { ResumenSemanalCard } from '../../src/components/finanzas/ResumenSemanal
 import { type NotifData } from '../../src/services/NotificacionesService';
 import { useNotificacionesManager } from '../../src/hooks/useNotificacionesManager';
 import { useWidgetSync } from '../../src/hooks/useWidgetSync';
+import { useCapturaAutomatica } from '../../src/hooks/useCapturaAutomatica';
 import * as Notifications from 'expo-notifications';
 import * as Linking from 'expo-linking';
 
@@ -66,6 +67,9 @@ import { AcademiaScreen } from '../../src/screens/AcademiaScreen';
 import { ProyeccionesScreen } from '../../src/screens/ProyeccionesScreen';
 import { MetasScreen } from '../../src/screens/MetasScreen';
 import { DeudasScreen } from '../../src/screens/DeudasScreen';
+import { BilleteraScreen } from '../../src/screens/BilleteraScreen';
+import { CapturaScreen } from '../../src/screens/CapturaScreen';
+import type { ExtrasTransaccion } from '../../src/state/FinanceContext';
 import { RecurrentesScreen } from '../../src/screens/RecurrentesScreen';
 import { Usuario } from '../../src/screens/Usuario';
 import { type ScreenName } from '../../src/screens/Navigation';
@@ -117,6 +121,7 @@ export default function HomeScreen() {
   const {
     setUser, user, isOnboarded, setIsOnboarded, onboardingState, updateOnboardingStep, profile,
     transactions, categories, goal, userLevel, leccionesCompletadas, retosCompletados, retoActivo, premium,
+    metas, deudas, recurrentes, mediosPago,
     addTransaction: ctxAddTransaction, deleteTransaction: ctxDeleteTransaction,
     addCategory,
     isLoading, importServerData, saldoDisponible, limpiarEstadoLocal,
@@ -127,6 +132,10 @@ export default function HomeScreen() {
   // ==================== NOTIFICATIONS ====================
   useNotificacionesManager();
   useWidgetSync();
+  useCapturaAutomatica();
+
+  // navegarA se define más abajo; los enlaces profundos la usan por referencia.
+  const navegarARef = useRef<((screen: string) => void) | null>(null);
 
   // ==================== DEEP LINK (widget tap) ====================
   // Maneja finanzaspersonales://agregar-gasto cuando el usuario toca el widget
@@ -134,11 +143,15 @@ export default function HomeScreen() {
     const handleUrl = ({ url }: { url: string }) => {
       if (url.includes('agregar-gasto')) {
         setQuickAddMode('expense');
+      } else if (url.includes('captura')) {
+        // Aviso de Finn: "detectó un pago… toca para confirmarlo".
+        navegarARef.current?.('captura');
       }
     };
     // URL que abrió la app desde estado cerrado
     Linking.getInitialURL().then(url => {
       if (url && url.includes('agregar-gasto')) setQuickAddMode('expense');
+      else if (url && url.includes('captura')) setTimeout(() => navegarARef.current?.('captura'), 600);
     });
     // URL mientras la app está en background
     const sub = Linking.addEventListener('url', handleUrl);
@@ -355,6 +368,7 @@ export default function HomeScreen() {
       setCurrentScreen(screen as ScreenName);
     }, 'forward');
   }, [currentScreen, ejecutarTransicion]);
+  useEffect(() => { navegarARef.current = navegarA; }, [navegarA]);
 
   const volver = useCallback(() => {
     const prev = navHistory.length > 0 ? navHistory[navHistory.length - 1] : 'dashboard';
@@ -626,6 +640,10 @@ export default function HomeScreen() {
           isOnboarded: true,
           name: nombreLocal,
           monthlySalary: profile?.monthlySalary ?? sbUser.monthlySalary ?? 0,
+          metas,
+          deudas,
+          recurrentes,
+          mediosPago,
         }).catch(() => {});
       } else {
         // ── Usuario completamente nuevo (sin onboarding local) ────────
@@ -742,6 +760,10 @@ export default function HomeScreen() {
           isOnboarded,
           name: resolvedName,
           monthlySalary: profile?.monthlySalary ?? sbUser.monthlySalary ?? 0,
+          metas,
+          deudas,
+          recurrentes,
+          mediosPago,
         });
       } else {
         // ── Fallback local (sin Supabase configurado) ─────────────────────
@@ -812,7 +834,10 @@ export default function HomeScreen() {
   };
 
   // ==================== FINANCE HANDLERS ====================
-  const addTransaction = (amount: number, category: string, type: 'income' | 'expense', date: Date, description?: string) => {
+  const addTransaction = (
+    amount: number, category: string, type: 'income' | 'expense', date: Date, description?: string,
+    extras?: ExtrasTransaccion,
+  ) => {
     // Si es un gasto y la categoría no existe en la lista del usuario, crearla
     if (type === 'expense') {
       const exists = categories.some((c: any) => c.name === category);
@@ -834,14 +859,18 @@ export default function HomeScreen() {
       type,
       date: date.toISOString(),
       ...(description?.trim() ? { description: description.trim() } : {}),
+      ...(extras?.subcategory ? { subcategory: extras.subcategory } : {}),
+      ...(extras?.paymentMethodId ? { paymentMethodId: extras.paymentMethodId } : {}),
+      ...(extras?.source ? { source: extras.source } : {}),
+      ...(extras?.merchant ? { merchant: extras.merchant } : {}),
     });
   };
 
   const addIncome = (amount: number, category: string, date: Date, description?: string) =>
     addTransaction(amount, category, 'income', date, description);
 
-  const addExpense = (amount: number, category: string, date: Date, description?: string) =>
-    addTransaction(amount, category, 'expense', date, description);
+  const addExpense = (amount: number, category: string, date: Date, description?: string, extras?: ExtrasTransaccion) =>
+    addTransaction(amount, category, 'expense', date, description, extras);
 
   const deleteTransaction = (id: string) => ctxDeleteTransaction(id);
 
@@ -1087,6 +1116,7 @@ export default function HomeScreen() {
               onAddExpense={addExpense}
               onDeleteTransaction={deleteTransaction}
               onBack={volver}
+              onNavigate={navegarA}
             />
           )}
           {currentScreen === 'categorias' && <CategoriasScreen onNavigate={navegarA} />}
@@ -1168,6 +1198,12 @@ export default function HomeScreen() {
           {currentScreen === 'metas' && (
             <MetasScreen onBack={volver} onPremiumPress={() => navegarA('premium')} />
           )}
+          {currentScreen === 'billetera' && (
+            <BilleteraScreen onBack={volver} onNavigate={navegarA} />
+          )}
+          {currentScreen === 'captura' && (
+            <CapturaScreen onBack={volver} onNavigate={navegarA} />
+          )}
           {currentScreen === 'deudas' && (
             <DeudasScreen onBack={volver} />
           )}
@@ -1237,8 +1273,8 @@ export default function HomeScreen() {
         visible={quickAddMode !== null}
         mode={quickAddMode ?? 'expense'}
         onClose={() => setQuickAddMode(null)}
-        onAdd={(amount, category, type, date) => {
-          addTransaction(amount, category, type, date);
+        onAdd={(amount, category, type, date, description, extras) => {
+          addTransaction(amount, category, type, date, description, extras);
           setQuickAddMode(null);
         }}
       />

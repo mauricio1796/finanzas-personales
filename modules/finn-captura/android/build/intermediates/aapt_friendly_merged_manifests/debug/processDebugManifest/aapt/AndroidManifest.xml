@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="expo.modules.finncaptura" >
+
+    <uses-sdk android:minSdkVersion="24" />
+
+    <application>
+
+        <!--
+      Lee las notificaciones de las apps que el usuario habilite (SMS, bancos,
+      correo) para registrar compras. Android solo lo activa si el usuario da
+      el acceso en Ajustes › Acceso a notificaciones.
+        -->
+        <service
+            android:name="expo.modules.finncaptura.FinnNotificationListener"
+            android:exported="true"
+            android:label="Finn · registro automático de compras"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" >
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+    </application>
+
+</manifest>

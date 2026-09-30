@@ -43,6 +43,8 @@ export function versionFor(type: ConsentType): string {
     case 'privacy':       return LEGAL_VERSIONS.privacy;
     case 'terms':         return LEGAL_VERSIONS.terms;
     case 'ai_processing': return LEGAL_VERSIONS.ai;
+    // La lectura de notificaciones se describe en la política de tratamiento.
+    case 'capture_notifications': return LEGAL_VERSIONS.privacy;
     default:              return LEGAL_VERSIONS.privacy;
   }
 }
@@ -90,6 +92,11 @@ class ConsentService {
   }
 
   /** ¿El usuario autorizó el procesamiento con IA de terceros? */
+  async hasCaptureConsent(): Promise<boolean> {
+    const s = await this.getLocal();
+    return s.capture_notifications?.granted === true;
+  }
+
   async hasAIConsent(): Promise<boolean> {
     const s = await this.getLocal();
     return s.ai_processing?.granted === true;

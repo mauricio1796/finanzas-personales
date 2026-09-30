@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Transaction, Category, User, FinancialProfile, FinancialGoal, UserLevel, Meta, Deuda, GastoRecurrente, CompraEvitada } from '../../types';
+import type { Transaction, Category, User, FinancialProfile, FinancialGoal, UserLevel, Meta, Deuda, GastoRecurrente, CompraEvitada, MedioPago } from '../../types';
 import type { PremiumState, RetoActivo } from '../../state/FinanceContext';
+import type { CapturaPendiente, ReglaComercio } from '../../utils/capturaMotor';
 
 export interface StorageData {
   transactions: Transaction[];
@@ -30,6 +31,11 @@ class StorageService {
     RECURRENTES: '@financy_recurrentes',
     COMPRAS_EVITADAS: '@financy_compras_evitadas',
     PERMISSIONS_SHOWN: '@financy_permissions_shown',
+    MEDIOS_PAGO: '@financy_medios_pago',
+    CAPTURAS_PENDIENTES: '@financy_capturas_pendientes',
+    REGLAS_COMERCIO: '@financy_reglas_comercio',
+    HUELLAS_IGNORADAS: '@financy_huellas_ignoradas',
+    TITULARES_BANCO: '@financy_titulares_banco',
   };
 
   async saveData(key: string, data: any): Promise<void> {
@@ -107,6 +113,20 @@ class StorageService {
   // Compras evitadas (Simulador): caché local; se sincronizan con la tabla compras_evitadas.
   async saveComprasEvitadas(c: CompraEvitada[]): Promise<void> { return this.saveData(this.KEYS.COMPRAS_EVITADAS, c); }
   async getComprasEvitadas(): Promise<CompraEvitada[] | null> { return this.getData<CompraEvitada[]>(this.KEYS.COMPRAS_EVITADAS); }
+  // Medios de pago (Billetera): caché local; se sincronizan con la tabla payment_methods.
+  async saveMediosPago(m: MedioPago[]): Promise<void> { return this.saveData(this.KEYS.MEDIOS_PAGO, m); }
+  async getMediosPago(): Promise<MedioPago[] | null> { return this.getData<MedioPago[]>(this.KEYS.MEDIOS_PAGO); }
+  // Captura automática: la bandeja y lo descartado viven solo en el dispositivo;
+  // las reglas aprendidas también se sincronizan con merchant_rules.
+  async saveCapturasPendientes(p: CapturaPendiente[]): Promise<void> { return this.saveData(this.KEYS.CAPTURAS_PENDIENTES, p); }
+  async getCapturasPendientes(): Promise<CapturaPendiente[] | null> { return this.getData<CapturaPendiente[]>(this.KEYS.CAPTURAS_PENDIENTES); }
+  async saveReglasComercio(r: ReglaComercio[]): Promise<void> { return this.saveData(this.KEYS.REGLAS_COMERCIO, r); }
+  async getReglasComercio(): Promise<ReglaComercio[] | null> { return this.getData<ReglaComercio[]>(this.KEYS.REGLAS_COMERCIO); }
+  async saveHuellasIgnoradas(h: string[]): Promise<void> { return this.saveData(this.KEYS.HUELLAS_IGNORADAS, h); }
+  async getHuellasIgnoradas(): Promise<string[] | null> { return this.getData<string[]>(this.KEYS.HUELLAS_IGNORADAS); }
+  // Nombre del titular según los avisos del banco (para reconocer envíos a sus propias cuentas).
+  async saveTitularesBanco(t: string[]): Promise<void> { return this.saveData(this.KEYS.TITULARES_BANCO, t); }
+  async getTitularesBanco(): Promise<string[] | null> { return this.getData<string[]>(this.KEYS.TITULARES_BANCO); }
 
   // Generic string key/value helpers (usados por features livianas: tips, gamificación local)
   async getValue(key: string): Promise<string | null> {

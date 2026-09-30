@@ -1,7 +1,8 @@
 import { supabase, isSupabaseReady } from '../../lib/supabase';
 import { getNivelActual } from '../GamificacionService';
-import type { Transaction, Category, FinancialProfile, FinancialGoal, UserLevel, Meta, Deuda, GastoRecurrente, CompraEvitada } from '../../types';
+import type { Transaction, Category, FinancialProfile, FinancialGoal, UserLevel, Meta, Deuda, GastoRecurrente, CompraEvitada, MedioPago } from '../../types';
 import type { PremiumState, RetoActivo } from '../../state/FinanceContext';
+import type { ReglaComercio } from '../../utils/capturaMotor';
 
 // ─── Tipos públicos ───────────────────────────────────────────────────────────
 export interface ServerData {
@@ -22,6 +23,8 @@ export interface ServerData {
   deudas: Deuda[];
   recurrentes: GastoRecurrente[];
   comprasEvitadas: CompraEvitada[];
+  mediosPago: MedioPago[];
+  reglasComercio: ReglaComercio[];
 }
 
 export interface TransactionPage {
@@ -77,6 +80,30 @@ function rowToTransaction(r: Record<string, any>): Transaction {
     ...(r.description ? { description: r.description as string } : {}),
     ...(r.subcategory ? { subcategory: r.subcategory as string } : {}),
     ...(r.category_id ? { categoryId: r.category_id as string } : {}),
+    ...(r.payment_method_id ? { paymentMethodId: r.payment_method_id as string } : {}),
+    ...(r.source ? { source: r.source as Transaction['source'] } : {}),
+    ...(r.merchant ? { merchant: r.merchant as string } : {}),
+    ...(r.dedupe_hash ? { dedupeHash: r.dedupe_hash as string } : {}),
+  };
+}
+
+const TX_COLUMNS = 'id, amount, category, category_id, date, type, description, subcategory, payment_method_id, source, merchant, dedupe_hash';
+
+function rowToMedioPago(r: Record<string, any>): MedioPago {
+  return {
+    id: r.id as string,
+    tipo: r.tipo as MedioPago['tipo'],
+    entidad: r.entidad as string,
+    alias: r.alias as string,
+    ...(r.ultimos4 ? { ultimos4: r.ultimos4 as string } : {}),
+    ...(r.franquicia ? { franquicia: r.franquicia as MedioPago['franquicia'] } : {}),
+    color: r.color as string,
+    ...(r.cupo != null ? { cupo: Number(r.cupo) } : {}),
+    ...(r.dia_corte != null ? { diaCorte: r.dia_corte as number } : {}),
+    ...(r.dia_pago != null ? { diaPago: r.dia_pago as number } : {}),
+    predeterminado: !!r.predeterminado,
+    archivado: !!r.archivado,
+    creadoEn: r.creado_en as string,
   };
 }
 
@@ -173,6 +200,12 @@ class SupabaseService {
       p_updated_at:   new Date().toISOString(),
       p_subcategory:  tx.subcategory?.substring(0, 200) ?? null,
       p_category_id:  tx.categoryId?.substring(0, 200) ?? null,
+      // Siempre se envía `p_source`: así el servidor sabe que esta versión
+      // conoce el medio de pago y puede quitarlo si el usuario lo quitó.
+      p_payment_method_id: tx.paymentMethodId?.substring(0, 64) ?? null,
+      p_source:            tx.source ?? 'manual',
+      p_merchant:          tx.merchant?.substring(0, 120) ?? null,
+      p_dedupe_hash:       tx.dedupeHash?.substring(0, 128) ?? null,
     });
     if (error) throw error;
   }
@@ -195,7 +228,7 @@ class SupabaseService {
 
     let query = db
       .from('transactions')
-      .select('id, amount, category, category_id, date, type, description, subcategory, updated_at')
+      .select(`${TX_COLUMNS}, updated_at`)
       .eq('user_id', userId)
       .is('deleted_at', null)   // excluye soft-deleted
       .order('date', { ascending: false })
@@ -224,7 +257,7 @@ class SupabaseService {
     if (!db) return null;
     const { data, error } = await db
       .from('transactions')
-      .select('id, amount, category, category_id, date, type, description, subcategory')
+      .select(TX_COLUMNS)
       .eq('user_id', userId)
       .is('deleted_at', null)
       .order('date', { ascending: false });
@@ -248,6 +281,12 @@ class SupabaseService {
         date: tx.date,
         type: tx.type,
         description: tx.description?.substring(0, 500) ?? null,
+        subcategory: tx.subcategory?.substring(0, 200) ?? null,
+        category_id: tx.categoryId?.substring(0, 200) ?? null,
+        payment_method_id: tx.paymentMethodId?.substring(0, 64) ?? null,
+        source: tx.source ?? 'manual',
+        merchant: tx.merchant?.substring(0, 120) ?? null,
+        dedupe_hash: tx.dedupeHash?.substring(0, 128) ?? null,
         updated_at: new Date().toISOString(),
       }))
     );
@@ -586,6 +625,94 @@ class SupabaseService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // MEDIOS DE PAGO (Billetera)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async getMediosPago(userId: string): Promise<MedioPago[] | null> {
+    const db = this.db;
+    if (!db) return null;
+    const { data, error } = await db
+      .from('payment_methods')
+      .select('id, tipo, entidad, alias, ultimos4, franquicia, color, cupo, dia_corte, dia_pago, predeterminado, archivado, creado_en')
+      .eq('user_id', userId)
+      .order('creado_en', { ascending: true });
+    if (error || !data) return null;
+    return (data as any[]).map(rowToMedioPago);
+  }
+
+  async upsertMedioPago(userId: string, m: MedioPago): Promise<void> {
+    const db = this.db;
+    if (!db) return;
+    const { error } = await db.from('payment_methods').upsert(
+      {
+        user_id: userId,
+        id: m.id.substring(0, 64),
+        tipo: m.tipo,
+        entidad: m.entidad.substring(0, 40),
+        alias: m.alias.substring(0, 40),
+        ultimos4: m.ultimos4 ?? null,
+        franquicia: m.franquicia ?? null,
+        color: m.color,
+        cupo: m.cupo ?? null,
+        dia_corte: m.diaCorte ?? null,
+        dia_pago: m.diaPago ?? null,
+        predeterminado: m.predeterminado,
+        archivado: m.archivado,
+        creado_en: m.creadoEn,
+        actualizado_en: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,id' },
+    );
+    if (error) throw error;
+  }
+
+  async deleteMedioPago(id: string, userId: string): Promise<void> {
+    const db = this.db;
+    if (!db) return;
+    const { error } = await db.from('payment_methods').delete().eq('user_id', userId).eq('id', id);
+    if (error) throw error;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REGLAS DE COMERCIO (captura automática)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async getReglasComercio(userId: string): Promise<ReglaComercio[] | null> {
+    const db = this.db;
+    if (!db) return null;
+    const { data, error } = await db
+      .from('merchant_rules')
+      .select('clave, category_id, category_name, usos, actualizada_en')
+      .eq('user_id', userId)
+      .limit(2000);
+    if (error || !data) return null;
+    return (data as any[]).map(r => ({
+      clave: r.clave,
+      categoryId: r.category_id,
+      categoryName: r.category_name,
+      usos: r.usos ?? 1,
+      actualizadaEn: r.actualizada_en,
+    }));
+  }
+
+  async upsertReglaComercio(userId: string, r: ReglaComercio): Promise<void> {
+    const db = this.db;
+    if (!db) return;
+    const { error } = await db.from('merchant_rules').upsert(
+      {
+        user_id: userId,
+        clave: r.clave.substring(0, 120),
+        category_id: r.categoryId.substring(0, 200),
+        category_name: r.categoryName.substring(0, 100),
+        usos: Math.max(1, r.usos),
+        actualizada_en: r.actualizadaEn,
+      },
+      { onConflict: 'user_id,clave' },
+    );
+    if (error) throw error;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // DEUDAS
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -719,7 +846,7 @@ class SupabaseService {
   async pullFromServer(userId: string): Promise<ServerData | null> {
     if (!this.db) return null;
     try {
-      const [transactions, categories, profile, goal, userLevel, userData, metas, deudas, recurrentes, comprasEvitadas] = await Promise.all([
+      const [transactions, categories, profile, goal, userLevel, userData, metas, deudas, recurrentes, comprasEvitadas, mediosPago, reglasComercio] = await Promise.all([
         this.getAllTransactions(userId),
         this.getCategories(userId),
         this.getFinancialProfile(userId),
@@ -730,6 +857,8 @@ class SupabaseService {
         this.getDeudas(userId),
         this.getRecurrentes(userId),
         this.getComprasEvitadas(userId),
+        this.getMediosPago(userId),
+        this.getReglasComercio(userId),
       ]);
 
       if (!transactions && !categories && !profile && !userData) return null;
@@ -752,6 +881,8 @@ class SupabaseService {
         deudas: deudas ?? [],
         recurrentes: recurrentes ?? [],
         comprasEvitadas: comprasEvitadas ?? [],
+        mediosPago: mediosPago ?? [],
+        reglasComercio: reglasComercio ?? [],
       };
     } catch (e) {
       console.warn('[SupabaseService] pullFromServer error:', e);
@@ -780,6 +911,7 @@ class SupabaseService {
     metas?: Meta[];
     deudas?: Deuda[];
     recurrentes?: GastoRecurrente[];
+    mediosPago?: MedioPago[];
   }): Promise<void> {
     if (!this.db) return;
     try {
@@ -800,6 +932,7 @@ class SupabaseService {
         ...(data.metas ?? []).map(m => this.upsertMeta(userId, m)),
         ...(data.deudas ?? []).map(d => this.upsertDeuda(userId, d)),
         ...(data.recurrentes ?? []).map(r => this.upsertRecurrente(userId, r)),
+        ...(data.mediosPago ?? []).map(m => this.upsertMedioPago(userId, m)),
       ]);
     } catch (e) {
       console.warn('[SupabaseService] pushAllToServer error:', e);

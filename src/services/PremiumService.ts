@@ -59,6 +59,7 @@ export const FEATURES_GRATIS = [
 
 export const FEATURES_PREMIUM = [
   'Academia completa (8+ lecciones)',
+  'Registro automático de compras desde SMS y correos del banco',
   'Proyecciones y simulador financiero',
   'AI Insights ilimitados y personalizados',
   'Analisis de anomalias avanzado',

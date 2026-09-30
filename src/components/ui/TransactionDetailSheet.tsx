@@ -7,7 +7,19 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../state/ThemeContext';
 import { THEME } from '../../constants/theme';
 import { getCategoryIcon, Icon } from './Icon';
-import { type Transaction } from '../../types';
+import { type Transaction, type OrigenTransaccion } from '../../types';
+import { useFinance } from '../../state';
+import { entidadPorId, etiquetaMedio } from '../../utils/mediosPago';
+
+const ORIGEN_LABEL: Record<OrigenTransaccion, string> = {
+  manual:       'Registrado por ti',
+  recibo:       'Recibo escaneado',
+  notificacion: 'Detectado de una notificación',
+  correo:       'Detectado de un correo del banco',
+  atajo:        'Detectado con Apple Pay',
+  texto:        'Detectado de un mensaje del banco',
+  open_finance: 'Sincronizado con tu banco',
+};
 
 interface Props {
   transaction: Transaction | null;
@@ -23,8 +35,19 @@ const MESES = [
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
 ];
 
+const Row: React.FC<{ label: string; value: string; valueColor?: string }> = ({ label, value, valueColor }) => {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.row, { borderBottomColor: colors.border }]}>
+      <Text style={[styles.rowLabel, { color: colors.textTertiary }]}>{label}</Text>
+      <Text style={[styles.rowValue, { color: valueColor ?? colors.textPrimary }]}>{value}</Text>
+    </View>
+  );
+};
+
 export const TransactionDetailSheet: React.FC<Props> = ({ transaction, onClose }) => {
   const { colors } = useTheme();
+  const { mediosPago } = useFinance();
   const slideAnim  = useRef(new Animated.Value(500)).current;
   const backdropOp = useRef(new Animated.Value(0)).current;
 
@@ -56,13 +79,10 @@ export const TransactionDetailSheet: React.FC<Props> = ({ transaction, onClose }
   const año       = date.getFullYear();
   const hora      = date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
   const catIcon   = getCategoryIcon(transaction.category);
+  const medio     = transaction.paymentMethodId
+    ? mediosPago.find(m => m.id === transaction.paymentMethodId)
+    : undefined;
 
-  const Row = ({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) => (
-    <View style={[styles.row, { borderBottomColor: colors.border }]}>
-      <Text style={[styles.rowLabel, { color: colors.textTertiary }]}>{label}</Text>
-      <Text style={[styles.rowValue, { color: valueColor ?? colors.textPrimary }]}>{value}</Text>
-    </View>
-  );
 
   return (
     <Modal transparent animationType="none" visible={visible} onRequestClose={onClose}>
@@ -106,6 +126,25 @@ export const TransactionDetailSheet: React.FC<Props> = ({ transaction, onClose }
           <Row label="Hora"       value={hora} />
           {transaction.description && transaction.description !== transaction.category && (
             <Row label="Descripción" value={transaction.description} />
+          )}
+          {transaction.paymentMethodId && (
+            <View style={[styles.row, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.rowLabel, { color: colors.textTertiary }]}>Medio de pago</Text>
+              {medio ? (
+                <View style={styles.medioValue}>
+                  <View style={[styles.medioDot, { backgroundColor: entidadPorId(medio.entidad).color }]} />
+                  <Text style={[styles.rowValue, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {etiquetaMedio(medio)}{medio.archivado ? ' (archivado)' : ''}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.rowValue, { color: colors.textTertiary }]}>Medio eliminado</Text>
+              )}
+            </View>
+          )}
+          {transaction.merchant && <Row label="Comercio" value={transaction.merchant} />}
+          {transaction.source && transaction.source !== 'manual' && (
+            <Row label="Origen" value={ORIGEN_LABEL[transaction.source] ?? transaction.source} />
           )}
           <Row label="Tipo"       value={isIncome ? 'Ingreso' : 'Gasto'} valueColor={accent} />
           <Row label="Monto"      value={fmtCOP(transaction.amount)} valueColor={accent} />
@@ -204,6 +243,12 @@ const styles = StyleSheet.create({
   },
   rowValue: {
     fontSize: 13, fontWeight: '600', maxWidth: '60%', textAlign: 'right',
+  },
+  medioValue: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '60%',
+  },
+  medioDot: {
+    width: 10, height: 10, borderRadius: 5,
   },
 
   // Close button

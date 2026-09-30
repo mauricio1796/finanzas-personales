@@ -18,6 +18,9 @@ import { Icon, getCategoryIcon } from './Icon';
 import { useTheme } from '../../state/ThemeContext';
 import { THEME } from '../../constants/theme';
 import { verificarGastoInusual } from '../../services/NotificacionesService';
+import { MedioPagoSelector } from '../finanzas/MedioPagoSelector';
+import { medioPredeterminado } from '../../utils/mediosPago';
+import type { ExtrasTransaccion } from '../../state/FinanceContext';
 import { type Transaction } from '../../types';
 
 // ─── Quick categories ──────────────────────────────────────────────────
@@ -51,13 +54,13 @@ interface QuickAddSheetProps {
   visible:      boolean;
   mode:         'income' | 'expense';
   onClose:      () => void;
-  onAdd:        (amount: number, category: string, type: 'income' | 'expense', date: Date, description?: string) => void;
+  onAdd:        (amount: number, category: string, type: 'income' | 'expense', date: Date, description?: string, extras?: ExtrasTransaccion) => void;
   initialData?: QuickAddInitialData;
 }
 
 export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onClose, onAdd, initialData }) => {
   const { colors } = useTheme();
-  const { categories, transactions } = useFinance();
+  const { categories, transactions, mediosPago } = useFinance();
   const slideAnim  = useRef(new Animated.Value(400)).current;
   const backdropOp = useRef(new Animated.Value(0)).current;
 
@@ -65,6 +68,7 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   const [amountFocused, setAmountFocused] = useState(false);
+  const [medioId, setMedioId] = useState<string | null>(null);
 
   const isIncome = mode === 'income';
   const accent   = isIncome ? colors.income : colors.expense;
@@ -102,6 +106,7 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
         ? cats.find(c => c.label.toLowerCase() === initialData.category!.toLowerCase())?.id ?? null
         : null;
       setSelectedCat(pidioCategoria ? matchedCat : (cats[0]?.id ?? null));
+      setMedioId(medioPredeterminado(mediosPago)?.id ?? null);
       Animated.parallel([
         Animated.spring(slideAnim, { toValue: 0, friction: 8, tension: 65, useNativeDriver: true }),
         Animated.timing(backdropOp, { toValue: 1, duration: 200, useNativeDriver: true }),
@@ -124,7 +129,10 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
     if (!parsed || parsed <= 0 || !selectedCat) return;
 
     const fecha = new Date();
-    onAdd(parsed, selectedCat, mode, fecha, description.trim() || undefined);
+    const extras: ExtrasTransaccion | undefined = mode === 'expense'
+      ? { source: 'manual', ...(medioId ? { paymentMethodId: medioId } : {}) }
+      : undefined;
+    onAdd(parsed, selectedCat, mode, fecha, description.trim() || undefined, extras);
 
     // Verificar gasto inusual de forma asíncrona (no bloquea la UI)
     if (mode === 'expense') {
@@ -218,6 +226,13 @@ export const QuickAddSheet: React.FC<QuickAddSheetProps> = ({ visible, mode, onC
               );
             })}
           </ScrollView>
+
+          {/* Medio de pago (solo gastos; se oculta si aún no tiene medios) */}
+          {!isIncome && (
+            <View style={{ marginBottom: 16 }}>
+              <MedioPagoSelector value={medioId} onChange={setMedioId} accent={accent} />
+            </View>
+          )}
 
           {/* Description input (opcional) */}
           <TextInput

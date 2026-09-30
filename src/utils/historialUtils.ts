@@ -14,6 +14,8 @@ export interface FiltrosActivos {
   periodo:   FiltroPeriodo;
   categoria: string | null;
   busqueda:  string;
+  /** MedioPago.id; null/ausente = todos los medios. */
+  medio?:    string | null;
 }
 
 export interface TransaccionAgrupada {
@@ -110,11 +112,16 @@ export function filtrarTransacciones(
     result = result.filter(t => t.category === filtros.categoria);
   }
 
+  if (filtros.medio) {
+    result = result.filter(t => t.paymentMethodId === filtros.medio);
+  }
+
   if (filtros.busqueda.trim()) {
     const q = filtros.busqueda.toLowerCase();
     result = result.filter(t =>
       t.category.toLowerCase().includes(q) ||
       (t.description?.toLowerCase() ?? '').includes(q) ||
+      (t.merchant?.toLowerCase() ?? '').includes(q) ||
       String(Math.round(t.amount)).includes(q),
     );
   }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   StyleSheet, TextInput, Pressable, View, Text,
   ScrollView, Platform, Modal, TouchableOpacity,
@@ -17,6 +17,9 @@ import { useTheme } from '@/src/state/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getBgIconoCategoria, getIconoCategoria } from '@/src/utils/categoryUtils';
 import { encontrarCategoriaDeTx } from '@/src/utils/categoryResolver';
+import { MedioPagoSelector } from '@/src/components/finanzas/MedioPagoSelector';
+import { etiquetaMedio, medioPredeterminado } from '@/src/utils/mediosPago';
+import type { ExtrasTransaccion } from '@/src/state/FinanceContext';
 
 const parseCOP  = (s: string) => parseInt(s.replace(/\./g, '').replace(/[^0-9]/g, ''), 10);
 const fmtCOP    = (n: number) => '$' + Math.round(n).toLocaleString('es-CO').replace(/,/g, '.');
@@ -38,16 +41,17 @@ const TIPS = [
 // ── Props ─────────────────────────────────────────────────────────────────────
 interface GastosProps {
   transactions: Transaction[];
-  onAddExpense: (amount: number, category: string, date: Date, description?: string) => void;
+  onAddExpense: (amount: number, category: string, date: Date, description?: string, extras?: ExtrasTransaccion) => void;
   onDeleteTransaction: (id: string) => void;
   onBack?: () => void;
+  onNavigate?: (screen: string) => void;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack }: GastosProps) {
+export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack, onNavigate }: GastosProps) {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const { categories } = useFinance();
+  const { categories, mediosPago } = useFinance();
 
   // Only top-level expense categories
   const topCats = useMemo(
@@ -66,6 +70,18 @@ export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack
   const [tipIdx]                          = useState(() => Math.floor(Math.random() * TIPS.length));
   const [subModalOpen,  setSubModalOpen]  = useState(false);
   const [scanModalOpen, setScanModalOpen] = useState(false);
+  // Medio de pago: arranca en el predeterminado; el usuario puede cambiarlo o quitarlo.
+  const [selMedioId, setSelMedioId] = useState<string | null>(() => medioPredeterminado(mediosPago)?.id ?? null);
+  const medioElegido = useRef(false);
+  useEffect(() => {
+    // Si los medios cargan después (hidratación) o cambia el predeterminado,
+    // se sigue al predeterminado mientras el usuario no haya elegido otro.
+    // Si el elegido se archivó o eliminó, se vuelve al predeterminado.
+    const elegidoSigueActivo = selMedioId !== null && mediosPago.some(m => m.id === selMedioId && !m.archivado);
+    if (medioElegido.current && (selMedioId === null || elegidoSigueActivo)) return;
+    medioElegido.current = false;
+    setSelMedioId(medioPredeterminado(mediosPago)?.id ?? null);
+  }, [mediosPago]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Derived ───────────────────────────────────────────────────────────────
   // ── Historial: tarjetas desplegables + confirmación tranquila ────────────
@@ -133,8 +149,11 @@ export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack
     if (!selCat) { setError('Selecciona una categoría'); return; }
     if (subcats.length > 0 && !selSubId) { setError('Selecciona una subcategoría'); return; }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    const addFn = onAddExpense as any;
-    addFn(n, selCat.name, new Date(), description || undefined, selSubId ?? undefined);
+    onAddExpense(n, selCat.name, new Date(), description || undefined, {
+      ...(selSubId ? { subcategory: selSubId } : {}),
+      ...(selMedioId ? { paymentMethodId: selMedioId } : {}),
+      source: 'manual',
+    });
     setAmount('');
     setDescription('');
     setSelSubId(null);
@@ -327,6 +346,16 @@ export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack
             </Pressable>
           </Modal>
 
+          {/* Medio de pago */}
+          <View style={{ marginTop: 18 }}>
+            <MedioPagoSelector
+              value={selMedioId}
+              onChange={id => { medioElegido.current = true; setSelMedioId(id); }}
+              accent="#EF4444"
+              onAgregar={onNavigate ? () => onNavigate('billetera') : undefined}
+            />
+          </View>
+
           {/* Description */}
           <Text style={[s.fieldLabel, { color: colors.textTertiary, marginTop: 18 }]}>NOTA (opcional)</Text>
           <TextInput
@@ -412,11 +441,12 @@ export function Gastos({ transactions, onAddExpense, onDeleteTransaction, onBack
               const { bg: iconBg, color: iconColor } = getBgIconoCategoria(catName, isDark);
               const iconName = (cat?.icon as string) || getIconoCategoria(catName);
               const fecha = new Date(item.date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' });
+              const medio = item.paymentMethodId ? mediosPago.find(m => m.id === item.paymentMethodId) : undefined;
               return (
                 <TransactionCard
                   key={item.id}
                   title={item.description || catName}
-                  meta={[sub ? `${catName} · ${sub.name}` : catName, fecha]}
+                  meta={[sub ? `${catName} · ${sub.name}` : catName, ...(medio ? [etiquetaMedio(medio)] : []), fecha]}
                   amountLabel={`-${fmtCOP(item.amount)}`}
                   amountColor={colors.expense}
                   iconName={iconName as any}

@@ -85,6 +85,7 @@ export const ReceiptScanScreen: React.FC<Props> = ({ onGastoRegistrado, onCancel
         data.fecha,
         data.descripcion || data.comercio || undefined,
         data.subcategoria,
+        { source: 'recibo', ...(data.comercio ? { merchant: data.comercio.substring(0, 120) } : {}) },
       );
       setEstado('exito');
       setTimeout(onGastoRegistrado, 800);

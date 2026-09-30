@@ -69,7 +69,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
   const {
     user, transactions, categories, profile, goal, userLevel,
     addTransaction: ctxAdd, deleteTransaction: ctxDelete, addCategory,
-    metas, deudas, premium,
+    metas, deudas, premium, capturasPendientes,
   } = useFinance();
 
   // ── Date constants ──────────────────────────────────────────────────────────
@@ -746,6 +746,36 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
           ))}
         </View>
 
+        {/* ── Captura automática: movimientos por confirmar ────────────── */}
+        {capturasPendientes.length > 0 && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => onNavigate('captura')}
+            testID="feed-capturas-pendientes"
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 12,
+              backgroundColor: colors.aiLight, borderRadius: 18,
+              padding: 14, marginBottom: 16,
+            }}
+          >
+            <View style={{
+              width: 38, height: 38, borderRadius: 12, backgroundColor: colors.ai,
+              alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <Icon name="inbox" size={18} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13.5, fontWeight: '700', color: colors.textPrimary }}>
+                Finn detectó {capturasPendientes.length} movimiento{capturasPendientes.length > 1 ? 's' : ''} por confirmar
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                Elige la categoría o descártalos en un toque
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={16} color={colors.ai} />
+          </TouchableOpacity>
+        )}
+
         {/* ── Evidencia de ahorro: cuánto más ahorras con Finn ───────── */}
         <AhorroEvidenciaCard onOpenBot={onOpenBot} />
 
@@ -1314,7 +1344,7 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
         visible={quickAddVisible}
         mode={quickAddInitial?.type ?? quickAddType}
         onClose={() => { setQuickAddVisible(false); setQuickAddInitial(undefined); }}
-        onAdd={(amount, category, type, date, description) => {
+        onAdd={(amount, category, type, date, description, extras) => {
           ctxAdd({
             id: Date.now().toString(),
             amount,
@@ -1322,6 +1352,8 @@ export const FinancialFeed: React.FC<FinancialFeedProps> = ({ onNavigate, onOpen
             type,
             date: date.toISOString(),
             ...(description ? { description } : {}),
+            ...(extras?.paymentMethodId ? { paymentMethodId: extras.paymentMethodId } : {}),
+            ...(extras?.source ? { source: extras.source } : {}),
           });
           setQuickAddVisible(false);
           setQuickAddInitial(undefined);

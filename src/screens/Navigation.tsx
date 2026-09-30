@@ -9,7 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { THEME } from '../constants/theme';
 
-export type ScreenName = 'dashboard' | 'ingresos' | 'gastos' | 'categorias' | 'estadisticas' | 'bot' | 'perfil' | 'explorar' | 'historial' | 'resumenSemanal' | 'gamificacion' | 'configuracion' | 'personalizacion' | 'retos' | 'calendario' | 'academia' | 'proyecciones' | 'resumenMensual' | 'simulador' | 'exportar' | 'widget' | 'metas' | 'deudas' | 'recurrentes' | 'compartido' | 'escanear' | 'alertas-preferencias' | 'premium'
+export type ScreenName = 'dashboard' | 'ingresos' | 'gastos' | 'categorias' | 'estadisticas' | 'bot' | 'perfil' | 'explorar' | 'historial' | 'resumenSemanal' | 'gamificacion' | 'configuracion' | 'personalizacion' | 'retos' | 'calendario' | 'academia' | 'proyecciones' | 'resumenMensual' | 'simulador' | 'exportar' | 'widget' | 'metas' | 'deudas' | 'recurrentes' | 'billetera' | 'captura' | 'compartido' | 'escanear' | 'alertas-preferencias' | 'premium'
   | 'privacidad' | 'eliminar-cuenta'
   | 'legal-privacidad' | 'legal-terminos' | 'legal-ia' | 'legal-cookies' | 'legal-derechos' | 'legal-eliminacion';
 

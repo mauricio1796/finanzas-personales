@@ -2,7 +2,9 @@
  * Reglas puras de consentimiento (sin dependencias de React Native, testeables
  * con `node --test`). Ver services/ConsentService.ts.
  */
-export type ConsentType = 'privacy' | 'terms' | 'age_confirmation' | 'ai_processing' | 'marketing';
+export type ConsentType = 'privacy' | 'terms' | 'age_confirmation' | 'ai_processing' | 'marketing'
+  /** Leer notificaciones del banco para registrar compras (captura automática, Android). */
+  | 'capture_notifications';
 
 export interface ConsentRecord {
   granted: boolean;
