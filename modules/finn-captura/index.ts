@@ -1,5 +1,5 @@
 import { requireOptionalNativeModule } from 'expo';
-import { Platform } from 'react-native';
+import { PermissionsAndroid, Platform } from 'react-native';
 
 /**
  * Captura automática desde las notificaciones del banco (solo Android).
@@ -75,6 +75,26 @@ export function confirmarProcesadas(ids: string[]): void {
 
 export function mostrarAviso(titulo: string, cuerpo: string): void {
   try { Nativo?.mostrarAviso(titulo, cuerpo); } catch { /* sin permiso de notificaciones */ }
+}
+
+/**
+ * SMS directos (RECEIVE_SMS): desde Android 15 el texto de muchas
+ * notificaciones de SMS llega oculto, así que los SMS del banco se reciben
+ * aparte. Solo SMS nuevos: Finn no lee la bandeja de mensajes.
+ */
+export async function tienePermisoSms(): Promise<boolean> {
+  if (!Nativo) return false;
+  try { return await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECEIVE_SMS); } catch { return false; }
+}
+
+export async function pedirPermisoSms(): Promise<boolean> {
+  if (!Nativo) return false;
+  try {
+    const r = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECEIVE_SMS);
+    return r === PermissionsAndroid.RESULTS.GRANTED;
+  } catch {
+    return false;
+  }
 }
 
 /** Se llama cuando llega una notificación financiera con la app viva. */
